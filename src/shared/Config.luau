@@ -54,6 +54,14 @@ Config.Buffs = {
 	PetBoost = 0.9                       -- 10% faster when pet is nearby (90% of normal time)
 }
 
+-- Economy configuration
+-- Settings for currency and economic systems
+Config.Economy = {
+	CurrencyName = "Coins",              -- Name displayed in leaderstats
+	StartingCoins = 100,                 -- Coins given to new players
+	EnablePersistence = true             -- Whether to save/load player data
+}
+
 -- VFX particle configuration
 -- Settings for visual effects system (currently uses fallback sparkles if particles don't exist)
 Config.VFX = {

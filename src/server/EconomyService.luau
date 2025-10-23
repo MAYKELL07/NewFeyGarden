@@ -1,14 +1,16 @@
 -- EconomyService.luau
--- Manages player currency, inventory, and transactions
+-- Manages player currency, inventory, and transactions with persistent storage
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local DataStoreService = game:GetService("DataStoreService")
+local ServerScriptService = game:GetService("ServerScriptService")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
+local Config = require(ReplicatedStorage.Shared.Config)
+local DataService = require(ServerScriptService.Server.Persistence.DataService)
 
 local EconomyService = {}
-EconomyService.PlayerData = {}
+EconomyService.PlayerData = {} -- Legacy cache, now backed by DataService
 
 -- Create RemoteEvents
 local buySeedEvent = Instance.new("RemoteEvent")
@@ -27,107 +29,126 @@ local updateInventoryEvent = Instance.new("RemoteEvent")
 updateInventoryEvent.Name = Constants.EVENTS.UPDATE_INVENTORY
 updateInventoryEvent.Parent = ReplicatedStorage
 
--- Initialize player data
+-- Initialize player data (now loads from DataService)
 function EconomyService.InitializePlayerData(player)
+	-- Wait for DataService to load profile
+	task.wait(0.3)
+	
+	local profile = DataService.GetProfile(player.UserId)
+	if not profile then
+		warn("EconomyService: No profile loaded for", player.Name)
+		return
+	end
+	
+	-- Create legacy cache reference for compatibility
 	EconomyService.PlayerData[player.UserId] = {
-		Coins = Constants.STARTING_COINS,
-		Inventory = {
-			Seeds = {
-				[Constants.PLANT_TYPES.GLOWBUD] = 2,
-				[Constants.PLANT_TYPES.DEWLEAF] = 3
-			},
-			Pets = {}
-		}
+		Coins = profile.Coins,
+		Inventory = profile.Inventory
 	}
 	
-	print("Initialized data for", player.Name)
+	-- Give starting items if new player
+	if profile.Coins == 0 then
+		DataService.AddCoins(player.UserId, Config.Economy.StartingCoins or Constants.STARTING_COINS)
+		DataService.AddSeed(player.UserId, Constants.PLANT_TYPES.GLOWBUD, 2)
+		DataService.AddSeed(player.UserId, Constants.PLANT_TYPES.DEWLEAF, 3)
+		
+		-- Update cache
+		EconomyService.PlayerData[player.UserId].Coins = Config.Economy.StartingCoins or Constants.STARTING_COINS
+	end
+	
+	print("EconomyService: Initialized data for", player.Name, "- Coins:", profile.Coins)
 	EconomyService.SyncPlayerData(player)
 end
 
 -- Sync player data to client
 function EconomyService.SyncPlayerData(player)
-	local data = EconomyService.PlayerData[player.UserId]
-	if not data then return end
+	local profile = DataService.GetProfile(player.UserId)
+	if not profile then return end
+	
+	-- Update cache
+	EconomyService.PlayerData[player.UserId] = {
+		Coins = profile.Coins,
+		Inventory = profile.Inventory
+	}
 	
 	-- Update currency
-	updateCurrencyEvent:FireClient(player, data.Coins, true)
+	updateCurrencyEvent:FireClient(player, profile.Coins, true)
 	
 	-- Update inventory
-	updateInventoryEvent:FireClient(player, data.Inventory)
+	updateInventoryEvent:FireClient(player, profile.Inventory)
 end
 
 -- Add coins to player
 function EconomyService.AddCoins(player, amount)
-	local data = EconomyService.PlayerData[player.UserId]
-	if not data then return false end
+	local success = DataService.AddCoins(player.UserId, amount)
+	if not success then return false end
 	
-	data.Coins = data.Coins + amount
+	-- Update cache
+	local profile = DataService.GetProfile(player.UserId)
+	if profile then
+		EconomyService.PlayerData[player.UserId].Coins = profile.Coins
+	end
+	
 	updateCurrencyEvent:FireClient(player, amount, false)
-	
-	print(player.Name .. " earned " .. amount .. " coins")
+	print(player.Name .. " earned " .. amount .. " coins (Total:", profile.Coins, ")")
 	return true
 end
 
 -- Remove coins from player
 function EconomyService.RemoveCoins(player, amount)
-	local data = EconomyService.PlayerData[player.UserId]
-	if not data then return false end
+	local success = DataService.RemoveCoins(player.UserId, amount)
+	if not success then return false end
 	
-	if data.Coins < amount then
-		return false
+	-- Update cache
+	local profile = DataService.GetProfile(player.UserId)
+	if profile then
+		EconomyService.PlayerData[player.UserId].Coins = profile.Coins
 	end
 	
-	data.Coins = data.Coins - amount
 	updateCurrencyEvent:FireClient(player, -amount, false)
-	
-	print(player.Name .. " spent " .. amount .. " coins")
+	print(player.Name .. " spent " .. amount .. " coins (Remaining:", profile.Coins, ")")
 	return true
 end
 
 -- Get player coins
 function EconomyService.GetCoins(player)
-	local data = EconomyService.PlayerData[player.UserId]
-	return data and data.Coins or 0
+	return DataService.GetCoins(player.UserId)
 end
 
 -- Add seed to inventory
 function EconomyService.AddSeed(player, plantType, amount)
-	local data = EconomyService.PlayerData[player.UserId]
-	if not data then return false end
-	
 	amount = amount or 1
+	local success = DataService.AddSeed(player.UserId, plantType, amount)
+	if not success then return false end
 	
-	if not data.Inventory.Seeds[plantType] then
-		data.Inventory.Seeds[plantType] = 0
+	-- Update cache
+	local profile = DataService.GetProfile(player.UserId)
+	if profile then
+		EconomyService.PlayerData[player.UserId].Inventory = profile.Inventory
 	end
 	
-	data.Inventory.Seeds[plantType] = data.Inventory.Seeds[plantType] + amount
 	EconomyService.SyncPlayerData(player)
-	
 	return true
 end
 
 -- Remove seed from inventory
 function EconomyService.RemoveSeed(player, plantType)
-	local data = EconomyService.PlayerData[player.UserId]
-	if not data then return false end
+	local success = DataService.RemoveSeed(player.UserId, plantType)
+	if not success then return false end
 	
-	if not data.Inventory.Seeds[plantType] or data.Inventory.Seeds[plantType] <= 0 then
-		return false
+	-- Update cache
+	local profile = DataService.GetProfile(player.UserId)
+	if profile then
+		EconomyService.PlayerData[player.UserId].Inventory = profile.Inventory
 	end
 	
-	data.Inventory.Seeds[plantType] = data.Inventory.Seeds[plantType] - 1
 	EconomyService.SyncPlayerData(player)
-	
 	return true
 end
 
 -- Get seed count
 function EconomyService.GetSeedCount(player, plantType)
-	local data = EconomyService.PlayerData[player.UserId]
-	if not data then return 0 end
-	
-	return data.Inventory.Seeds[plantType] or 0
+	return DataService.GetSeedCount(player.UserId, plantType)
 end
 
 -- Buy seed
@@ -160,11 +181,8 @@ function EconomyService.BuyPet(player, petType)
 		return false
 	end
 	
-	local data = EconomyService.PlayerData[player.UserId]
-	if not data then return false end
-	
 	-- Check if player already has this pet
-	if data.Inventory.Pets[petType] then
+	if DataService.HasPet(player.UserId, petType) then
 		warn(player.Name .. " already owns this pet")
 		return false
 	end
@@ -174,7 +192,14 @@ function EconomyService.BuyPet(player, petType)
 		return false
 	end
 	
-	data.Inventory.Pets[petType] = true
+	DataService.AddPet(player.UserId, petType)
+	
+	-- Update cache
+	local profile = DataService.GetProfile(player.UserId)
+	if profile then
+		EconomyService.PlayerData[player.UserId].Inventory = profile.Inventory
+	end
+	
 	EconomyService.SyncPlayerData(player)
 	
 	print(player.Name .. " bought " .. petType .. " pet")

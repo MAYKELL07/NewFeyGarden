@@ -1,5 +1,5 @@
 -- GardenManager.luau
--- Manages player garden plots and plant placement
+-- Manages player garden plots and plant placement with multiplayer support
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -8,7 +8,9 @@ local ServerScriptService = game:GetService("ServerScriptService")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local PlantModule = require(ReplicatedStorage.Shared.PlantModule)
+local Config = require(ReplicatedStorage.Shared.Config)
 local EconomyService = require(ServerScriptService.Server.EconomyService)
+local DataService = require(ServerScriptService.Server.Persistence.DataService)
 
 local GardenManager = {}
 GardenManager.PlayerPlots = {}
@@ -22,6 +24,91 @@ plantSeedEvent.Parent = ReplicatedStorage
 local harvestPlantEvent = Instance.new("RemoteEvent")
 harvestPlantEvent.Name = Constants.EVENTS.HARVEST_PLANT
 harvestPlantEvent.Parent = ReplicatedStorage
+
+local claimPlotEvent = Instance.new("RemoteEvent")
+claimPlotEvent.Name = "ClaimPlotRequest"
+claimPlotEvent.Parent = ReplicatedStorage
+
+-- Helper: Get plots folder
+local function getPlotsFolder()
+	return Workspace:FindFirstChild(Config.World.PlotsFolder)
+end
+
+-- Helper: Find first free plot
+local function getFreePlotName()
+	local plotsFolder = getPlotsFolder()
+	if not plotsFolder then return nil end
+	
+	for _, plot in ipairs(plotsFolder:GetChildren()) do
+		if plot:IsA("Model") and not plot:GetAttribute("Owner") then
+			return plot.Name
+		end
+	end
+	return nil
+end
+
+-- Helper: Save plant state to DataService
+local function savePlantState(ownerUserId, plotModel)
+	if not plotModel then return end
+	
+	local plotName = plotModel.Name
+	
+	-- Find plants in the plot
+	local plantStates = {}
+	for _, child in ipairs(plotModel:GetChildren()) do
+		if child:IsA("Model") and child:GetAttribute("PlantType") then
+			local slotIndex = child:GetAttribute("SlotIndex")
+			if slotIndex then
+				plantStates[slotIndex] = {
+					Type = child:GetAttribute("PlantType"),
+					Stage = child:GetAttribute("Stage"),
+					WateredUntil = child:GetAttribute("WaterBuffEnd") or 0,
+					PetBoost = child:GetAttribute("PetBoost") or false,
+				}
+			end
+		end
+	end
+	
+	DataService.SetPlantState(ownerUserId, plotName, plantStates)
+	print("GardenManager: Saved plant states for plot", plotName)
+end
+
+-- Helper: Restore plant state from DataService
+local function restorePlantState(ownerUserId, plotModel)
+	if not plotModel then return end
+	
+	local plotName = plotModel.Name
+	local plantStates = DataService.GetPlantState(ownerUserId, plotName)
+	
+	if not plantStates or type(plantStates) ~= "table" then return end
+	
+	for slotIndex, state in pairs(plantStates) do
+		if type(state) == "table" and state.Type then
+			-- Get position for this slot
+			local position = GardenManager.GetPlantPosition(plotModel, slotIndex)
+			if position then
+				-- Create plant
+				local plantModel = PlantModule.CreatePlantModel(state.Type, position)
+				if plantModel then
+					plantModel:SetAttribute("Owner", ownerUserId)
+					plantModel:SetAttribute("SlotIndex", slotIndex)
+					plantModel:SetAttribute("PlantType", state.Type)
+					plantModel:SetAttribute("Stage", state.Stage or "Seed")
+					plantModel:SetAttribute("WaterBuffEnd", state.WateredUntil or 0)
+					plantModel:SetAttribute("PetBoost", state.PetBoost or false)
+					plantModel.Parent = plotModel
+					
+					-- Resume growth if not at final stage
+					if state.Stage ~= "Bloom" then
+						PlantModule.GrowPlant(plantModel)
+					end
+					
+					print("GardenManager: Restored plant", state.Type, "at slot", slotIndex, "stage", state.Stage)
+				end
+			end
+		end
+	end
+end
 
 -- Create a garden plot for a player
 function GardenManager.CreatePlot(player)
@@ -190,6 +277,9 @@ function GardenManager.PlantSeed(player, plantType, slotIndex)
 	end
 	table.insert(GardenManager.ActivePlants[player.UserId], plantModel)
 	
+	-- Save plant state to persistence
+	savePlantState(player.UserId, plotModel)
+	
 	print(player.Name .. " planted " .. plantType)
 	return true
 end
@@ -228,6 +318,11 @@ function GardenManager.HarvestPlant(player, plantModel)
 	-- Destroy plant
 	plantModel:Destroy()
 	
+	-- Save updated plant state to persistence
+	if plotModel then
+		savePlantState(player.UserId, plotModel)
+	end
+	
 	print(player.Name .. " harvested plant for " .. value .. " coins")
 	return value
 end
@@ -252,21 +347,100 @@ function GardenManager.Initialize()
 		end
 	end)
 	
-	-- Create plots for existing players
-	for _, player in ipairs(Players:GetPlayers()) do
-		GardenManager.CreatePlot(player)
-	end
-	
-	-- Create plots for new players
+	-- Multiplayer: Handle player joining
 	Players.PlayerAdded:Connect(function(player)
-		GardenManager.CreatePlot(player)
+		print("GardenManager: Player joined:", player.Name)
+		
+		-- Wait for DataService to load profile
+		task.wait(0.5)
+		
+		local profile = DataService.GetProfile(player.UserId)
+		if not profile then
+			warn("GardenManager: No profile loaded for", player.Name)
+			return
+		end
+		
+		-- Reclaim previously owned plots if available
+		local plotsFolder = getPlotsFolder()
+		if plotsFolder then
+			for _, plotName in ipairs(profile.OwnedPlots) do
+				local plot = plotsFolder:FindFirstChild(plotName)
+				if plot and not plot:GetAttribute("Owner") then
+					plot:SetAttribute("Owner", player.UserId)
+					GardenManager.PlayerPlots[player.UserId] = plot
+					print("GardenManager: Reclaimed plot", plotName, "for", player.Name)
+					
+					-- Restore plant states
+					restorePlantState(player.UserId, plot)
+				end
+			end
+		end
+		
+		-- If player has no owned plots, try to assign one (or use old system)
+		if not GardenManager.PlayerPlots[player.UserId] then
+			-- Try to claim a free plot
+			local freePlotName = getFreePlotName()
+			if freePlotName and plotsFolder then
+				local plot = plotsFolder:FindFirstChild(freePlotName)
+				if plot then
+					plot:SetAttribute("Owner", player.UserId)
+					DataService.AddOwnedPlot(player.UserId, freePlotName)
+					GardenManager.PlayerPlots[player.UserId] = plot
+					print("GardenManager: Assigned free plot", freePlotName, "to", player.Name)
+				end
+			else
+				-- Fallback: Create a plot using old system
+				warn("GardenManager: No free plots, creating new plot for", player.Name)
+				GardenManager.CreatePlot(player)
+			end
+		end
 	end)
 	
-	-- Cleanup when player leaves
+	-- Multiplayer: Handle player leaving
 	Players.PlayerRemoving:Connect(function(player)
+		print("GardenManager: Player leaving:", player.Name)
+		
+		-- Save plant states before cleaning up
+		local plot = GardenManager.PlayerPlots[player.UserId]
+		if plot then
+			savePlantState(player.UserId, plot)
+			-- Optional: Keep plot owned (comment out to free on leave)
+			-- plot:SetAttribute("Owner", nil)
+		end
+		
 		GardenManager.PlayerPlots[player.UserId] = nil
 		GardenManager.ActivePlants[player.UserId] = nil
 	end)
+	
+	-- Handle plot claiming RemoteEvent
+	claimPlotEvent.OnServerEvent:Connect(function(player)
+		print("GardenManager: Plot claim request from", player.Name)
+		
+		local freePlotName = getFreePlotName()
+		if not freePlotName then
+			warn("GardenManager: No free plots available for", player.Name)
+			return
+		end
+		
+		local plotsFolder = getPlotsFolder()
+		if not plotsFolder then return end
+		
+		local plot = plotsFolder:FindFirstChild(freePlotName)
+		if plot then
+			plot:SetAttribute("Owner", player.UserId)
+			DataService.AddOwnedPlot(player.UserId, freePlotName)
+			GardenManager.PlayerPlots[player.UserId] = plot
+			print("GardenManager: Claimed plot", freePlotName, "for", player.Name)
+		end
+	end)
+	
+	-- Initialize existing players (for server restart during testing)
+	for _, player in ipairs(Players:GetPlayers()) do
+		-- Trigger the PlayerAdded logic
+		task.spawn(function()
+			Players.PlayerAdded:Fire(player)
+		end)
+	end
 end
 
 return GardenManager
