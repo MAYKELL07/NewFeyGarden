@@ -70,7 +70,19 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	
 	-- Check for left mouse click
 	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		if not currentTool then return end
+		-- Check if player has a tool equipped
+		local character = player.Character
+		if not character then return end
+		
+		local equippedTool = character:FindFirstChildOfClass("Tool")
+		if not equippedTool then return end
+		
+		local toolName = equippedTool.Name
+		
+		-- Only handle Shovel and WateringCan
+		if toolName ~= Config.Tools.Shovel.Name and toolName ~= Config.Tools.WateringCan.Name then
+			return
+		end
 		
 		-- Raycast from camera
 		local rayOrigin = camera.CFrame.Position
@@ -78,14 +90,14 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 		
 		local raycastParams = RaycastParams.new()
 		raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-		raycastParams.FilterDescendantsInstances = {player.Character}
+		raycastParams.FilterDescendantsInstances = {character}
 		
 		local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
 		
 		if rayResult and rayResult.Instance then
 			-- Send tool action to server
-			toolActionEvent:FireServer(currentTool, rayResult.Instance, rayResult.Position)
-			print("Tool used:", currentTool, "on", rayResult.Instance.Name)
+			toolActionEvent:FireServer(toolName, rayResult.Instance, rayResult.Position)
+			print("Tool used:", toolName, "on", rayResult.Instance.Name)
 		end
 	end
 end)

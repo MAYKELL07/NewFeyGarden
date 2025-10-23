@@ -54,62 +54,63 @@ local function getPlayerPlot(hitPart, player)
 	return nil
 end
 
--- Helper: Find plant in plot
-local function getPlantInPlot(plot)
-	for _, child in ipairs(plot:GetChildren()) do
-		if child:IsA("Model") and child:GetAttribute("PlantType") then
-			return child
-		end
+-- Helper: Find plant that was clicked
+local function getPlantFromHit(hitPart)
+	-- Check if hitPart is part of a plant model
+	local model = hitPart:FindFirstAncestorOfClass("Model")
+	if model and model:GetAttribute("PlantType") then
+		return model
 	end
 	return nil
 end
 
 -- Shovel tool handler
 local function handleShovel(player, hitPart, position)
-	local plot = getPlayerPlot(hitPart, player)
-	if not plot then
-		warn(player.Name, "tried to use shovel on non-owned plot")
-		return
-	end
+	-- First check if they clicked on a plant directly
+	local plant = getPlantFromHit(hitPart)
 	
-	-- Find and remove plant
-	local plant = getPlantInPlot(plot)
 	if plant then
-		plant:Destroy()
-		plot:SetAttribute("PlantCount", math.max(0, (plot:GetAttribute("PlantCount") or 1) - 1))
-		
-		-- Show VFX
-		VFXModule.ShowGrowthEffect(position)
-		
-		print(player.Name, "cleared plant from plot with shovel")
+		-- Verify it's in the player's plot
+		local plot = plant.Parent
+		if plot and plot:IsA("Model") and plot:GetAttribute("Owner") == player.UserId then
+			plant:Destroy()
+			plot:SetAttribute("PlantCount", math.max(0, (plot:GetAttribute("PlantCount") or 1) - 1))
+			
+			-- Show VFX
+			VFXModule.ShowGrowthEffect(position)
+			
+			print(player.Name, "cleared plant from plot with shovel")
+		else
+			warn(player.Name, "tried to clear plant from non-owned plot")
+		end
 	else
-		warn("No plant found to clear")
+		warn("No plant found to clear - click directly on a plant")
 	end
 end
 
 -- Watering Can tool handler
 local function handleWateringCan(player, hitPart, position)
-	local plot = getPlayerPlot(hitPart, player)
-	if not plot then
-		warn(player.Name, "tried to water non-owned plot")
-		return
+	-- Find the plant that was clicked
+	local plant = getPlantFromHit(hitPart)
+	
+	if plant then
+		-- Verify it's in the player's plot
+		local plot = plant.Parent
+		if plot and plot:IsA("Model") and plot:GetAttribute("Owner") == player.UserId then
+			-- Water the plant
+			BuffsModule.WaterPlant(plant, Config.Tools.WateringCan.WaterSeconds)
+			
+			-- Show VFX
+			VFXModule.TryEmitWater(plant)
+			VFXModule.ShowWateringEffect(position)
+			
+			print(player.Name, "watered plant for", Config.Tools.WateringCan.WaterSeconds, "seconds")
+		else
+			warn(player.Name, "tried to water plant from non-owned plot")
+		end
+	else
+		warn("No plant found to water - click directly on a plant")
 	end
-	
-	-- Find plant
-	local plant = getPlantInPlot(plot)
-	if not plant then
-		warn("No plant found to water")
-		return
-	end
-	
-	-- Water the plant
-	BuffsModule.WaterPlant(plant, Config.Tools.WateringCan.WaterSeconds)
-	
-	-- Show VFX
-	VFXModule.TryEmitWater(plant)
-	VFXModule.ShowWateringEffect(position)
-	
-	print(player.Name, "watered plant for", Config.Tools.WateringCan.WaterSeconds, "seconds")
 end
 
 -- Main tool action handler

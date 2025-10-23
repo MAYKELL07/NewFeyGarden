@@ -474,6 +474,13 @@ function UIHandler.Initialize()
 	mouse.Button1Down:Connect(function()
 		if not selectedPlantType then return end
 		
+		-- Don't plant if a tool is equipped
+		local character = player.Character
+		if character then
+			local equippedTool = character:FindFirstChildOfClass("Tool")
+			if equippedTool then return end -- Tool is equipped, let ToolClient handle it
+		end
+		
 		local target = mouse.Target
 		if target and target.Name == "Floor" and target.Parent:FindFirstChild("Sign") then
 			-- Check if it's player's plot
