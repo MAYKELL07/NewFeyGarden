@@ -30,14 +30,16 @@ end
 
 -- Add coins to player
 function AdminCommands.AddCoins(player, amount)
-	local EconomyService = require(script.Parent.Parent.server.EconomyService)
+	local ServerScriptService = game:GetService("ServerScriptService")
+	local EconomyService = require(ServerScriptService.Server.EconomyService)
 	EconomyService.AddCoins(player, amount)
 	return true, "Added " .. amount .. " coins"
 end
 
 -- Remove coins from player
 function AdminCommands.RemoveCoins(player, amount)
-	local EconomyService = require(script.Parent.Parent.server.EconomyService)
+	local ServerScriptService = game:GetService("ServerScriptService")
+	local EconomyService = require(ServerScriptService.Server.EconomyService)
 	local success = EconomyService.RemoveCoins(player, amount)
 	if success then
 		return true, "Removed " .. amount .. " coins"
@@ -48,7 +50,8 @@ end
 
 -- Get player coins
 function AdminCommands.GetCoins(player)
-	local EconomyService = require(script.Parent.Parent.server.EconomyService)
+	local ServerScriptService = game:GetService("ServerScriptService")
+	local EconomyService = require(ServerScriptService.Server.EconomyService)
 	local coins = EconomyService.GetCoins(player)
 	return true, player.Name .. " has " .. coins .. " coins"
 end
@@ -56,7 +59,8 @@ end
 -- Add seeds to player
 function AdminCommands.AddSeeds(player, plantType, amount)
 	local Constants = require(ReplicatedStorage.Shared.Constants)
-	local EconomyService = require(script.Parent.Parent.server.EconomyService)
+	local ServerScriptService = game:GetService("ServerScriptService")
+	local EconomyService = require(ServerScriptService.Server.EconomyService)
 	
 	amount = amount or 1
 	
@@ -93,7 +97,8 @@ end
 
 -- Speed up plant growth (for testing)
 function AdminCommands.GrowAllPlants(player)
-	local GardenManager = require(script.Parent.Parent.server.GardenManager)
+	local ServerScriptService = game:GetService("ServerScriptService")
+	local GardenManager = require(ServerScriptService.Server.GardenManager)
 	local plotModel = GardenManager.PlayerPlots[player.UserId]
 	
 	if not plotModel then
@@ -115,7 +120,8 @@ end
 
 -- Clear player's garden
 function AdminCommands.ClearGarden(player)
-	local GardenManager = require(script.Parent.Parent.server.GardenManager)
+	local ServerScriptService = game:GetService("ServerScriptService")
+	local GardenManager = require(ServerScriptService.Server.GardenManager)
 	local plotModel = GardenManager.PlayerPlots[player.UserId]
 	
 	if not plotModel then

@@ -7,10 +7,14 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
+local Config = require(ReplicatedStorage.Shared.Config)
+local BuffsModule = require(ReplicatedStorage.Shared.BuffsModule)
+local VFXModule = require(ReplicatedStorage.Shared.VFXModule)
 
 local PetController = {}
 PetController.CurrentPet = nil
 local player = Players.LocalPlayer
+local PET_BOOST_RADIUS = 12
 
 -- Create pet model
 local function createPetModel(petType)
@@ -58,7 +62,7 @@ local function createPetModel(petType)
 	return petModel
 end
 
--- Update pet follow behavior
+-- Update pet follow behavior and apply proximity buffs
 local function updatePetFollow()
 	if not PetController.CurrentPet then return end
 	if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
@@ -86,6 +90,40 @@ local function updatePetFollow()
 	local time = tick()
 	local bobOffset = math.sin(time * 2) * 0.5
 	bodyPosition.Position = targetPosition + Vector3.new(0, bobOffset, 0)
+	
+	-- Apply pet boost to nearby plants
+	local plotsFolder = Config.functions.GetWorldFolder(Config.World.PlotsFolder)
+	if not plotsFolder then return end
+	
+	local petPosition = petBody.Position
+	
+	for _, plot in ipairs(plotsFolder:GetChildren()) do
+		if plot:IsA("Model") then
+			-- Find plant in plot
+			for _, child in ipairs(plot:GetChildren()) do
+				if child:IsA("Model") and child:GetAttribute("PlantType") then
+					local plantPos = child:GetBoundingBox().Position
+					local distance = (plantPos - petPosition).Magnitude
+					
+					-- Apply boost if close enough
+					if distance <= PET_BOOST_RADIUS then
+						if not child:GetAttribute("PetBoost") then
+							child:SetAttribute("PetBoost", true)
+							-- Emit cheer VFX occasionally
+							if math.random() < 0.01 then  -- 1% chance per frame
+								VFXModule.TryEmitPetCheer(PetController.CurrentPet)
+							end
+						end
+					else
+						-- Remove boost if too far
+						if child:GetAttribute("PetBoost") then
+							child:SetAttribute("PetBoost", false)
+						end
+					end
+				end
+			end
+		end
+	end
 end
 
 -- Spawn a pet

@@ -21,14 +21,4 @@ task.wait(1) -- Give server time to set up
 UIHandler.Initialize()
 PetController.Initialize()
 
--- Load admin UI (will only show for admins)
-task.spawn(function()
-	local success, err = pcall(function()
-		require(script.Parent.AdminUI)
-	end)
-	if not success then
-		warn("Admin UI failed to load:", err)
-	end
-end)
-
 print("✨ FeyGarden Client Ready!")

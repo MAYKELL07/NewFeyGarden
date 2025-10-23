@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
+local BuffsModule = require(ReplicatedStorage.Shared.BuffsModule)
 
 local WeatherController = {}
 WeatherController.CurrentWeather = Constants.WEATHER_TYPES.SUNNY
@@ -29,6 +30,9 @@ local function applyWeather(weatherType)
 	Lighting.Brightness = config.Brightness
 	Lighting.ColorShift_Top = config.ColorShift_Top
 	Lighting.ClockTime = config.ClockTime
+	
+	-- Update BuffsModule
+	BuffsModule.SetWeather(weatherType)
 	
 	-- Notify all clients
 	weatherEvent:FireAllClients(weatherType)

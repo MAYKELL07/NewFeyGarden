@@ -1,8 +1,10 @@
 -- PlantModule.luau
--- Handles plant growth logic with weather-based multipliers
+-- Handles plant growth logic with weather-based multipliers and buffs
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Constants = require(ReplicatedStorage.Shared.Constants)
+local BuffsModule = require(ReplicatedStorage.Shared.BuffsModule)
+local VFXModule = require(ReplicatedStorage.Shared.VFXModule)
 
 local PlantModule = {}
 
@@ -99,8 +101,8 @@ function PlantModule.UpdatePlantVisual(plantModel)
 	end
 end
 
--- Grow plant over time
-function PlantModule.GrowPlant(plantModel, weatherMultiplier, petBoost)
+-- Grow plant over time with dynamic buff system
+function PlantModule.GrowPlant(plantModel)
 	local plantType = plantModel:GetAttribute("PlantType")
 	local config = Constants.PLANT_CONFIG[plantType]
 	
@@ -112,19 +114,25 @@ function PlantModule.GrowPlant(plantModel, weatherMultiplier, petBoost)
 		Constants.GROWTH_STAGES.BLOOM
 	}
 	
-	weatherMultiplier = weatherMultiplier or 1.0
-	petBoost = petBoost or 1.0
-	
 	task.spawn(function()
 		for i, stage in ipairs(stages) do
-			-- Calculate growth time with multipliers
-			local growthTime = config.GrowthTime * weatherMultiplier * petBoost
+			-- Get current buff multiplier (dynamic - checks buffs each stage)
+			local buffMultiplier = BuffsModule.GetGrowthMultiplier(plantModel)
+			
+			-- Calculate growth time with buffs
+			local growthTime = config.GrowthTime * buffMultiplier
 			
 			-- Update stage
 			plantModel:SetAttribute("Stage", stage)
 			PlantModule.UpdatePlantVisual(plantModel)
 			
-			print(plantModel.Name .. " grew to " .. stage)
+			-- Emit growth VFX
+			VFXModule.TryEmitGrowth(plantModel)
+			
+			-- Debug info
+			local buffStatus = BuffsModule.GetBuffStatus(plantModel)
+			print(string.format("%s grew to %s (%.2fs, mult: %.2f)", 
+				plantModel.Name, stage, growthTime, buffMultiplier))
 			
 			-- Wait for next stage (except on last stage)
 			if i < #stages then
@@ -134,6 +142,7 @@ function PlantModule.GrowPlant(plantModel, weatherMultiplier, petBoost)
 		
 		-- Mark as harvestable
 		plantModel:SetAttribute("Harvestable", true)
+		print(plantModel.Name .. " is now harvestable!")
 	end)
 end
 

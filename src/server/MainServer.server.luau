@@ -12,10 +12,12 @@ local Constants = require(ReplicatedStorage.Shared.Constants)
 local WeatherController = require(script.Parent.WeatherController)
 local GardenManager = require(script.Parent.GardenManager)
 local EconomyService = require(script.Parent.EconomyService)
+local ToolServer = require(script.Parent.ToolServer)
 
 -- Initialize all systems
 WeatherController.Initialize()
 EconomyService.Initialize()
 GardenManager.Initialize()
+-- ToolServer initializes itself on require
 
 print("✨ FeyGarden Server Ready!")

@@ -154,10 +154,8 @@ function GardenManager.PlantSeed(player, plantType, slotIndex)
 	plantModel:SetAttribute("SlotIndex", slotIndex)
 	plantModel.Parent = plotModel
 	
-	-- Start growth
-	local WeatherController = require(script.Parent.WeatherController)
-	local growthMultiplier = WeatherController.GetGrowthMultiplier()
-	PlantModule.GrowPlant(plantModel, growthMultiplier, 1.0)
+	-- Start growth (BuffsModule now handles all multipliers dynamically)
+	PlantModule.GrowPlant(plantModel)
 	
 	-- Update plant count
 	plotModel:SetAttribute("PlantCount", plantCount + 1)
