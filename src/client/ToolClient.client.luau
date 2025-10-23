@@ -21,8 +21,12 @@ local currentTool = nil
 
 -- Monitor tool equipping
 local function setupToolTracking()
+	-- Wait for character and backpack to load
+	local character = player.Character or player.CharacterAdded:Wait()
+	local backpack = player:WaitForChild("Backpack")
+	
 	-- Track backpack tools
-	player.Backpack.ChildAdded:Connect(function(tool)
+	backpack.ChildAdded:Connect(function(tool)
 		if tool:IsA("Tool") then
 			tool.Equipped:Connect(function()
 				currentTool = tool.Name
@@ -37,7 +41,7 @@ local function setupToolTracking()
 	end)
 	
 	-- Track existing tools
-	for _, tool in ipairs(player.Backpack:GetChildren()) do
+	for _, tool in ipairs(backpack:GetChildren()) do
 		if tool:IsA("Tool") then
 			tool.Equipped:Connect(function()
 				currentTool = tool.Name

@@ -4,9 +4,11 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
+local ServerScriptService = game:GetService("ServerScriptService")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local PlantModule = require(ReplicatedStorage.Shared.PlantModule)
+local EconomyService = require(ServerScriptService.Server.EconomyService)
 
 local GardenManager = {}
 GardenManager.PlayerPlots = {}
@@ -131,9 +133,17 @@ function GardenManager.PlantSeed(player, plantType, slotIndex)
 		return false
 	end
 	
+	-- Check if player has the seed
+	if not EconomyService.RemoveSeed(player, plantType) then
+		warn(player.Name .. " doesn't have a " .. plantType .. " seed")
+		return false
+	end
+	
 	local plantCount = plotModel:GetAttribute("PlantCount") or 0
 	if plantCount >= Constants.MAX_PLANTS_PER_PLOT then
 		warn("Plot is full!")
+		-- Refund the seed
+		EconomyService.AddSeed(player, plantType, 1)
 		return false
 	end
 	
@@ -141,12 +151,16 @@ function GardenManager.PlantSeed(player, plantType, slotIndex)
 	local position = GardenManager.GetPlantPosition(plotModel, slotIndex)
 	if not position then
 		warn("Invalid plant position")
+		-- Refund the seed
+		EconomyService.AddSeed(player, plantType, 1)
 		return false
 	end
 	
 	-- Create plant
 	local plantModel = PlantModule.CreatePlantModel(plantType, position)
 	if not plantModel then
+		-- Refund the seed
+		EconomyService.AddSeed(player, plantType, 1)
 		return false
 	end
 	

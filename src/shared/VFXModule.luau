@@ -30,7 +30,16 @@ function VFXModule.TryEmitWater(target)
 		return true
 	end
 	
-	-- Create placeholder effect if no particle found
+	-- Create visible fallback water splash effect
+	local position = target:GetPivot().Position
+	for i = 1, 6 do
+		task.spawn(function()
+			VFXModule.CreateSparkleEffect(
+				position + Vector3.new(math.random(-2, 2), math.random(0, 3), math.random(-2, 2)),
+				Color3.fromRGB(100, 200, 255) -- Light blue for water
+			)
+		end)
+	end
 	print("VFXModule: Water splash effect triggered on", target.Name)
 	return false
 end
@@ -45,7 +54,17 @@ function VFXModule.TryEmitGrowth(target)
 		return true
 	end
 	
-	-- Create placeholder effect if no particle found
+	-- Create visible fallback growth sparkle effect
+	local position = target:GetPivot().Position
+	for i = 1, 8 do
+		task.spawn(function()
+			task.wait(i * 0.05) -- Stagger the sparkles
+			VFXModule.CreateSparkleEffect(
+				position + Vector3.new(math.random(-2, 2), math.random(1, 4), math.random(-2, 2)),
+				Color3.fromRGB(255, 255, 100) -- Golden yellow for growth
+			)
+		end)
+	end
 	print("VFXModule: Growth sparkle effect triggered on", target.Name)
 	return false
 end
@@ -60,7 +79,16 @@ function VFXModule.TryEmitPetCheer(target)
 		return true
 	end
 	
-	-- Create placeholder effect if no particle found
+	-- Create visible fallback pet cheer effect
+	local position = target:GetPivot().Position
+	for i = 1, 5 do
+		task.spawn(function()
+			VFXModule.CreateSparkleEffect(
+				position + Vector3.new(math.random(-1, 1), math.random(0, 2), math.random(-1, 1)),
+				Color3.fromRGB(255, 150, 255) -- Pink/purple for pet effect
+			)
+		end)
+	end
 	print("VFXModule: Pet cheer effect triggered on", target.Name)
 	return false
 end
