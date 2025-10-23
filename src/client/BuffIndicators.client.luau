@@ -75,10 +75,8 @@ end
 -- Monitor plants for buff changes
 local function monitorPlants()
 	RunService.Heartbeat:Connect(function()
-		local gardenWorld = Workspace:FindFirstChild(Config.World.GardenWorldName)
-		if not gardenWorld then return end
-		
-		local plotsFolder = gardenWorld:FindFirstChild(Config.World.GardenPlotsFolder)
+		-- Get plots folder directly from workspace
+		local plotsFolder = Workspace:FindFirstChild(Config.World.PlotsFolder)
 		if not plotsFolder then return end
 		
 		-- Find player's plot
@@ -103,7 +101,7 @@ local function monitorPlants()
 						
 						-- Check for pet boost
 						local petBoost = child:GetAttribute("PetBoost")
-						if petBoost and petBoost > 1 then
+						if petBoost == true then
 							if not child:GetAttribute("_PetIndicatorShown") then
 								child:SetAttribute("_PetIndicatorShown", true)
 								createBuffIndicator(child, "pet")

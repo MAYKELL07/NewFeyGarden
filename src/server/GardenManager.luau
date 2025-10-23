@@ -147,6 +147,16 @@ function GardenManager.PlantSeed(player, plantType, slotIndex)
 		return false
 	end
 	
+	-- Check if slot is already occupied
+	for _, child in ipairs(plotModel:GetChildren()) do
+		if child:IsA("Model") and child:GetAttribute("SlotIndex") == slotIndex then
+			warn("Slot", slotIndex, "is already occupied!")
+			-- Refund the seed
+			EconomyService.AddSeed(player, plantType, 1)
+			return false
+		end
+	end
+	
 	-- Get position for plant
 	local position = GardenManager.GetPlantPosition(plotModel, slotIndex)
 	if not position then

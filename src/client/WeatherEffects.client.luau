@@ -45,11 +45,8 @@ local function showPlantBoostEffects(weatherType)
 	local config = Constants.WEATHER_CONFIG[weatherType]
 	if not config or config.GrowthMultiplier <= 1.0 then return end
 	
-	-- Find player's garden plot
-	local gardenWorld = Workspace:FindFirstChild(Config.World.GardenWorldName)
-	if not gardenWorld then return end
-	
-	local plotsFolder = gardenWorld:FindFirstChild(Config.World.GardenPlotsFolder)
+	-- Find plots folder directly in workspace
+	local plotsFolder = Workspace:FindFirstChild(Config.World.PlotsFolder)
 	if not plotsFolder then return end
 	
 	-- Find player's plot

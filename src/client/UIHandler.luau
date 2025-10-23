@@ -16,7 +16,38 @@ local playerCoins = 0
 local playerInventory = {}
 local currentWeather = "Sunny"
 local selectedPlantType = nil
-local selectedSlot = 1
+
+-- Helper function to find next available slot
+local function getNextAvailableSlot()
+	local Config = require(ReplicatedStorage.Shared.Config)
+	local plotsFolder = game.Workspace:FindFirstChild(Config.World.PlotsFolder)
+	if not plotsFolder then return 1 end
+	
+	-- Find player's plot
+	for _, plot in ipairs(plotsFolder:GetChildren()) do
+		if plot:GetAttribute("Owner") == player.UserId then
+			-- Track which slots are occupied
+			local occupiedSlots = {}
+			for _, child in ipairs(plot:GetChildren()) do
+				if child:IsA("Model") and child:GetAttribute("SlotIndex") then
+					occupiedSlots[child:GetAttribute("SlotIndex")] = true
+				end
+			end
+			
+			-- Find first available slot
+			for i = 1, Constants.MAX_PLANTS_PER_PLOT do
+				if not occupiedSlots[i] then
+					return i
+				end
+			end
+			
+			-- If all slots occupied, return 1
+			return 1
+		end
+	end
+	
+	return 1
+end
 
 -- Create main UI
 local function createMainUI()
@@ -448,11 +479,8 @@ function UIHandler.Initialize()
 			-- Check if it's player's plot
 			local plantSeedEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.PLANT_SEED)
 			if plantSeedEvent then
-				plantSeedEvent:FireServer(selectedPlantType, selectedSlot)
-				selectedSlot = selectedSlot + 1
-				if selectedSlot > Constants.MAX_PLANTS_PER_PLOT then
-					selectedSlot = 1
-				end
+				local nextSlot = getNextAvailableSlot()
+				plantSeedEvent:FireServer(selectedPlantType, nextSlot)
 			end
 		end
 	end)
