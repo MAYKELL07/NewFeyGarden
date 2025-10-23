@@ -56,11 +56,18 @@ end
 
 -- Helper: Find plant that was clicked
 local function getPlantFromHit(hitPart)
+	print("ToolServer: Looking for plant from hitPart:", hitPart:GetFullName())
+	
 	-- Check if hitPart is part of a plant model
 	local model = hitPart:FindFirstAncestorOfClass("Model")
-	if model and model:GetAttribute("PlantType") then
-		return model
+	if model then
+		print("ToolServer: Found model:", model.Name, "PlantType attribute:", model:GetAttribute("PlantType"))
+		if model:GetAttribute("PlantType") then
+			return model
+		end
 	end
+	
+	print("ToolServer: No plant found from hitPart")
 	return nil
 end
 
@@ -116,18 +123,26 @@ end
 -- Main tool action handler
 toolActionEvent.OnServerEvent:Connect(function(player, toolName, hitPart, position)
 	-- Validate inputs
-	if not toolName or not hitPart then return end
+	if not toolName or not hitPart then 
+		warn("ToolServer: Invalid inputs - toolName:", toolName, "hitPart:", hitPart)
+		return 
+	end
+	
+	print("ToolServer: Received action - Tool:", toolName, "Hit:", hitPart:GetFullName(), "Position:", position)
 	
 	-- Check cooldown
 	if isOnCooldown(player, toolName) then
+		print("ToolServer:", player.Name, "is on cooldown for", toolName)
 		return
 	end
 	
 	-- Handle tool actions
 	if toolName == Config.Tools.Shovel.Name then
+		print("ToolServer: Handling Shovel action")
 		handleShovel(player, hitPart, position)
 		
 	elseif toolName == Config.Tools.WateringCan.Name then
+		print("ToolServer: Handling WateringCan action")
 		handleWateringCan(player, hitPart, position)
 		
 	else

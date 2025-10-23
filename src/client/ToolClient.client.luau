@@ -25,82 +25,63 @@ local function setupToolTracking()
 	local character = player.Character or player.CharacterAdded:Wait()
 	local backpack = player:WaitForChild("Backpack")
 	
-	-- Track backpack tools
-	backpack.ChildAdded:Connect(function(tool)
-		if tool:IsA("Tool") then
-			tool.Equipped:Connect(function()
-				currentTool = tool.Name
-				print("Equipped tool:", currentTool)
-			end)
-			
-			tool.Unequipped:Connect(function()
-				currentTool = nil
-				print("Unequipped tool")
-			end)
-		end
-	end)
-	
-	-- Track existing tools
-	for _, tool in ipairs(backpack:GetChildren()) do
-		if tool:IsA("Tool") then
-			tool.Equipped:Connect(function()
-				currentTool = tool.Name
-				print("Equipped tool:", currentTool)
-			end)
-			
-			tool.Unequipped:Connect(function()
-				currentTool = nil
-			end)
-		end
-	end
-	
-	-- Track character tools
-	player.CharacterAdded:Connect(function(character)
-		character.ChildAdded:Connect(function(tool)
-			if tool:IsA("Tool") then
-				currentTool = tool.Name
-			end
-		end)
-	end)
-end
-
--- Handle mouse click for tool usage
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then return end
-	
-	-- Check for left mouse click
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		-- Check if player has a tool equipped
-		local character = player.Character
-		if not character then return end
+	-- Function to setup tool activation
+	local function setupTool(tool)
+		if not tool:IsA("Tool") then return end
 		
-		local equippedTool = character:FindFirstChildOfClass("Tool")
-		if not equippedTool then return end
-		
-		local toolName = equippedTool.Name
-		
-		-- Only handle Shovel and WateringCan
+		-- Only handle our specific tools
+		local toolName = tool.Name
 		if toolName ~= Config.Tools.Shovel.Name and toolName ~= Config.Tools.WateringCan.Name then
 			return
 		end
 		
-		-- Raycast from camera
-		local rayOrigin = camera.CFrame.Position
-		local rayDirection = camera.CFrame.LookVector * Config.Tools.MaxUseDistance
+		tool.Equipped:Connect(function()
+			currentTool = tool.Name
+			print("Equipped tool:", currentTool)
+		end)
 		
-		local raycastParams = RaycastParams.new()
-		raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-		raycastParams.FilterDescendantsInstances = {character}
+		tool.Unequipped:Connect(function()
+			currentTool = nil
+			print("Unequipped tool")
+		end)
 		
-		local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-		
-		if rayResult and rayResult.Instance then
-			-- Send tool action to server
-			toolActionEvent:FireServer(toolName, rayResult.Instance, rayResult.Position)
-			print("Tool used:", toolName, "on", rayResult.Instance.Name)
-		end
+		-- Handle tool activation (when player clicks with tool)
+		tool.Activated:Connect(function()
+			print("Tool activated:", toolName)
+			
+			-- Raycast from camera
+			local rayOrigin = camera.CFrame.Position
+			local rayDirection = camera.CFrame.LookVector * Config.Tools.MaxUseDistance
+			
+			local raycastParams = RaycastParams.new()
+			raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+			raycastParams.FilterDescendantsInstances = {player.Character}
+			
+			local rayResult = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+			
+			if rayResult and rayResult.Instance then
+				-- Send tool action to server
+				toolActionEvent:FireServer(toolName, rayResult.Instance, rayResult.Position)
+				print("Tool used:", toolName, "on", rayResult.Instance:GetFullName())
+			else
+				print("Tool click didn't hit anything")
+			end
+		end)
 	end
-end)
+	
+	-- Track backpack tools
+	backpack.ChildAdded:Connect(setupTool)
+	
+	-- Track existing tools in backpack
+	for _, tool in ipairs(backpack:GetChildren()) do
+		setupTool(tool)
+	end
+	
+	-- Track character tools (when equipped)
+	player.CharacterAdded:Connect(function(char)
+		char.ChildAdded:Connect(setupTool)
+	end)
+end
 
 -- Initialize tool tracking
 setupToolTracking()
