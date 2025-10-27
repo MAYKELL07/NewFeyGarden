@@ -11,94 +11,190 @@ local Schema = require(script.Parent.Schema)
 local DataService = {}
 
 -- Configuration
-local STORE_NAME = "FeyGarden_Player_v1"
-local SAVE_INTERVAL = 60 -- seconds between autosaves
-local MAX_RETRIES = 5
+local STORE_NAME = "FeyGarden_Player_v2"
+local SAVE_INTERVAL = 120 -- seconds between autosaves (increased to reduce API calls)
+local MAX_RETRIES = 3
+local RETRY_DELAY = 1
 
 -- Storage
 local PlayerStore = DataStoreService:GetDataStore(STORE_NAME)
 local Profiles = {} -- [UserId] = profile data table
-local LastSave = {} -- [UserId] = os.clock() timestamp
+local SessionLocks = {} -- [UserId] = session id to prevent data conflicts
+local IsSaving = {} -- [UserId] = boolean to prevent concurrent saves
+local DataLoaded = {} -- [UserId] = boolean to track if data loaded successfully
 
 -- Helper: Generate key for a user
 local function keyFor(userId)
-	return "p:" .. tostring(userId)
+	return "Player_" .. tostring(userId)
+end
+
+-- Helper: Generate unique session ID
+local function generateSessionId()
+	return game.JobId .. "_" .. os.time() .. "_" .. math.random(1000, 9999)
 end
 
 -- Helper: Retry a function with exponential backoff
-local function retry(fn)
+local function retryAsync(fn, maxRetries)
+	maxRetries = maxRetries or MAX_RETRIES
 	local tries = 0
 	local lastErr = nil
 	
-	while tries < MAX_RETRIES do
-		local ok, result = pcall(fn)
-		if ok then 
+	while tries < maxRetries do
+		local success, result = pcall(fn)
+		if success then 
 			return true, result 
 		end
 		
 		tries = tries + 1
 		lastErr = result
-		task.wait(0.5 * tries) -- exponential backoff
-		warn("DataStore retry", tries, "/", MAX_RETRIES, "Error:", lastErr)
+		
+		if tries < maxRetries then
+			local waitTime = RETRY_DELAY * tries
+			task.wait(waitTime)
+			warn(string.format("[DataService] Retry %d/%d (waiting %.1fs) - Error: %s", tries, maxRetries, waitTime, tostring(lastErr)))
+		end
 	end
 	
-	warn("DataStore retries exceeded:", lastErr)
+	warn(string.format("[DataService] All retries failed: %s", tostring(lastErr)))
 	return false, lastErr
 end
 
--- Load profile from DataStore
+-- Load profile from DataStore with session locking
 local function LoadProfile(userId)
-	local ok, data = retry(function()
-		return PlayerStore:GetAsync(keyFor(userId))
-	end)
+	local sessionId = generateSessionId()
+	SessionLocks[userId] = sessionId
 	
-	if not ok then
-		warn("DataService: Failed to load, using default profile for", userId)
-		return Schema.Default()
-	end
-	
-	if not data then
-		return Schema.Default()
-	end
-	
-	return Schema.Migrate(data)
-end
-
--- Save profile to DataStore
-local function SaveProfile(userId)
-	local profile = Profiles[userId]
-	if not profile then 
-		return false
-	end
-	
-	profile.Version = Schema.CurrentVersion
-	
-	local ok = retry(function()
-		return PlayerStore:UpdateAsync(keyFor(userId), function(old)
-			-- Last write wins (single-writer per user per server)
-			return profile
+	local success, data = retryAsync(function()
+		return PlayerStore:UpdateAsync(keyFor(userId), function(oldData)
+			-- If data exists and has a recent session lock from another server, use default
+			if oldData and oldData.SessionLock then
+				local lockAge = os.time() - (oldData.SessionLockTime or 0)
+				if lockAge < 10 then -- 5 minutes
+					warn(string.format("[DataService] Session locked by another server (age: %ds)", lockAge))
+					-- Don't overwrite, just return the old data to read it
+					return oldData
+				end
+			end
+			
+			-- Set our session lock
+			local profileData = oldData or Schema.Default()
+			profileData.SessionLock = sessionId
+			profileData.SessionLockTime = os.time()
+			
+			return profileData
 		end)
 	end)
 	
-	if not ok then
-		warn("DataService: Failed to save profile for", userId)
+	if not success then
+		warn(string.format("[DataService] Failed to load profile for UserId %d, using default", userId))
+		return Schema.Default(), false
 	end
 	
-	return ok
+	-- Migrate and validate
+	local profile = Schema.Migrate(data)
+	
+	-- Verify session lock is ours (we got the data)
+	if profile.SessionLock ~= sessionId then
+		warn(string.format("[DataService] Session lock mismatch for UserId %d", userId))
+	end
+	
+	return profile, true
+end
+
+-- Save profile to DataStore
+local function SaveProfile(userId, isShuttingDown)
+	-- Prevent concurrent saves
+	if IsSaving[userId] then
+		warn(string.format("[DataService] Save already in progress for UserId %d", userId))
+		return false
+	end
+	
+	local profile = Profiles[userId]
+	if not profile then 
+		warn(string.format("[DataService] No profile to save for UserId %d", userId))
+		return false
+	end
+	
+	-- Only save if data was successfully loaded
+	if not DataLoaded[userId] then
+		warn(string.format("[DataService] Skipping save - data was not successfully loaded for UserId %d", userId))
+		return false
+	end
+	
+	IsSaving[userId] = true
+	profile.Version = Schema.CurrentVersion
+	profile.LastSaved = os.time()
+	
+	-- Deep copy to prevent modification during save
+	local profileCopy = {}
+	for key, value in pairs(profile) do
+		if type(value) == "table" then
+			profileCopy[key] = {}
+			for k, v in pairs(value) do
+				if type(v) == "table" then
+					profileCopy[key][k] = {}
+					for k2, v2 in pairs(v) do
+						profileCopy[key][k][k2] = v2
+					end
+				else
+					profileCopy[key][k] = v
+				end
+			end
+		else
+			profileCopy[key] = value
+		end
+	end
+	
+	local success = retryAsync(function()
+		return PlayerStore:UpdateAsync(keyFor(userId), function(oldData)
+			-- Only save if session lock matches (prevent overwriting other server's data)
+			if oldData and oldData.SessionLock and oldData.SessionLock ~= SessionLocks[userId] then
+				warn(string.format("[DataService] Session lock changed during save for UserId %d", userId))
+				return nil -- Don't save
+			end
+			
+			return profileCopy
+		end)
+	end, isShuttingDown and 5 or MAX_RETRIES)
+	
+	IsSaving[userId] = false
+	
+	if success then
+		print(string.format("[DataService] ✓ Saved profile for UserId %d (Coins: %d, Seeds: %d types, Plants: %d slots)", 
+			userId, 
+			profile.Coins or 0,
+			(function()
+				local count = 0
+				for _ in pairs(profile.Inventory.Seeds or {}) do count = count + 1 end
+				return count
+			end)(),
+			(function()
+				local count = 0
+				for _ in pairs(profile.PlantSlots or {}) do count = count + 1 end
+				return count
+			end)()
+		))
+	else
+		warn(string.format("[DataService] ✗ Failed to save profile for UserId %d", userId))
+	end
+	
+	return success
 end
 
 -- Autosave loop
 local function AutosaveLoop()
+	local lastAutosave = {}
+	
 	while true do
 		task.wait(SAVE_INTERVAL)
 		
 		for userId, profile in pairs(Profiles) do
-			local last = LastSave[userId] or 0
+			local last = lastAutosave[userId] or 0
 			
 			if os.clock() - last >= SAVE_INTERVAL then
-				local ok = SaveProfile(userId)
-				if ok then 
-					LastSave[userId] = os.clock()
+				local success = SaveProfile(userId, false)
+				if success then 
+					lastAutosave[userId] = os.clock()
 				end
 			end
 		end
@@ -110,27 +206,41 @@ task.spawn(AutosaveLoop)
 
 -- Player join: Load profile
 Players.PlayerAdded:Connect(function(player)
-	local profile = LoadProfile(player.UserId)
+	local profile, loaded = LoadProfile(player.UserId)
 	Profiles[player.UserId] = profile
-	LastSave[player.UserId] = os.clock()
+	DataLoaded[player.UserId] = loaded
+	
+	if loaded then
+		print(string.format("[DataService] ✓ Loaded profile for %s (UserId: %d)", player.Name, player.UserId))
+	else
+		warn(string.format("[DataService] ⚠ Using default profile for %s (UserId: %d)", player.Name, player.UserId))
+	end
 end)
 
 -- Player leave: Save profile
 Players.PlayerRemoving:Connect(function(player)
-	SaveProfile(player.UserId)
+	local success = SaveProfile(player.UserId, false)
 	
+	-- Release session lock
+	SessionLocks[player.UserId] = nil
+	DataLoaded[player.UserId] = nil
 	Profiles[player.UserId] = nil
-	LastSave[player.UserId] = nil
 end)
 
 -- Shutdown: Save all profiles
 game:BindToClose(function()
+	print("[DataService] Server shutting down - saving all profiles...")
+	
+	local savePromises = {}
 	for userId, _ in pairs(Profiles) do
-		SaveProfile(userId)
+		table.insert(savePromises, task.spawn(function()
+			SaveProfile(userId, true)
+		end))
 	end
 	
-	-- Give a moment for the last saves to complete
-	task.wait(3)
+	-- Wait for all saves to complete (with timeout)
+	task.wait(5)
+	print("[DataService] Shutdown save complete")
 end)
 
 -- Public API
@@ -252,6 +362,16 @@ function DataService.HasPet(userId, petType)
 	if not profile then return false end
 	
 	return profile.Inventory.Pets[petType] == true
+end
+
+-- Force save a player's profile (useful for important actions)
+function DataService.ForceSave(userId)
+	return SaveProfile(userId, false)
+end
+
+-- Check if player data is loaded
+function DataService.IsDataLoaded(userId)
+	return DataLoaded[userId] == true
 end
 
 print("💾 DataService initialized")

@@ -31,14 +31,29 @@ updateInventoryEvent.Parent = ReplicatedStorage
 
 -- Initialize player data (now loads from DataService)
 function EconomyService.InitializePlayerData(player)
-	-- Wait for DataService to load profile
-	task.wait(0.3)
+	-- Wait for DataService to load profile with retry
+	local profile = nil
+	local attempts = 0
+	local maxAttempts = 20
 	
-	local profile = DataService.GetProfile(player.UserId)
+	while not profile and attempts < maxAttempts do
+		task.wait(0.5)
+		attempts = attempts + 1
+		profile = DataService.GetProfile(player.UserId)
+		
+		if not profile then
+			if attempts % 4 == 0 then
+				print(string.format("EconomyService: Waiting for profile to load for %s (attempt %d/%d)", player.Name, attempts, maxAttempts))
+			end
+		end
+	end
+	
 	if not profile then
-		warn("EconomyService: No profile loaded for", player.Name)
+		warn(string.format("EconomyService: No profile loaded for %s after %d attempts", player.Name, attempts))
 		return
 	end
+	
+	print(string.format("EconomyService: Profile loaded for %s after %d attempts", player.Name, attempts))
 	
 	-- Create legacy cache reference for compatibility
 	EconomyService.PlayerData[player.UserId] = {
@@ -46,17 +61,29 @@ function EconomyService.InitializePlayerData(player)
 		Inventory = profile.Inventory
 	}
 	
-	-- Give starting items if new player
-	if profile.Coins == 0 then
-		DataService.AddCoins(player.UserId, Config.Economy.StartingCoins or Constants.STARTING_COINS)
+	-- Give starting items if new player (only if they have default starting coins)
+	if profile.Coins == 100 and not next(profile.Inventory.Seeds) then
+		print(string.format("EconomyService: New player detected - giving starting items to %s", player.Name))
 		DataService.AddSeed(player.UserId, Constants.PLANT_TYPES.GLOWBUD, 2)
 		DataService.AddSeed(player.UserId, Constants.PLANT_TYPES.DEWLEAF, 3)
 		
 		-- Update cache
-		EconomyService.PlayerData[player.UserId].Coins = Config.Economy.StartingCoins or Constants.STARTING_COINS
+		local updatedProfile = DataService.GetProfile(player.UserId)
+		if updatedProfile then
+			EconomyService.PlayerData[player.UserId].Inventory = updatedProfile.Inventory
+		end
 	end
 	
-	print("EconomyService: Initialized data for", player.Name, "- Coins:", profile.Coins)
+	print(string.format("EconomyService: ✓ Initialized data for %s - Coins: %d, Seeds: %d types", 
+		player.Name, 
+		profile.Coins,
+		(function()
+			local count = 0
+			for _ in pairs(profile.Inventory.Seeds) do count = count + 1 end
+			return count
+		end)()
+	))
+	
 	EconomyService.SyncPlayerData(player)
 end
 
@@ -208,7 +235,7 @@ end
 
 -- Initialize Economy Service
 function EconomyService.Initialize()
-	print("EconomyService initialized")
+	print("EconomyService: Initializing...")
 	
 	-- Handle buy seed requests
 	buySeedEvent.OnServerEvent:Connect(function(player, plantType, amount)
@@ -227,21 +254,29 @@ function EconomyService.Initialize()
 		end
 	end)
 	
-	-- Initialize existing players
-	for _, player in ipairs(Players:GetPlayers()) do
-		EconomyService.InitializePlayerData(player)
-	end
-	
-	-- Initialize new players
+	-- Initialize new players (async to not block)
 	Players.PlayerAdded:Connect(function(player)
-		EconomyService.InitializePlayerData(player)
+		task.spawn(function()
+			EconomyService.InitializePlayerData(player)
+		end)
+	end)
+	
+	-- Initialize existing players (async)
+	task.spawn(function()
+		task.wait(1) -- Give DataService time to initialize
+		for _, player in ipairs(Players:GetPlayers()) do
+			task.spawn(function()
+				EconomyService.InitializePlayerData(player)
+			end)
+		end
 	end)
 	
 	-- Cleanup when player leaves
 	Players.PlayerRemoving:Connect(function(player)
-		-- In production, save to DataStore here
 		EconomyService.PlayerData[player.UserId] = nil
 	end)
+	
+	print("EconomyService: ✓ Initialized")
 end
 
 return EconomyService

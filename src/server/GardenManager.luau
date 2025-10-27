@@ -517,6 +517,10 @@ function GardenManager.PlantSeed(player: Player, slotIndex: number, plantType: s
 			WateredUntil = 0,
 			PetBoost = false,
 		})
+		-- Force save to prevent data loss
+		task.spawn(function()
+			DataService.ForceSave(player.UserId)
+		end)
 	end
 
 	task.spawn(PlantModule.GrowPlant, plantModel)
@@ -552,6 +556,10 @@ function GardenManager.HarvestPlant(player: Player, slotIndex: number): (boolean
 	-- Only clear from DataStore if persistence is enabled
 	if Config.Economy.EnablePersistence then
 		DataService.ClearPlantSlot(player.UserId, slotIndex)
+		-- Force save to prevent data loss
+		task.spawn(function()
+			DataService.ForceSave(player.UserId)
+		end)
 	end
 
 	local cache = ensurePlayerCache(player.UserId)

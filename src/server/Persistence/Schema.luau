@@ -9,12 +9,15 @@ Schema.CurrentVersion = 1
 function Schema.Default()
 	return {
 		Version = Schema.CurrentVersion,
-		Coins = 0,
+		Coins = 100, -- Starting coins
 		Inventory = {
 			Seeds = {}, -- {PlantType = count}
 			Pets = {}   -- {PetType = owned}
 		},
 		PlantSlots = {}, -- {[slotIndex] = {Type, Stage, WateredUntil, PetBoost}}
+		SessionLock = nil, -- Session lock for preventing conflicts
+		SessionLockTime = 0,
+		LastSaved = os.time(),
 	}
 end
 
@@ -31,16 +34,27 @@ function Schema.Migrate(data)
 	end
 	
 	-- Add missing fields safely
-	data.Coins = data.Coins or 0
+	data.Coins = data.Coins or 100
 	data.Inventory = data.Inventory or {Seeds = {}, Pets = {}}
 	data.Inventory.Seeds = data.Inventory.Seeds or {}
 	data.Inventory.Pets = data.Inventory.Pets or {}
 	data.PlantSlots = data.PlantSlots or {}
+	data.SessionLock = data.SessionLock or nil
+	data.SessionLockTime = data.SessionLockTime or 0
+	data.LastSaved = data.LastSaved or os.time()
 	
-	-- Remove old fields if they exist
+	-- Remove old/invalid fields
 	data.OwnedPlots = nil
 	data.Garden = nil
-	data.Garden = data.Garden or {}
+	
+	-- Validate PlantSlots structure
+	if type(data.PlantSlots) == "table" then
+		for slotIndex, slotData in pairs(data.PlantSlots) do
+			if type(slotData) ~= "table" or not slotData.Type then
+				data.PlantSlots[slotIndex] = nil
+			end
+		end
+	end
 	
 	-- Future version migrations would go here
 	-- if data.Version < 2 then
