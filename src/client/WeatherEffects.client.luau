@@ -15,8 +15,8 @@ local player = Players.LocalPlayer
 local function createRainEffect()
 	local rainPart = Instance.new("Part")
 	rainPart.Name = "RainEffect"
-	rainPart.Size = Vector3.new(100, 1, 100)
-	rainPart.Position = Vector3.new(0, 50, 0)
+	rainPart.Size = Vector3.new(200, 1, 200) -- Larger coverage
+	rainPart.Position = Vector3.new(0, 80, 0) -- Higher up
 	rainPart.Transparency = 1
 	rainPart.Anchored = true
 	rainPart.CanCollide = false
@@ -25,14 +25,16 @@ local function createRainEffect()
 	local rainEmitter = Instance.new("ParticleEmitter")
 	rainEmitter.Name = "Rain"
 	rainEmitter.Texture = "rbxasset://textures/particles/smoke_main.dds"
-	rainEmitter.Color = ColorSequence.new(Color3.fromRGB(150, 180, 220))
-	rainEmitter.Size = NumberSequence.new(0.2, 0.2)
-	rainEmitter.Transparency = NumberSequence.new(0.3, 0.5)
-	rainEmitter.Lifetime = NumberRange.new(2, 3)
-	rainEmitter.Rate = 100
-	rainEmitter.Speed = NumberRange.new(30, 40)
-	rainEmitter.SpreadAngle = Vector2.new(5, 5)
-	rainEmitter.Acceleration = Vector3.new(0, -50, 0)
+	rainEmitter.Color = ColorSequence.new(Color3.fromRGB(150, 200, 240))
+	rainEmitter.Size = NumberSequence.new(0.4, 0.6) -- Larger droplets
+	rainEmitter.Transparency = NumberSequence.new(0.3, 0.7) -- More visible
+	rainEmitter.Lifetime = NumberRange.new(3, 4) -- Last longer
+	rainEmitter.Rate = 200 -- Much more rain
+	rainEmitter.Speed = NumberRange.new(50, 60) -- Faster fall
+	rainEmitter.SpreadAngle = Vector2.new(2, 2) -- Nearly straight down
+	rainEmitter.Acceleration = Vector3.new(0, -80, 0) -- Gravity effect
+	rainEmitter.EmissionDirection = Enum.NormalId.Bottom
+	rainEmitter.LightEmission = 0.3 -- Slight glow
 	rainEmitter.Parent = rainPart
 	
 	return rainPart

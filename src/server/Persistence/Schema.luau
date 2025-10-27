@@ -14,6 +14,7 @@ function Schema.Default()
 			Seeds = {}, -- {PlantType = count}
 			Pets = {}   -- {PetType = owned}
 		},
+		EquippedPet = nil, -- Currently equipped pet type
 		PlantSlots = {}, -- {[slotIndex] = {Type, Stage, WateredUntil, PetBoost}}
 		SessionLock = nil, -- Session lock for preventing conflicts
 		SessionLockTime = 0,
@@ -38,6 +39,7 @@ function Schema.Migrate(data)
 	data.Inventory = data.Inventory or {Seeds = {}, Pets = {}}
 	data.Inventory.Seeds = data.Inventory.Seeds or {}
 	data.Inventory.Pets = data.Inventory.Pets or {}
+	data.EquippedPet = data.EquippedPet or nil
 	data.PlantSlots = data.PlantSlots or {}
 	data.SessionLock = data.SessionLock or nil
 	data.SessionLockTime = data.SessionLockTime or 0

@@ -11,6 +11,7 @@ local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild(
 -- Load client modules
 local PetController = require(script.Parent.PetController)
 local UIHandler = require(script.Parent.UIHandler)
+local BuffParticles = require(script.Parent.BuffParticles)
 
 -- Wait for character to load
 local player = game.Players.LocalPlayer
@@ -20,5 +21,6 @@ player.CharacterAdded:Wait()
 task.wait(1) -- Give server time to set up
 UIHandler.Initialize()
 PetController.Initialize()
+BuffParticles.Initialize()
 
 print("✨ FeyGarden Client Ready!")

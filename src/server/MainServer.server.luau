@@ -71,4 +71,5 @@ print("  - UpdateCurrency:", ReplicatedStorage:FindFirstChild(Constants.EVENTS.U
 print("  - UpdateInventory:", ReplicatedStorage:FindFirstChild(Constants.EVENTS.UPDATE_INVENTORY) and "✓" or "✗")
 print("  - BuySeed:", ReplicatedStorage:FindFirstChild(Constants.EVENTS.BUY_SEED) and "✓" or "✗")
 print("  - BuyPet:", ReplicatedStorage:FindFirstChild(Constants.EVENTS.BUY_PET) and "✓" or "✗")
+print("  - EquipPet:", ReplicatedStorage:FindFirstChild(Constants.EVENTS.EQUIP_PET) and "✓" or "✗")
 print("  - ToolAction:", ReplicatedStorage:FindFirstChild("ToolAction") and "✓" or "✗")

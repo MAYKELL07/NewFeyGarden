@@ -364,6 +364,30 @@ function DataService.HasPet(userId, petType)
 	return profile.Inventory.Pets[petType] == true
 end
 
+-- Equip a pet
+function DataService.EquipPet(userId, petType)
+	local profile = Profiles[userId]
+	if not profile then return false end
+	
+	-- Check if player owns this pet
+	if not profile.Inventory.Pets[petType] then
+		warn("Player doesn't own pet:", petType)
+		return false
+	end
+	
+	profile.EquippedPet = petType
+	print(string.format("[DataService] Player %d equipped pet: %s", userId, petType))
+	return true
+end
+
+-- Get equipped pet
+function DataService.GetEquippedPet(userId)
+	local profile = Profiles[userId]
+	if not profile then return nil end
+	
+	return profile.EquippedPet
+end
+
 -- Force save a player's profile (useful for important actions)
 function DataService.ForceSave(userId)
 	return SaveProfile(userId, false)

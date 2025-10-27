@@ -13,7 +13,11 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 -- Player data cache
 local playerCoins = 0
-local playerInventory = {}
+local playerInventory = {
+	Seeds = {},
+	Pets = {},
+	EquippedPet = nil
+}
 local currentWeather = "Sunny"
 local selectedPlantType = nil
 
@@ -316,6 +320,7 @@ local function createShopUI()
 	-- Add pet items
 	for petType, config in pairs(Constants.PET_CONFIG) do
 		local itemFrame = Instance.new("Frame")
+		itemFrame.Name = petType .. "PetFrame"
 		itemFrame.Size = UDim2.new(1, -10, 0, 80)
 		itemFrame.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
 		itemFrame.Parent = itemsContainer
@@ -336,6 +341,7 @@ local function createShopUI()
 		nameLabel.Parent = itemFrame
 		
 		local priceLabel = Instance.new("TextLabel")
+		priceLabel.Name = "PriceLabel"
 		priceLabel.Size = UDim2.new(0.5, 0, 0.5, 0)
 		priceLabel.Position = UDim2.new(0, 10, 0.5, 0)
 		priceLabel.BackgroundTransparency = 1
@@ -346,24 +352,39 @@ local function createShopUI()
 		priceLabel.TextXAlignment = Enum.TextXAlignment.Left
 		priceLabel.Parent = itemFrame
 		
-		local buyButton = Instance.new("TextButton")
-		buyButton.Size = UDim2.new(0, 100, 0, 60)
-		buyButton.Position = UDim2.new(1, -110, 0.5, -30)
-		buyButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-		buyButton.Text = "BUY"
-		buyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-		buyButton.Font = Enum.Font.SourceSansBold
-		buyButton.TextSize = 18
-		buyButton.Parent = itemFrame
+		local actionButton = Instance.new("TextButton")
+		actionButton.Name = "ActionButton"
+		actionButton.Size = UDim2.new(0, 100, 0, 60)
+		actionButton.Position = UDim2.new(1, -110, 0.5, -30)
+		actionButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+		actionButton.Text = "BUY"
+		actionButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+		actionButton.Font = Enum.Font.SourceSansBold
+		actionButton.TextSize = 18
+		actionButton.Parent = itemFrame
 		
 		local buyCorner = Instance.new("UICorner")
 		buyCorner.CornerRadius = UDim.new(0, 8)
-		buyCorner.Parent = buyButton
+		buyCorner.Parent = actionButton
 		
-		buyButton.MouseButton1Click:Connect(function()
-			local buyPetEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.BUY_PET)
-			if buyPetEvent then
-				buyPetEvent:FireServer(petType)
+		-- Store reference for updating later
+		itemFrame:SetAttribute("PetType", petType)
+		
+		actionButton.MouseButton1Click:Connect(function()
+			local isOwned = playerInventory.Pets and playerInventory.Pets[petType]
+			
+			if isOwned then
+				-- Equip the pet
+				local equipPetEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.EQUIP_PET)
+				if equipPetEvent then
+					equipPetEvent:FireServer(petType)
+				end
+			else
+				-- Buy the pet
+				local buyPetEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.BUY_PET)
+				if buyPetEvent then
+					buyPetEvent:FireServer(petType)
+				end
 			end
 		end)
 	end
@@ -399,6 +420,7 @@ local function updateInventoryDisplay(inventory)
 	local screenGui = playerGui:FindFirstChild("FeyGardenUI")
 	if not screenGui then return end
 	
+	-- Update seed inventory display
 	local seedContainer = screenGui.InventoryFrame:FindFirstChild("SeedContainer")
 	if not seedContainer then return end
 	
@@ -478,6 +500,59 @@ local function updateWeatherDisplay(weather)
 	weatherLabel.Text = icon .. " " .. weather
 end
 
+-- Update shop pet display based on ownership
+local function updateShopPetDisplay()
+	local screenGui = playerGui:FindFirstChild("FeyGardenUI")
+	if not screenGui then return end
+	
+	local shopWindow = screenGui:FindFirstChild("ShopWindow")
+	if not shopWindow then return end
+	
+	local itemsContainer = shopWindow:FindFirstChild("ScrollingFrame")
+	if not itemsContainer then return end
+	
+	-- Update each pet item frame
+	for _, itemFrame in ipairs(itemsContainer:GetChildren()) do
+		if itemFrame:IsA("Frame") and itemFrame:GetAttribute("PetType") then
+			local petType = itemFrame:GetAttribute("PetType")
+			local actionButton = itemFrame:FindFirstChild("ActionButton")
+			local priceLabel = itemFrame:FindFirstChild("PriceLabel")
+			
+			if actionButton and priceLabel then
+				local isOwned = playerInventory.Pets and playerInventory.Pets[petType]
+				local isEquipped = playerInventory.EquippedPet == petType
+				
+				if isOwned then
+					-- Player owns this pet
+					if isEquipped then
+						actionButton.Text = "EQUIPPED"
+						actionButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
+						priceLabel.Text = "✓ Currently Active"
+						priceLabel.TextColor3 = Color3.fromRGB(100, 255, 100)
+						itemFrame.BackgroundColor3 = Color3.fromRGB(50, 90, 50) -- Highlight
+					else
+						actionButton.Text = "EQUIP"
+						actionButton.BackgroundColor3 = Color3.fromRGB(50, 100, 200)
+						priceLabel.Text = "✓ Owned"
+						priceLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+						itemFrame.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+					end
+				else
+					-- Player doesn't own this pet
+					local config = Constants.PET_CONFIG[petType]
+					actionButton.Text = "BUY"
+					actionButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+					if config then
+						priceLabel.Text = "💰 " .. config.Price .. " coins"
+						priceLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+					end
+					itemFrame.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+				end
+			end
+		end
+	end
+end
+
 -- Initialize UI Handler
 function UIHandler.Initialize()
 	print("UIHandler initialized")
@@ -507,7 +582,10 @@ function UIHandler.Initialize()
 	-- Listen for inventory updates
 	local updateInventoryEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.UPDATE_INVENTORY, 10)
 	if updateInventoryEvent then
-		updateInventoryEvent.OnClientEvent:Connect(updateInventoryDisplay)
+		updateInventoryEvent.OnClientEvent:Connect(function(inventory)
+			updateInventoryDisplay(inventory)
+			updateShopPetDisplay() -- Update pet buttons when inventory changes
+		end)
 	else
 		warn("UpdateInventory RemoteEvent not found!")
 	end

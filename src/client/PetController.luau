@@ -92,32 +92,39 @@ local function updatePetFollow()
 	bodyPosition.Position = targetPosition + Vector3.new(0, bobOffset, 0)
 	
 	-- Apply pet boost to nearby plants
-	local plotsFolder = Config.functions.GetWorldFolder(Config.World.PlotsFolder)
-	if not plotsFolder then return end
+	local Config = require(ReplicatedStorage.Shared.Config)
+	local gardensFolder = Workspace:FindFirstChild(Config.World.GardensFolder)
+	if not gardensFolder then return end
 	
 	local petPosition = petBody.Position
 	
-	for _, plot in ipairs(plotsFolder:GetChildren()) do
-		if plot:IsA("Model") then
-			-- Find plant in plot
-			for _, child in ipairs(plot:GetChildren()) do
-				if child:IsA("Model") and child:GetAttribute("PlantType") then
-					local plantPos = child:GetBoundingBox().Position
-					local distance = (plantPos - petPosition).Magnitude
-					
-					-- Apply boost if close enough
-					if distance <= PET_BOOST_RADIUS then
-						if not child:GetAttribute("PetBoost") then
-							child:SetAttribute("PetBoost", true)
-							-- Emit cheer VFX occasionally
-							if math.random() < 0.01 then  -- 1% chance per frame
-								VFXModule.TryEmitPetCheer(PetController.CurrentPet)
+	-- Scan all gardens for plants
+	for _, garden in ipairs(gardensFolder:GetChildren()) do
+		if garden:IsA("Folder") then
+			local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
+			if plotsFolder and plotsFolder:IsA("Folder") then
+				-- Check each PlantAnchor
+				for _, anchor in ipairs(plotsFolder:GetChildren()) do
+					if anchor:IsA("BasePart") then
+						-- Find plant model in anchor
+						for _, child in ipairs(anchor:GetChildren()) do
+							if child:IsA("Model") and child:GetAttribute("PlantType") then
+								local plantPos = child:GetBoundingBox().Position
+								local distance = (plantPos - petPosition).Magnitude
+								
+								-- Apply boost if close enough
+								if distance <= PET_BOOST_RADIUS then
+									if not child:GetAttribute("PetBoost") then
+										child:SetAttribute("PetBoost", true)
+										print(string.format("[PetController] Pet boosting plant at distance %.1f", distance))
+									end
+								else
+									-- Remove boost if too far
+									if child:GetAttribute("PetBoost") then
+										child:SetAttribute("PetBoost", false)
+									end
+								end
 							end
-						end
-					else
-						-- Remove boost if too far
-						if child:GetAttribute("PetBoost") then
-							child:SetAttribute("PetBoost", false)
 						end
 					end
 				end
@@ -157,16 +164,21 @@ end
 function PetController.Initialize()
 	print("PetController initialized")
 	
-	-- Listen for inventory updates to spawn pets
+	-- Listen for inventory updates to spawn equipped pet
 	local updateInventoryEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.UPDATE_INVENTORY)
 	updateInventoryEvent.OnClientEvent:Connect(function(inventory)
-		-- Check if player has any pets
-		if inventory.Pets then
-			for petType, owned in pairs(inventory.Pets) do
-				if owned and not PetController.CurrentPet then
-					PetController.SpawnPet(petType)
-					break
-				end
+		-- Check if player has an equipped pet
+		if inventory.EquippedPet then
+			-- Only spawn if it's different from current pet
+			local currentPetType = PetController.CurrentPet and PetController.CurrentPet:GetAttribute("PetType")
+			if currentPetType ~= inventory.EquippedPet then
+				PetController.SpawnPet(inventory.EquippedPet)
+			end
+		else
+			-- No equipped pet, remove current pet
+			if PetController.CurrentPet then
+				PetController.CurrentPet:Destroy()
+				PetController.CurrentPet = nil
 			end
 		end
 	end)

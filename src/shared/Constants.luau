@@ -96,6 +96,7 @@ Constants.EVENTS = {
 	HARVEST_PLANT = "HarvestPlant",
 	BUY_SEED = "BuySeed",
 	BUY_PET = "BuyPet",
+	EQUIP_PET = "EquipPet",
 	UPDATE_CURRENCY = "UpdateCurrency",
 	UPDATE_INVENTORY = "UpdateInventory"
 }

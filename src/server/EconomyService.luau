@@ -21,6 +21,10 @@ local buyPetEvent = Instance.new("RemoteEvent")
 buyPetEvent.Name = Constants.EVENTS.BUY_PET
 buyPetEvent.Parent = ReplicatedStorage
 
+local equipPetEvent = Instance.new("RemoteEvent")
+equipPetEvent.Name = Constants.EVENTS.EQUIP_PET
+equipPetEvent.Parent = ReplicatedStorage
+
 local updateCurrencyEvent = Instance.new("RemoteEvent")
 updateCurrencyEvent.Name = Constants.EVENTS.UPDATE_CURRENCY
 updateCurrencyEvent.Parent = ReplicatedStorage
@@ -95,14 +99,20 @@ function EconomyService.SyncPlayerData(player)
 	-- Update cache
 	EconomyService.PlayerData[player.UserId] = {
 		Coins = profile.Coins,
-		Inventory = profile.Inventory
+		Inventory = profile.Inventory,
+		EquippedPet = profile.EquippedPet
 	}
 	
 	-- Update currency
 	updateCurrencyEvent:FireClient(player, profile.Coins, true)
 	
-	-- Update inventory
-	updateInventoryEvent:FireClient(player, profile.Inventory)
+	-- Update inventory (now includes EquippedPet)
+	local inventoryData = {
+		Seeds = profile.Inventory.Seeds,
+		Pets = profile.Inventory.Pets,
+		EquippedPet = profile.EquippedPet
+	}
+	updateInventoryEvent:FireClient(player, inventoryData)
 end
 
 -- Add coins to player
@@ -233,6 +243,36 @@ function EconomyService.BuyPet(player, petType)
 	return true
 end
 
+-- Equip pet
+function EconomyService.EquipPet(player, petType)
+	local config = Constants.PET_CONFIG[petType]
+	if not config then
+		warn("Invalid pet type:", petType)
+		return false
+	end
+	
+	-- Check if player owns this pet
+	if not DataService.HasPet(player.UserId, petType) then
+		warn(player.Name .. " doesn't own this pet")
+		return false
+	end
+	
+	-- Equip the pet
+	DataService.EquipPet(player.UserId, petType)
+	
+	-- Update cache
+	local profile = DataService.GetProfile(player.UserId)
+	if profile then
+		EconomyService.PlayerData[player.UserId].Inventory = profile.Inventory
+		EconomyService.PlayerData[player.UserId].EquippedPet = profile.EquippedPet
+	end
+	
+	EconomyService.SyncPlayerData(player)
+	
+	print(player.Name .. " equipped " .. petType .. " pet")
+	return true
+end
+
 -- Initialize Economy Service
 function EconomyService.Initialize()
 	print("EconomyService: Initializing...")
@@ -245,6 +285,11 @@ function EconomyService.Initialize()
 	-- Handle buy pet requests
 	buyPetEvent.OnServerEvent:Connect(function(player, petType)
 		EconomyService.BuyPet(player, petType)
+	end)
+	
+	-- Handle equip pet requests
+	equipPetEvent.OnServerEvent:Connect(function(player, petType)
+		EconomyService.EquipPet(player, petType)
 	end)
 	
 	-- Handle harvest rewards (listen for update currency from GardenManager)
