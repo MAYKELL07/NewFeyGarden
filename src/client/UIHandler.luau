@@ -17,35 +17,66 @@ local playerInventory = {}
 local currentWeather = "Sunny"
 local selectedPlantType = nil
 
--- Helper function to find next available slot
-local function getNextAvailableSlot()
+-- Helper function to find player's assigned garden
+local function getPlayerGarden()
 	local Config = require(ReplicatedStorage.Shared.Config)
-	local plotsFolder = game.Workspace:FindFirstChild(Config.World.PlotsFolder)
-	if not plotsFolder then return 1 end
+	local gardensFolder = game.Workspace:FindFirstChild(Config.World.GardensFolder)
+	if not gardensFolder then 
+		warn("[getPlayerGarden] Gardens folder not found in Workspace")
+		return nil 
+	end
 	
-	-- Find player's plot
-	for _, plot in ipairs(plotsFolder:GetChildren()) do
-		if plot:GetAttribute("Owner") == player.UserId then
-			-- Track which slots are occupied
-			local occupiedSlots = {}
-			for _, child in ipairs(plot:GetChildren()) do
-				if child:IsA("Model") and child:GetAttribute("SlotIndex") then
-					occupiedSlots[child:GetAttribute("SlotIndex")] = true
-				end
+	-- Check each garden's OwnerUserId attribute (more reliable than sign text)
+	for _, garden in ipairs(gardensFolder:GetChildren()) do
+		if garden:IsA("Folder") then
+			local ownerId = garden:GetAttribute("OwnerUserId")
+			if ownerId == player.UserId then
+				print(string.format("[getPlayerGarden] ✓ Found garden: %s (OwnerUserId: %d)", garden.Name, ownerId))
+				return garden
 			end
-			
-			-- Find first available slot
-			for i = 1, Constants.MAX_PLANTS_PER_PLOT do
-				if not occupiedSlots[i] then
-					return i
-				end
-			end
-			
-			-- If all slots occupied, return 1
-			return 1
 		end
 	end
 	
+	print(string.format("[getPlayerGarden] No garden found for UserId: %d", player.UserId))
+	return nil
+end
+
+-- Helper function to find next available slot in player's garden
+local function getNextAvailableSlot()
+	local Config = require(ReplicatedStorage.Shared.Config)
+	local garden = getPlayerGarden()
+	if not garden then return 1 end
+	
+	-- Find Plots folder within garden
+	local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
+	if not plotsFolder then return 1 end
+	
+	-- Track which slots are occupied
+	local occupiedSlots = {}
+	
+	-- Check each PlantAnchor for existing plants
+	for i = 1, Config.Garden.SlotsPerGarden do
+		local anchorName = Config.Garden.PlantAnchorPrefix .. tostring(i)
+		local anchor = plotsFolder:FindFirstChild(anchorName)
+		if anchor then
+			-- Check if anchor has a plant model
+			for _, child in ipairs(anchor:GetChildren()) do
+				if child:IsA("Model") and child:GetAttribute("PlantType") then
+					occupiedSlots[i] = true
+					break
+				end
+			end
+		end
+	end
+	
+	-- Find first available slot
+	for i = 1, Config.Garden.SlotsPerGarden do
+		if not occupiedSlots[i] then
+			return i
+		end
+	end
+	
+	-- If all slots occupied, return 1 (server will handle the error)
 	return 1
 end
 
@@ -402,7 +433,15 @@ local function updateInventoryDisplay(inventory)
 				
 				button.MouseButton1Click:Connect(function()
 					selectedPlantType = plantType
-					print("Selected:", plantType)
+					print(string.format("[UIHandler] 🌱 SEED SELECTED: %s (Count: %d)", plantType, count))
+					
+					-- Visual feedback - highlight selected seed
+					for _, child in ipairs(seedContainer:GetChildren()) do
+						if child:IsA("Frame") then
+							child.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+						end
+					end
+					seedFrame.BackgroundColor3 = Color3.fromRGB(100, 150, 100) -- Highlight selected
 				end)
 				
 				local countLabel = Instance.new("TextLabel")
@@ -458,36 +497,130 @@ function UIHandler.Initialize()
 	end
 	
 	-- Listen for currency updates
-	local updateCurrencyEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.UPDATE_CURRENCY)
-	updateCurrencyEvent.OnClientEvent:Connect(updateCurrencyDisplay)
+	local updateCurrencyEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.UPDATE_CURRENCY, 10)
+	if updateCurrencyEvent then
+		updateCurrencyEvent.OnClientEvent:Connect(updateCurrencyDisplay)
+	else
+		warn("UpdateCurrency RemoteEvent not found!")
+	end
 	
 	-- Listen for inventory updates
-	local updateInventoryEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.UPDATE_INVENTORY)
-	updateInventoryEvent.OnClientEvent:Connect(updateInventoryDisplay)
+	local updateInventoryEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.UPDATE_INVENTORY, 10)
+	if updateInventoryEvent then
+		updateInventoryEvent.OnClientEvent:Connect(updateInventoryDisplay)
+	else
+		warn("UpdateInventory RemoteEvent not found!")
+	end
 	
 	-- Listen for weather updates
-	local weatherChangedEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.WEATHER_CHANGED)
-	weatherChangedEvent.OnClientEvent:Connect(updateWeatherDisplay)
+	local weatherChangedEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.WEATHER_CHANGED, 10)
+	if weatherChangedEvent then
+		weatherChangedEvent.OnClientEvent:Connect(updateWeatherDisplay)
+	else
+		warn("WeatherChanged RemoteEvent not found!")
+	end
 	
-	-- Plant seed on click
-	local mouse = player:GetMouse()
-	mouse.Button1Down:Connect(function()
-		if not selectedPlantType then return end
+	-- Setup ClickDetector connections for PlantAnchors
+	local Config = require(ReplicatedStorage.Shared.Config)
+	local function setupGardenClicks(garden)
+		print(string.format("[UIHandler] Setting up garden clicks for: %s", garden.Name))
 		
-		-- Don't plant if a tool is equipped
-		local character = player.Character
-		if character then
-			local equippedTool = character:FindFirstChildOfClass("Tool")
-			if equippedTool then return end -- Tool is equipped, let ToolClient handle it
+		local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
+		if not plotsFolder then 
+			warn(string.format("[UIHandler] No Plots folder found in %s", garden.Name))
+			return 
 		end
 		
-		local target = mouse.Target
-		if target and target.Name == "Floor" and target.Parent:FindFirstChild("Sign") then
-			-- Check if it's player's plot
-			local plantSeedEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.PLANT_SEED)
-			if plantSeedEvent then
-				local nextSlot = getNextAvailableSlot()
-				plantSeedEvent:FireServer(selectedPlantType, nextSlot)
+		print(string.format("[UIHandler] Found Plots folder, setting up %d anchors", Config.Garden.SlotsPerGarden))
+		local setupCount = 0
+		
+		for i = 1, Config.Garden.SlotsPerGarden do
+			local anchorName = Config.Garden.PlantAnchorPrefix .. tostring(i)
+			local anchor = plotsFolder:FindFirstChild(anchorName)
+			
+			if not anchor then
+				warn(string.format("[UIHandler] Anchor not found: %s", anchorName))
+			elseif not anchor:IsA("BasePart") then
+				warn(string.format("[UIHandler] %s is not a BasePart, it's a %s", anchorName, anchor.ClassName))
+			else
+				local clickDetector = anchor:FindFirstChildOfClass("ClickDetector")
+				if not clickDetector then
+					warn(string.format("[UIHandler] No ClickDetector found on %s", anchorName))
+				else
+					clickDetector.MouseClick:Connect(function(playerWhoClicked)
+						print(string.format("[UIHandler] 🖱️ CLICK DETECTED on %s by %s", anchor.Name, playerWhoClicked.Name))
+						
+						if playerWhoClicked ~= player then 
+							print(string.format("[UIHandler] ❌ Click was by different player: %s (expected %s)", playerWhoClicked.Name, player.Name))
+							return 
+						end
+						
+						print(string.format("[UIHandler] ✓ Click is by local player"))
+						
+						-- Check if player has a seed selected
+						if not selectedPlantType then
+							warn("[UIHandler] ❌ No seed selected! Click a seed in your inventory first.")
+							return
+						end
+						
+						print(string.format("[UIHandler] ✓ Selected plant type: %s", selectedPlantType))
+						
+						-- Check if a tool is equipped
+						local character = player.Character
+						if character then
+							local equippedTool = character:FindFirstChildOfClass("Tool")
+							if equippedTool then 
+								print(string.format("[UIHandler] ❌ Tool equipped: %s - not planting", equippedTool.Name))
+								return 
+							end
+						end
+						
+						print("[UIHandler] ✓ No tool equipped")
+						
+						-- Find which slot this anchor is
+						local slotIndex = tonumber(string.match(anchor.Name, "%d+"))
+						if not slotIndex then 
+							warn(string.format("[UIHandler] ❌ Could not extract slot number from %s", anchor.Name))
+							return 
+						end
+						
+						print(string.format("[UIHandler] ✓ Slot index: %d", slotIndex))
+						
+						-- Send plant request to server
+						local plantSeedEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.PLANT_SEED)
+						if not plantSeedEvent then
+							warn("[UIHandler] ❌ PlantSeed event not found!")
+							return
+						end
+						
+						print(string.format("[UIHandler] 🌱 SENDING PLANT REQUEST - Slot: %d, Plant: %s", slotIndex, selectedPlantType))
+						plantSeedEvent:FireServer(slotIndex, selectedPlantType)
+					end)
+					setupCount = setupCount + 1
+					print(string.format("[UIHandler] ✓ Connected ClickDetector for %s", anchorName))
+				end
+			end
+		end
+		
+		print(string.format("[UIHandler] ✅ Setup complete - %d/%d anchors connected", setupCount, Config.Garden.SlotsPerGarden))
+	end
+	
+	-- Setup clicks for player's garden when they get one
+	print("[UIHandler] Waiting for player garden assignment...")
+	task.spawn(function()
+		local attempts = 0
+		while true do
+			task.wait(1)
+			attempts = attempts + 1
+			local garden = getPlayerGarden()
+			if garden then
+				print(string.format("[UIHandler] ✅ Found player garden after %d attempts: %s", attempts, garden.Name))
+				setupGardenClicks(garden)
+				break
+			else
+				if attempts % 5 == 0 then
+					print(string.format("[UIHandler] Still waiting for garden assignment (attempt %d)...", attempts))
+				end
 			end
 		end
 	end)

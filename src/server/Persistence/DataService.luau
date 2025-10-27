@@ -48,8 +48,6 @@ end
 
 -- Load profile from DataStore
 local function LoadProfile(userId)
-	print("DataService: Loading profile for UserId", userId)
-	
 	local ok, data = retry(function()
 		return PlayerStore:GetAsync(keyFor(userId))
 	end)
@@ -60,11 +58,9 @@ local function LoadProfile(userId)
 	end
 	
 	if not data then
-		print("DataService: No existing data, creating new profile for", userId)
 		return Schema.Default()
 	end
 	
-	print("DataService: Successfully loaded profile for", userId)
 	return Schema.Migrate(data)
 end
 
@@ -72,13 +68,10 @@ end
 local function SaveProfile(userId)
 	local profile = Profiles[userId]
 	if not profile then 
-		warn("DataService: No profile to save for", userId)
 		return false
 	end
 	
 	profile.Version = Schema.CurrentVersion
-	
-	print("DataService: Saving profile for UserId", userId)
 	
 	local ok = retry(function()
 		return PlayerStore:UpdateAsync(keyFor(userId), function(old)
@@ -87,9 +80,7 @@ local function SaveProfile(userId)
 		end)
 	end)
 	
-	if ok then
-		print("DataService: Successfully saved profile for", userId)
-	else
+	if not ok then
 		warn("DataService: Failed to save profile for", userId)
 	end
 	
@@ -108,7 +99,6 @@ local function AutosaveLoop()
 				local ok = SaveProfile(userId)
 				if ok then 
 					LastSave[userId] = os.clock()
-					print("DataService: Autosaved profile for", userId)
 				end
 			end
 		end
@@ -120,18 +110,13 @@ task.spawn(AutosaveLoop)
 
 -- Player join: Load profile
 Players.PlayerAdded:Connect(function(player)
-	print("DataService: Player joined:", player.Name, "UserId:", player.UserId)
-	
 	local profile = LoadProfile(player.UserId)
 	Profiles[player.UserId] = profile
 	LastSave[player.UserId] = os.clock()
-	
-	print("DataService: Profile loaded - Coins:", profile.Coins, "OwnedPlots:", #profile.OwnedPlots)
 end)
 
 -- Player leave: Save profile
 Players.PlayerRemoving:Connect(function(player)
-	print("DataService: Player leaving:", player.Name)
 	SaveProfile(player.UserId)
 	
 	Profiles[player.UserId] = nil
@@ -140,13 +125,9 @@ end)
 
 -- Shutdown: Save all profiles
 game:BindToClose(function()
-	print("DataService: Server shutting down, saving all profiles...")
-	
 	for userId, _ in pairs(Profiles) do
 		SaveProfile(userId)
 	end
-	
-	print("DataService: All profiles saved on shutdown")
 	
 	-- Give a moment for the last saves to complete
 	task.wait(3)
@@ -185,57 +166,38 @@ function DataService.GetCoins(userId)
 	return profile and profile.Coins or 0
 end
 
--- Get plant state for a specific plot
-function DataService.GetPlantState(userId, plotName)
+-- Get plant slot state (for specific slot 1-16)
+function DataService.GetPlantSlot(userId, slotIndex)
 	local profile = Profiles[userId]
 	if not profile then return nil end
 	
-	profile.Garden[plotName] = profile.Garden[plotName] or {}
-	return profile.Garden[plotName]
+	return profile.PlantSlots[slotIndex]
 end
 
--- Set plant state for a specific plot
-function DataService.SetPlantState(userId, plotName, stateTable)
+-- Set plant slot state
+function DataService.SetPlantSlot(userId, slotIndex, plantData)
 	local profile = Profiles[userId]
 	if not profile then return false end
 	
-	profile.Garden[plotName] = stateTable
+	profile.PlantSlots[slotIndex] = plantData
 	return true
 end
 
--- Add an owned plot
-function DataService.AddOwnedPlot(userId, plotName)
+-- Get all plant slots
+function DataService.GetAllPlantSlots(userId)
 	local profile = Profiles[userId]
-	if not profile then return false end
+	if not profile then return {} end
 	
-	local owned = profile.OwnedPlots
-	
-	-- Check if already owned
-	for _, name in ipairs(owned) do
-		if name == plotName then return true end
-	end
-	
-	table.insert(owned, plotName)
-	print("DataService: Added owned plot", plotName, "to user", userId)
-	return true
+	return profile.PlantSlots or {}
 end
 
--- Remove an owned plot
-function DataService.RemoveOwnedPlot(userId, plotName)
+-- Clear plant slot
+function DataService.ClearPlantSlot(userId, slotIndex)
 	local profile = Profiles[userId]
 	if not profile then return false end
 	
-	local owned = profile.OwnedPlots
-	
-	for i, name in ipairs(owned) do
-		if name == plotName then
-			table.remove(owned, i)
-			print("DataService: Removed owned plot", plotName, "from user", userId)
-			return true
-		end
-	end
-	
-	return false
+	profile.PlantSlots[slotIndex] = nil
+	return true
 end
 
 -- Get inventory

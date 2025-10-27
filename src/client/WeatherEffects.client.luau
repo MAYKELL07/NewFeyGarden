@@ -70,7 +70,12 @@ local function showPlantBoostEffects(weatherType)
 end
 
 -- Listen for weather changes
-local weatherEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.WEATHER_CHANGED)
+local weatherEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.WEATHER_CHANGED, 10)
+if not weatherEvent then
+	warn("WeatherChanged RemoteEvent not found - weather effects disabled!")
+	return
+end
+
 weatherEvent.OnClientEvent:Connect(function(weatherType)
 	print("Weather changed to:", weatherType)
 	

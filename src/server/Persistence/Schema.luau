@@ -10,12 +10,11 @@ function Schema.Default()
 	return {
 		Version = Schema.CurrentVersion,
 		Coins = 0,
-		OwnedPlots = {}, -- Array of plot names the player owns
 		Inventory = {
 			Seeds = {}, -- {PlantType = count}
 			Pets = {}   -- {PetType = owned}
 		},
-		Garden = {}, -- {[PlotName] = {Type, Stage, WateredUntil, PetBoost}}
+		PlantSlots = {}, -- {[slotIndex] = {Type, Stage, WateredUntil, PetBoost}}
 	}
 end
 
@@ -33,10 +32,14 @@ function Schema.Migrate(data)
 	
 	-- Add missing fields safely
 	data.Coins = data.Coins or 0
-	data.OwnedPlots = data.OwnedPlots or {}
 	data.Inventory = data.Inventory or {Seeds = {}, Pets = {}}
 	data.Inventory.Seeds = data.Inventory.Seeds or {}
 	data.Inventory.Pets = data.Inventory.Pets or {}
+	data.PlantSlots = data.PlantSlots or {}
+	
+	-- Remove old fields if they exist
+	data.OwnedPlots = nil
+	data.Garden = nil
 	data.Garden = data.Garden or {}
 	
 	-- Future version migrations would go here
