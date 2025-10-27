@@ -209,28 +209,44 @@ end
 
 local function savePlantSlots(userId: number, gardenFolder: Folder)
 	if not Config.Economy.EnablePersistence then
+		print("[SavePlants] Persistence disabled, skipping save")
 		return
 	end
+	
+	print(string.format("[SavePlants] Saving plant slots for UserId %d in %s", userId, gardenFolder.Name))
+	local savedCount = 0
+	local clearedCount = 0
 	
 	for slotIndex = 1, Config.Garden.SlotsPerGarden do
 		local anchor = GardenManager.GetPlantAnchor(gardenFolder, slotIndex)
 		local plantModel = anchor and findPlantModel(anchor) or nil
+		
 		if plantModel then
 			local payload = serializePlant(plantModel)
 			if payload then
 				DataService.SetPlantSlot(userId, slotIndex, payload)
+				savedCount = savedCount + 1
+				print(string.format("[SavePlants] ✓ Saved slot %d: %s (Stage: %s)", slotIndex, payload.Type, payload.Stage))
 			else
 				DataService.ClearPlantSlot(userId, slotIndex)
+				clearedCount = clearedCount + 1
+				warn(string.format("[SavePlants] Failed to serialize plant in slot %d", slotIndex))
 			end
 		else
 			DataService.ClearPlantSlot(userId, slotIndex)
+			clearedCount = clearedCount + 1
 		end
 	end
+	
+	print(string.format("[SavePlants] ✅ Save complete - %d saved, %d cleared", savedCount, clearedCount))
 end
 
 local function restorePlantSlots(userId: number, gardenFolder: Folder)
+	print(string.format("[RestorePlants] Starting restoration for UserId %d in %s", userId, gardenFolder.Name))
+	
 	local cache = ensurePlayerCache(userId)
 
+	-- Clear all existing plants first
 	for slotIndex = 1, Config.Garden.SlotsPerGarden do
 		cache[slotIndex] = nil
 		local anchor = GardenManager.GetPlantAnchor(gardenFolder, slotIndex)
@@ -240,16 +256,28 @@ local function restorePlantSlots(userId: number, gardenFolder: Folder)
 	end
 
 	if not Config.Garden.RestorePlantsOnJoin then
+		print("[RestorePlants] RestorePlantsOnJoin is disabled in config")
 		return
 	end
 
 	local savedSlots = DataService.GetAllPlantSlots(userId)
+	local slotCount = 0
+	for _ in pairs(savedSlots) do slotCount = slotCount + 1 end
+	
+	print(string.format("[RestorePlants] Found %d saved plant slots for UserId %d", slotCount, userId))
+	
+	local restoredCount = 0
 	for slotIndex, state in pairs(savedSlots) do
+		print(string.format("[RestorePlants] Processing slot %s: %s", tostring(slotIndex), 
+			type(state) == "table" and string.format("Type=%s, Stage=%s", state.Type or "nil", state.Stage or "nil") or "invalid"))
+		
 		local numericIndex = tonumber(slotIndex)
 		if numericIndex and isValidSlot(numericIndex) then
 			if type(state) == "table" and type(state.Type) == "string" then
 				local anchor = GardenManager.GetPlantAnchor(gardenFolder, numericIndex)
 				if anchor then
+					print(string.format("[RestorePlants] Creating plant: %s at slot %d", state.Type, numericIndex))
+					
 					local plantModel = PlantModule.CreatePlantModel(state.Type, anchor.Position)
 					if plantModel then
 						plantModel:SetAttribute("OwnerUserId", userId)
@@ -261,11 +289,25 @@ local function restorePlantSlots(userId: number, gardenFolder: Folder)
 
 						continueGrowthFromStage(plantModel, state.Stage)
 						cache[numericIndex] = plantModel
+						restoredCount = restoredCount + 1
+						
+						print(string.format("[RestorePlants] ✓ Restored %s in slot %d (Stage: %s)", 
+							state.Type, numericIndex, state.Stage or "SEED"))
+					else
+						warn(string.format("[RestorePlants] ✗ Failed to create plant model for %s", state.Type))
 					end
+				else
+					warn(string.format("[RestorePlants] ✗ No anchor found for slot %d", numericIndex))
 				end
+			else
+				warn(string.format("[RestorePlants] ✗ Invalid slot data for slot %s", tostring(slotIndex)))
 			end
+		else
+			warn(string.format("[RestorePlants] ✗ Invalid slot index: %s", tostring(slotIndex)))
 		end
 	end
+	
+	print(string.format("[RestorePlants] ✅ Restoration complete - %d/%d plants restored", restoredCount, slotCount))
 end
 
 local function findGardenForPlayer(userId: number): Folder?
@@ -373,24 +415,50 @@ end
 
 function GardenManager.AssignGarden(player: Player): (boolean, string?)
 	if GardenManager.PlayerGardens[player.UserId] then
+		print(string.format("[AssignGarden] %s already has a garden assigned", player.Name))
 		return true, nil
 	end
 
 	local garden = findGardenForPlayer(player.UserId)
 	if not garden then
+		warn(string.format("[AssignGarden] No available gardens for %s", player.Name))
 		return false, "No available gardens"
 	end
+
+	print(string.format("[AssignGarden] Assigning %s to %s", garden.Name, player.Name))
 
 	GardenManager.PlayerGardens[player.UserId] = garden
 	GardenManager.GardenAssignments[garden.Name] = player.UserId
 	garden:SetAttribute("OwnerUserId", player.UserId)
 	updateGardenSign(garden, player.DisplayName)
 
-	restorePlantSlots(player.UserId, garden)
+	-- Wait a moment for DataService to be ready
+	task.wait(0.5)
+	
+	-- Check if DataService has loaded the profile
+	if not DataService.IsDataLoaded(player.UserId) then
+		warn(string.format("[AssignGarden] DataService not ready for %s, delaying plant restoration", player.Name))
+		task.spawn(function()
+			local attempts = 0
+			while not DataService.IsDataLoaded(player.UserId) and attempts < 20 do
+				task.wait(0.5)
+				attempts = attempts + 1
+			end
+			if DataService.IsDataLoaded(player.UserId) then
+				print(string.format("[AssignGarden] DataService ready after %d attempts, restoring plants", attempts))
+				restorePlantSlots(player.UserId, garden)
+			else
+				warn(string.format("[AssignGarden] DataService never loaded for %s, skipping plant restoration", player.Name))
+			end
+		end)
+	else
+		restorePlantSlots(player.UserId, garden)
+	end
 	
 	-- Ensure ClickDetectors are set up
 	setupClickDetectors(garden)
 
+	print(string.format("[AssignGarden] ✓ Successfully assigned %s to %s", garden.Name, player.Name))
 	return true, nil
 end
 
