@@ -41,7 +41,7 @@ local function createAdminUI()
 	local prefixLabel = Instance.new("TextLabel")
 	prefixLabel.Size = UDim2.new(0, 30, 1, 0)
 	prefixLabel.BackgroundTransparency = 1
-	prefixLabel.Text = "/"
+	prefixLabel.Text = "p"
 	prefixLabel.TextColor3 = Color3.fromRGB(255, 255, 0)
 	prefixLabel.Font = Enum.Font.SourceSansBold
 	prefixLabel.TextSize = 20
@@ -100,11 +100,11 @@ local function showOutput(success, message)
 	end)
 end
 
--- Toggle command frame with / key
+-- Toggle command frame with P key
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	
-	if input.KeyCode == Enum.KeyCode.Slash then
+	if input.KeyCode == Enum.KeyCode.P then
 		commandFrame.Visible = not commandFrame.Visible
 		if commandFrame.Visible then
 			commandBox:CaptureFocus()
@@ -136,4 +136,4 @@ adminCommandEvent.OnClientEvent:Connect(function(success, message)
 	print("[Admin]", message)
 end)
 
-print("🔧 Admin UI Loaded - Press '/' to open command console")
+print("🔧 Admin UI Loaded - Press 'P' to open command console")

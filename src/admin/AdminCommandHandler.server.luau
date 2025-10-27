@@ -58,15 +58,15 @@ adminCommandEvent.OnServerEvent:Connect(function(player, commandString)
 		
 	elseif command == "help" then
 		local commands = AdminCommands.GetCommandsList()
-		message = "=== Admin Commands ===\n"
+		message = "=== Admin Commands (Press P to open) ===\n"
 		for _, cmd in ipairs(commands) do
-			message = message .. string.format("/%s - %s\n", cmd.usage, cmd.desc)
+			message = message .. string.format("%s - %s\n", cmd.usage, cmd.desc)
 		end
 		success = true
 		
 	else
 		success = false
-		message = "Unknown command: " .. command .. ". Type /help for command list."
+		message = "Unknown command: " .. command .. ". Type 'help' for command list."
 	end
 	
 	-- Send response back to client
@@ -84,7 +84,7 @@ end)
 Players.PlayerAdded:Connect(function(player)
 	if AdminCommands.IsAdmin(player) then
 		task.wait(2)
-		adminCommandEvent:FireClient(player, true, "🔧 Admin commands enabled! Type /help for commands.")
-		print(string.format("[ADMIN] %s joined as admin", player.Name))
+		adminCommandEvent:FireClient(player, true, "🔧 Admin commands enabled! Press P and type 'help' for commands.")
+		print(string.format("[ADMIN] %s joined as admin (UserId: %d)", player.Name, player.UserId))
 	end
 end)

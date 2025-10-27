@@ -6,25 +6,23 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local AdminCommands = {}
 
--- List of admin user IDs (add your Roblox User ID here)
+-- List of admin user IDs - ONLY THESE USERS CAN USE ADMIN COMMANDS
 AdminCommands.AdminUsers = {
-	-- Add admin user IDs here, e.g.:
-	-- 123456789,
+	2337178779, -- Add your UserIds here (one per line)
+	-- Example: 123456789,
+	-- Example: 987654321,
 }
 
 -- Check if player is admin
 function AdminCommands.IsAdmin(player)
-	-- In testing mode, everyone is admin
-	if game:GetService("RunService"):IsStudio() then
-		return true
-	end
-	
+	-- Check whitelist
 	for _, userId in ipairs(AdminCommands.AdminUsers) do
 		if player.UserId == userId then
 			return true
 		end
 	end
 	
+	-- No one else is admin (including in Studio)
 	return false
 end
 
