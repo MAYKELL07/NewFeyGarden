@@ -97,19 +97,27 @@ end
 function AdminCommands.GrowAllPlants(player)
 	local ServerScriptService = game:GetService("ServerScriptService")
 	local GardenManager = require(ServerScriptService.Server.GardenManager)
-	local plotModel = GardenManager.PlayerPlots[player.UserId]
+	local Config = require(ReplicatedStorage.Shared.Config)
+	local garden = GardenManager.PlayerGardens[player.UserId]
 	
-	if not plotModel then
-		return false, "No plot found"
+	if not garden then
+		return false, "No garden found"
 	end
 	
 	local count = 0
-	for _, child in ipairs(plotModel:GetChildren()) do
-		if child:IsA("Model") and child:GetAttribute("PlantType") then
-			child:SetAttribute("Stage", "Bloom")
-			local PlantModule = require(ReplicatedStorage.Shared.PlantModule)
-			PlantModule.UpdatePlantVisual(child)
-			count = count + 1
+	local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
+	if plotsFolder then
+		for _, anchor in ipairs(plotsFolder:GetChildren()) do
+			if anchor:IsA("BasePart") then
+				for _, child in ipairs(anchor:GetChildren()) do
+					if child:IsA("Model") and child:GetAttribute("PlantType") then
+						child:SetAttribute("Stage", "Bloom")
+						local PlantModule = require(ReplicatedStorage.Shared.PlantModule)
+						PlantModule.UpdatePlantVisual(child)
+						count = count + 1
+					end
+				end
+			end
 		end
 	end
 	
@@ -120,21 +128,28 @@ end
 function AdminCommands.ClearGarden(player)
 	local ServerScriptService = game:GetService("ServerScriptService")
 	local GardenManager = require(ServerScriptService.Server.GardenManager)
-	local plotModel = GardenManager.PlayerPlots[player.UserId]
+	local Config = require(ReplicatedStorage.Shared.Config)
+	local garden = GardenManager.PlayerGardens[player.UserId]
 	
-	if not plotModel then
-		return false, "No plot found"
+	if not garden then
+		return false, "No garden found"
 	end
 	
 	local count = 0
-	for _, child in ipairs(plotModel:GetChildren()) do
-		if child:IsA("Model") and child:GetAttribute("PlantType") then
-			child:Destroy()
-			count = count + 1
+	local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
+	if plotsFolder then
+		for _, anchor in ipairs(plotsFolder:GetChildren()) do
+			if anchor:IsA("BasePart") then
+				for _, child in ipairs(anchor:GetChildren()) do
+					if child:IsA("Model") and child:GetAttribute("PlantType") then
+						child:Destroy()
+						count = count + 1
+					end
+				end
+			end
 		end
 	end
 	
-	plotModel:SetAttribute("PlantCount", 0)
 	return true, "Cleared " .. count .. " plants from garden"
 end
 

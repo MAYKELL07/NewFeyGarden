@@ -6,6 +6,7 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
+local Config = require(ReplicatedStorage.Shared.Config)
 
 local UIHandler = {}
 local player = Players.LocalPlayer
@@ -146,22 +147,6 @@ local function createMainUI()
 	weatherLabel.TextScaled = true
 	weatherLabel.Font = Enum.Font.SourceSansBold
 	weatherLabel.Parent = weatherFrame
-	
-	-- Shop Button (bottom right)
-	local shopButton = Instance.new("TextButton")
-	shopButton.Name = "ShopButton"
-	shopButton.Size = UDim2.new(0, 150, 0, 60)
-	shopButton.Position = UDim2.new(1, -160, 1, -70)
-	shopButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
-	shopButton.Text = "🛒 SHOP"
-	shopButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	shopButton.TextScaled = true
-	shopButton.Font = Enum.Font.SourceSansBold
-	shopButton.Parent = screenGui
-	
-	local shopCorner = Instance.new("UICorner")
-	shopCorner.CornerRadius = UDim.new(0, 8)
-	shopCorner.Parent = shopButton
 	
 	-- Inventory Frame (bottom left)
 	local inventoryFrame = Instance.new("Frame")
@@ -561,14 +546,27 @@ function UIHandler.Initialize()
 	local mainUI = createMainUI()
 	createShopUI()
 	
-	-- Setup shop button
-	local shopButton = mainUI:FindFirstChild("ShopButton")
+	-- Setup ProximityPrompt for shop
+	local shopPart = workspace:WaitForChild(Config.World.ShopPartName, 10)
 	local shopWindow = mainUI:FindFirstChild("ShopWindow")
 	
-	if shopButton and shopWindow then
-		shopButton.MouseButton1Click:Connect(function()
-			shopWindow.Visible = not shopWindow.Visible
-		end)
+	if shopPart and shopWindow then
+		local proximityPrompt = shopPart:FindFirstChildOfClass("ProximityPrompt")
+		
+		if proximityPrompt then
+			proximityPrompt.Triggered:Connect(function(playerWhoTriggered)
+				if playerWhoTriggered == player then
+					shopWindow.Visible = not shopWindow.Visible
+					print("[UIHandler] Shop toggled via ProximityPrompt")
+				end
+			end)
+		else
+			warn("[UIHandler] No ProximityPrompt found on " .. Config.World.ShopPartName)
+		end
+	else
+		if not shopPart then
+			warn("[UIHandler] ShopPart not found in workspace: " .. Config.World.ShopPartName)
+		end
 	end
 	
 	-- Listen for currency updates

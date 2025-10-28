@@ -25,6 +25,10 @@
         }
       }
     },
+    "StarterPack": {
+      "$path": "src/tools",
+      "$ignoreUnknownInstances": true
+    },
     "SoundService": {
       "$properties": {
         "RespectFilteringEnabled": true

@@ -432,6 +432,21 @@ function GardenManager.AssignGarden(player: Player): (boolean, string?)
 	garden:SetAttribute("OwnerUserId", player.UserId)
 	updateGardenSign(garden, player.DisplayName)
 
+	-- Teleport player to their garden spawn point on first join
+	local tpPart = garden:FindFirstChild(Config.World.TeleportPartName, true) -- Search recursively
+	if tpPart and tpPart:IsA("BasePart") then
+		-- Wait for character to load
+		local character = player.Character or player.CharacterAdded:Wait()
+		local humanoidRootPart = character:WaitForChild("HumanoidRootPart", 5)
+		
+		if humanoidRootPart then
+			humanoidRootPart.CFrame = tpPart.CFrame + Vector3.new(0, 3, 0) -- Teleport slightly above the part
+			print(string.format("[AssignGarden] Teleported %s to their garden", player.Name))
+		end
+	else
+		warn(string.format("[AssignGarden] No %s found in %s", Config.World.TeleportPartName, garden.Name))
+	end
+
 	-- Wait a moment for DataService to be ready
 	task.wait(0.5)
 	
