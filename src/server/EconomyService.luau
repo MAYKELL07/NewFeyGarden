@@ -25,6 +25,10 @@ local equipPetEvent = Instance.new("RemoteEvent")
 equipPetEvent.Name = Constants.EVENTS.EQUIP_PET
 equipPetEvent.Parent = ReplicatedStorage
 
+local sellFruitEvent = Instance.new("RemoteEvent")
+sellFruitEvent.Name = Constants.EVENTS.SELL_FRUIT
+sellFruitEvent.Parent = ReplicatedStorage
+
 local updateCurrencyEvent = Instance.new("RemoteEvent")
 updateCurrencyEvent.Name = Constants.EVENTS.UPDATE_CURRENCY
 updateCurrencyEvent.Parent = ReplicatedStorage
@@ -106,10 +110,11 @@ function EconomyService.SyncPlayerData(player)
 	-- Update currency
 	updateCurrencyEvent:FireClient(player, profile.Coins, true)
 	
-	-- Update inventory (now includes EquippedPet)
+	-- Update inventory (now includes EquippedPet and Fruits)
 	local inventoryData = {
 		Seeds = profile.Inventory.Seeds,
 		Pets = profile.Inventory.Pets,
+		Fruits = profile.Inventory.Fruits,
 		EquippedPet = profile.EquippedPet
 	}
 	updateInventoryEvent:FireClient(player, inventoryData)
@@ -273,6 +278,46 @@ function EconomyService.EquipPet(player, petType)
 	return true
 end
 
+-- Sell fruit
+function EconomyService.SellFruit(player, fruitName, amount)
+	amount = amount or 1
+	
+	-- Check if player has the fruit
+	local currentCount = DataService.GetFruitCount(player.UserId, fruitName)
+	if currentCount < amount then
+		warn(player.Name .. " doesn't have enough " .. fruitName)
+		return false
+	end
+	
+	-- Get the plant type from fruit name (remove "Fruit" suffix)
+	local plantType = fruitName:gsub("Fruit$", "")
+	local config = Constants.PLANT_CONFIG[plantType]
+	
+	if not config or not config.FruitSellPrice then
+		warn("Invalid fruit or no sell price for:", fruitName)
+		return false
+	end
+	
+	-- Calculate total sell price
+	local totalPrice = config.FruitSellPrice * amount
+	
+	-- Remove fruits from inventory
+	local success = DataService.AddFruit(player.UserId, fruitName, -amount)
+	if not success then
+		warn("Failed to remove fruits from inventory")
+		return false
+	end
+	
+	-- Add coins
+	EconomyService.AddCoins(player, totalPrice)
+	
+	-- Sync inventory to client
+	EconomyService.SyncPlayerData(player)
+	
+	print(string.format("%s sold %dx %s for %d coins", player.Name, amount, fruitName, totalPrice))
+	return true
+end
+
 -- Initialize Economy Service
 function EconomyService.Initialize()
 	print("EconomyService: Initializing...")
@@ -290,6 +335,11 @@ function EconomyService.Initialize()
 	-- Handle equip pet requests
 	equipPetEvent.OnServerEvent:Connect(function(player, petType)
 		EconomyService.EquipPet(player, petType)
+	end)
+	
+	-- Handle sell fruit requests
+	sellFruitEvent.OnServerEvent:Connect(function(player, fruitName, amount)
+		EconomyService.SellFruit(player, fruitName, amount)
 	end)
 	
 	-- Handle harvest rewards (listen for update currency from GardenManager)

@@ -36,6 +36,7 @@ end
 
 local plantSeedEvent = ensureRemoteEvent(Constants.EVENTS.PLANT_SEED)
 local harvestPlantEvent = ensureRemoteEvent(Constants.EVENTS.HARVEST_PLANT)
+local harvestFruitEvent = ensureRemoteEvent(Constants.EVENTS.HARVEST_FRUIT)
 
 local function getGardensFolder(): Folder?
 	local folder = Config.functions.GetWorldFolder(Config.World.GardensFolder)
@@ -113,6 +114,80 @@ local function clearAnchor(anchor: Instance)
 	end
 end
 
+local function setupPlantHarvestDetector(plantModel: Model, userId: number)
+	-- Only setup harvest detector for bloom stage plants
+	local stage = plantModel:GetAttribute("Stage")
+	if stage ~= Constants.GROWTH_STAGES.BLOOM then
+		return
+	end
+	
+	local plantPart = plantModel:FindFirstChild("Plant")
+	if not plantPart or not plantPart:IsA("BasePart") then
+		return
+	end
+	
+	-- Remove existing ClickDetector if present
+	local existingCD = plantPart:FindFirstChildOfClass("ClickDetector")
+	if existingCD then
+		existingCD:Destroy()
+	end
+	
+	-- Create harvest ClickDetector
+	local clickDetector = Instance.new("ClickDetector")
+	clickDetector.MaxActivationDistance = 15
+	clickDetector.Parent = plantPart
+	
+	-- Connect harvest handler
+	clickDetector.MouseClick:Connect(function(clickingPlayer)
+		if clickingPlayer.UserId ~= userId then
+			return -- Only owner can harvest
+		end
+		
+		local plantType = plantModel:GetAttribute("PlantType")
+		if not plantType then
+			return
+		end
+		
+		-- Check if still in bloom stage
+		if plantModel:GetAttribute("Stage") ~= Constants.GROWTH_STAGES.BLOOM then
+			return
+		end
+		
+		-- Generate fruit name
+		local fruitName = plantType .. "Fruit"
+		
+		-- Add fruit to inventory
+		local success = DataService.AddFruit(userId, fruitName, 1)
+		if success then
+			print(string.format("[HarvestFruit] Player %d harvested %s from %s", userId, fruitName, plantType))
+			
+			-- Sync inventory to client
+			EconomyService.SyncPlayerData(clickingPlayer)
+			
+			-- Remove the plant after harvest
+			plantModel:Destroy()
+			
+			-- Clear from cache
+			local cache = GardenManager.ActivePlants[userId]
+			if cache then
+				for slotIndex, cachedPlant in pairs(cache) do
+					if cachedPlant == plantModel then
+						cache[slotIndex] = nil
+						break
+					end
+				end
+			end
+			
+			-- Fire event to client for visual feedback
+			harvestFruitEvent:FireClient(clickingPlayer, fruitName, 1)
+		else
+			warn(string.format("[HarvestFruit] Failed to add fruit for player %d", userId))
+		end
+	end)
+	
+	print(string.format("[HarvestFruit] ✓ Setup harvest detector for %s (UserId: %d)", plantModel:GetAttribute("PlantType"), userId))
+end
+
 local function updateGardenSign(gardenFolder: Folder, playerName: string?)
 	local signModel = gardenFolder:FindFirstChild(Config.World.PlayerSignName)
 	if not signModel or not signModel:IsA("Model") then
@@ -185,7 +260,12 @@ local function continueGrowthFromStage(plantModel: Model, savedStage: string?)
 	plantModel:SetAttribute("Harvestable", currentStage == Constants.GROWTH_STAGES.BLOOM)
 	PlantModule.UpdatePlantVisual(plantModel)
 
+	-- Setup harvest detector if at bloom stage
 	if currentStage == Constants.GROWTH_STAGES.BLOOM then
+		local ownerId = plantModel:GetAttribute("OwnerUserId")
+		if ownerId then
+			setupPlantHarvestDetector(plantModel, ownerId)
+		end
 		return
 	end
 
@@ -203,6 +283,14 @@ local function continueGrowthFromStage(plantModel: Model, savedStage: string?)
 			plantModel:SetAttribute("Stage", nextStage)
 			plantModel:SetAttribute("Harvestable", nextStage == Constants.GROWTH_STAGES.BLOOM)
 			PlantModule.UpdatePlantVisual(plantModel)
+			
+			-- Setup harvest detector when reaching bloom stage
+			if nextStage == Constants.GROWTH_STAGES.BLOOM then
+				local ownerId = plantModel:GetAttribute("OwnerUserId")
+				if ownerId then
+					setupPlantHarvestDetector(plantModel, ownerId)
+				end
+			end
 		end
 	end)
 end

@@ -184,6 +184,42 @@ local function createMainUI()
 	listLayout.Padding = UDim.new(0, 10)
 	listLayout.Parent = seedContainer
 	
+	-- Fruits Inventory Frame (bottom left, below seeds)
+	local fruitsFrame = Instance.new("Frame")
+	fruitsFrame.Name = "FruitsFrame"
+	fruitsFrame.Size = UDim2.new(0, 400, 0, 100)
+	fruitsFrame.Position = UDim2.new(0, 10, 1, -220)
+	fruitsFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+	fruitsFrame.BorderSizePixel = 0
+	fruitsFrame.Parent = screenGui
+	
+	local fruitsCorner = Instance.new("UICorner")
+	fruitsCorner.CornerRadius = UDim.new(0, 8)
+	fruitsCorner.Parent = fruitsFrame
+	
+	local fruitsTitle = Instance.new("TextLabel")
+	fruitsTitle.Size = UDim2.new(1, 0, 0, 25)
+	fruitsTitle.BackgroundTransparency = 1
+	fruitsTitle.Text = "Fruits Inventory"
+	fruitsTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+	fruitsTitle.Font = Enum.Font.SourceSansBold
+	fruitsTitle.TextSize = 18
+	fruitsTitle.Parent = fruitsFrame
+	
+	-- Fruits container
+	local fruitsContainer = Instance.new("Frame")
+	fruitsContainer.Name = "FruitsContainer"
+	fruitsContainer.Size = UDim2.new(1, -20, 1, -35)
+	fruitsContainer.Position = UDim2.new(0, 10, 0, 30)
+	fruitsContainer.BackgroundTransparency = 1
+	fruitsContainer.Parent = fruitsFrame
+	
+	local fruitsLayout = Instance.new("UIListLayout")
+	fruitsLayout.FillDirection = Enum.FillDirection.Horizontal
+	fruitsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	fruitsLayout.Padding = UDim.new(0, 10)
+	fruitsLayout.Parent = fruitsContainer
+	
 	return screenGui
 end
 
@@ -381,6 +417,71 @@ local function createShopUI()
 	end)
 end
 
+-- Create sell shop UI
+local function createSellShopUI()
+	local screenGui = playerGui:FindFirstChild("FeyGardenUI")
+	if not screenGui then return end
+	
+	-- Sell Shop Window
+	local sellWindow = Instance.new("Frame")
+	sellWindow.Name = "SellWindow"
+	sellWindow.Size = UDim2.new(0, 500, 0, 400)
+	sellWindow.Position = UDim2.new(0.5, -250, 0.5, -200)
+	sellWindow.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+	sellWindow.Visible = false
+	sellWindow.Parent = screenGui
+	
+	local sellCorner = Instance.new("UICorner")
+	sellCorner.CornerRadius = UDim.new(0, 12)
+	sellCorner.Parent = sellWindow
+	
+	-- Title
+	local sellTitle = Instance.new("TextLabel")
+	sellTitle.Size = UDim2.new(1, 0, 0, 50)
+	sellTitle.BackgroundTransparency = 1
+	sellTitle.Text = "🍎 Sell Fruits"
+	sellTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+	sellTitle.Font = Enum.Font.SourceSansBold
+	sellTitle.TextSize = 24
+	sellTitle.Parent = sellWindow
+	
+	-- Close button
+	local closeButton = Instance.new("TextButton")
+	closeButton.Size = UDim2.new(0, 40, 0, 40)
+	closeButton.Position = UDim2.new(1, -45, 0, 5)
+	closeButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+	closeButton.Text = "✕"
+	closeButton.TextSize = 20
+	closeButton.Font = Enum.Font.SourceSansBold
+	closeButton.Parent = sellWindow
+	
+	local closeCorner = Instance.new("UICorner")
+	closeCorner.CornerRadius = UDim.new(0, 8)
+	closeCorner.Parent = closeButton
+	
+	closeButton.MouseButton1Click:Connect(function()
+		sellWindow.Visible = false
+	end)
+	
+	-- Scrolling frame for fruits
+	local itemsContainer = Instance.new("ScrollingFrame")
+	itemsContainer.Size = UDim2.new(1, -20, 1, -70)
+	itemsContainer.Position = UDim2.new(0, 10, 0, 60)
+	itemsContainer.BackgroundTransparency = 1
+	itemsContainer.ScrollBarThickness = 6
+	itemsContainer.Parent = sellWindow
+	
+	local itemsLayout = Instance.new("UIListLayout")
+	itemsLayout.Padding = UDim.new(0, 10)
+	itemsLayout.Parent = itemsContainer
+	
+	-- Update canvas size dynamically
+	itemsContainer.CanvasSize = UDim2.new(0, 0, 0, itemsLayout.AbsoluteContentSize.Y)
+	itemsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		itemsContainer.CanvasSize = UDim2.new(0, 0, 0, itemsLayout.AbsoluteContentSize.Y)
+	end)
+end
+
 -- Update currency display
 local function updateCurrencyDisplay(coins, isTotal)
 	local screenGui = playerGui:FindFirstChild("FeyGardenUI")
@@ -405,6 +506,15 @@ local function updateInventoryDisplay(inventory)
 	local screenGui = playerGui:FindFirstChild("FeyGardenUI")
 	if not screenGui then return end
 	
+	-- Check if selected seed still exists with count > 0, if not unselect
+	if selectedPlantType then
+		local seedCount = inventory.Seeds and inventory.Seeds[selectedPlantType] or 0
+		if seedCount <= 0 then
+			selectedPlantType = nil
+			print("[UIHandler] 🌱 Auto-unselected seed (count is 0)")
+		end
+	end
+	
 	-- Update seed inventory display
 	local seedContainer = screenGui.InventoryFrame:FindFirstChild("SeedContainer")
 	if not seedContainer then return end
@@ -419,47 +529,108 @@ local function updateInventoryDisplay(inventory)
 	-- Add seed items
 	if inventory.Seeds then
 		for plantType, count in pairs(inventory.Seeds) do
-			local config = Constants.PLANT_CONFIG[plantType]
-			if config then
-				local seedFrame = Instance.new("Frame")
-				seedFrame.Name = plantType
-				seedFrame.Size = UDim2.new(0, 80, 1, 0)
-				seedFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-				seedFrame.Parent = seedContainer
-				
-				local corner = Instance.new("UICorner")
-				corner.CornerRadius = UDim.new(0, 8)
-				corner.Parent = seedFrame
-				
-				local button = Instance.new("TextButton")
-				button.Size = UDim2.new(1, 0, 0.7, 0)
-				button.BackgroundTransparency = 1
-				button.Text = "🌱"
-				button.TextScaled = true
-				button.Parent = seedFrame
-				
-				button.MouseButton1Click:Connect(function()
-					selectedPlantType = plantType
-					print(string.format("[UIHandler] 🌱 SEED SELECTED: %s (Count: %d)", plantType, count))
+			-- Only show seeds with count > 0
+			if count and count > 0 then
+				local config = Constants.PLANT_CONFIG[plantType]
+				if config then
+					local seedFrame = Instance.new("Frame")
+					seedFrame.Name = plantType
+					seedFrame.Size = UDim2.new(0, 80, 1, 0)
+					seedFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+					seedFrame.Parent = seedContainer
 					
-					-- Visual feedback - highlight selected seed
-					for _, child in ipairs(seedContainer:GetChildren()) do
-						if child:IsA("Frame") then
-							child.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+					local corner = Instance.new("UICorner")
+					corner.CornerRadius = UDim.new(0, 8)
+					corner.Parent = seedFrame
+					
+					local button = Instance.new("TextButton")
+					button.Size = UDim2.new(1, 0, 0.7, 0)
+					button.BackgroundTransparency = 1
+					button.Text = "🌱"
+					button.TextScaled = true
+					button.Parent = seedFrame
+					
+					button.MouseButton1Click:Connect(function()
+						-- Toggle selection: if already selected, unselect it
+						if selectedPlantType == plantType then
+							selectedPlantType = nil
+							print("[UIHandler] 🌱 SEED UNSELECTED")
+							-- Reset all highlights
+							for _, child in ipairs(seedContainer:GetChildren()) do
+								if child:IsA("Frame") then
+									child.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+								end
+							end
+						else
+							selectedPlantType = plantType
+							print(string.format("[UIHandler] 🌱 SEED SELECTED: %s (Count: %d)", plantType, count))
+							
+							-- Visual feedback - highlight selected seed
+							for _, child in ipairs(seedContainer:GetChildren()) do
+								if child:IsA("Frame") then
+									child.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+								end
+							end
+							seedFrame.BackgroundColor3 = Color3.fromRGB(100, 150, 100) -- Highlight selected
 						end
-					end
-					seedFrame.BackgroundColor3 = Color3.fromRGB(100, 150, 100) -- Highlight selected
-				end)
-				
-				local countLabel = Instance.new("TextLabel")
-				countLabel.Size = UDim2.new(1, 0, 0.3, 0)
-				countLabel.Position = UDim2.new(0, 0, 0.7, 0)
-				countLabel.BackgroundTransparency = 1
-				countLabel.Text = tostring(count)
-				countLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-				countLabel.Font = Enum.Font.SourceSansBold
-				countLabel.TextScaled = true
-				countLabel.Parent = seedFrame
+					end)
+					
+					local countLabel = Instance.new("TextLabel")
+					countLabel.Size = UDim2.new(1, 0, 0.3, 0)
+					countLabel.Position = UDim2.new(0, 0, 0.7, 0)
+					countLabel.BackgroundTransparency = 1
+					countLabel.Text = tostring(count)
+					countLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+					countLabel.Font = Enum.Font.SourceSansBold
+					countLabel.TextScaled = true
+					countLabel.Parent = seedFrame
+				end
+			end
+		end
+	end
+	
+	-- Update fruits inventory display
+	local fruitsContainer = screenGui.FruitsFrame:FindFirstChild("FruitsContainer")
+	if fruitsContainer then
+		-- Clear existing items
+		for _, child in ipairs(fruitsContainer:GetChildren()) do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+		
+		-- Add fruit items
+		if inventory.Fruits then
+			for fruitName, count in pairs(inventory.Fruits) do
+				-- Only show fruits with count > 0
+				if count and count > 0 then
+					local fruitFrame = Instance.new("Frame")
+					fruitFrame.Name = fruitName
+					fruitFrame.Size = UDim2.new(0, 80, 1, 0)
+					fruitFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+					fruitFrame.Parent = fruitsContainer
+					
+					local corner = Instance.new("UICorner")
+					corner.CornerRadius = UDim.new(0, 8)
+					corner.Parent = fruitFrame
+					
+					local icon = Instance.new("TextLabel")
+					icon.Size = UDim2.new(1, 0, 0.7, 0)
+					icon.BackgroundTransparency = 1
+					icon.Text = "🍎"
+					icon.TextScaled = true
+					icon.Parent = fruitFrame
+					
+					local countLabel = Instance.new("TextLabel")
+					countLabel.Size = UDim2.new(1, 0, 0.3, 0)
+					countLabel.Position = UDim2.new(0, 0, 0.7, 0)
+					countLabel.BackgroundTransparency = 1
+					countLabel.Text = tostring(count)
+					countLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+					countLabel.Font = Enum.Font.SourceSansBold
+					countLabel.TextScaled = true
+					countLabel.Parent = fruitFrame
+				end
 			end
 		end
 	end
@@ -538,6 +709,103 @@ local function updateShopPetDisplay()
 	end
 end
 
+-- Update sell shop display with player's fruits
+local function updateSellShopDisplay()
+	local screenGui = playerGui:FindFirstChild("FeyGardenUI")
+	if not screenGui then return end
+	
+	local sellWindow = screenGui:FindFirstChild("SellWindow")
+	if not sellWindow then return end
+	
+	local itemsContainer = sellWindow:FindFirstChild("ScrollingFrame")
+	if not itemsContainer then return end
+	
+	-- Clear existing items
+	for _, child in ipairs(itemsContainer:GetChildren()) do
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
+	end
+	
+	-- Add fruit items from inventory
+	if playerInventory.Fruits then
+		for fruitName, count in pairs(playerInventory.Fruits) do
+			if count > 0 then
+				-- Get the plant type from fruit name (remove "Fruit" suffix)
+				local plantType = fruitName:gsub("Fruit$", "")
+				local config = Constants.PLANT_CONFIG[plantType]
+				
+				if config and config.FruitSellPrice then
+					local itemFrame = Instance.new("Frame")
+					itemFrame.Name = fruitName
+					itemFrame.Size = UDim2.new(1, 0, 0, 80)
+					itemFrame.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+					itemFrame.Parent = itemsContainer
+					
+					local itemCorner = Instance.new("UICorner")
+					itemCorner.CornerRadius = UDim.new(0, 8)
+					itemCorner.Parent = itemFrame
+					
+					-- Icon
+					local icon = Instance.new("TextLabel")
+					icon.Size = UDim2.new(0, 60, 0, 60)
+					icon.Position = UDim2.new(0, 10, 0.5, -30)
+					icon.BackgroundTransparency = 1
+					icon.Text = "🍎"
+					icon.TextScaled = true
+					icon.Parent = itemFrame
+					
+					-- Name and count
+					local nameLabel = Instance.new("TextLabel")
+					nameLabel.Size = UDim2.new(0, 200, 0, 30)
+					nameLabel.Position = UDim2.new(0, 80, 0, 10)
+					nameLabel.BackgroundTransparency = 1
+					nameLabel.Text = fruitName .. " x" .. count
+					nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+					nameLabel.Font = Enum.Font.SourceSansBold
+					nameLabel.TextSize = 18
+					nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+					nameLabel.Parent = itemFrame
+					
+					-- Price per unit
+					local priceLabel = Instance.new("TextLabel")
+					priceLabel.Size = UDim2.new(0, 200, 0, 20)
+					priceLabel.Position = UDim2.new(0, 80, 0, 45)
+					priceLabel.BackgroundTransparency = 1
+					priceLabel.Text = "💰 " .. config.FruitSellPrice .. " coins each"
+					priceLabel.TextColor3 = Color3.fromRGB(255, 255, 100)
+					priceLabel.Font = Enum.Font.SourceSans
+					priceLabel.TextSize = 14
+					priceLabel.TextXAlignment = Enum.TextXAlignment.Left
+					priceLabel.Parent = itemFrame
+					
+					-- Sell All button
+					local sellAllButton = Instance.new("TextButton")
+					sellAllButton.Size = UDim2.new(0, 100, 0, 35)
+					sellAllButton.Position = UDim2.new(1, -110, 0.5, -17.5)
+					sellAllButton.BackgroundColor3 = Color3.fromRGB(50, 150, 50)
+					sellAllButton.Text = "SELL ALL"
+					sellAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+					sellAllButton.Font = Enum.Font.SourceSansBold
+					sellAllButton.TextSize = 16
+					sellAllButton.Parent = itemFrame
+					
+					local sellAllCorner = Instance.new("UICorner")
+					sellAllCorner.CornerRadius = UDim.new(0, 8)
+					sellAllCorner.Parent = sellAllButton
+					
+					sellAllButton.MouseButton1Click:Connect(function()
+						local sellFruitEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.SELL_FRUIT)
+						if sellFruitEvent then
+							sellFruitEvent:FireServer(fruitName, count)
+						end
+					end)
+				end
+			end
+		end
+	end
+end
+
 -- Initialize UI Handler
 function UIHandler.Initialize()
 	print("UIHandler initialized")
@@ -545,6 +813,7 @@ function UIHandler.Initialize()
 	-- Create UI
 	local mainUI = createMainUI()
 	createShopUI()
+	createSellShopUI()
 	
 	-- Setup ProximityPrompt for shop
 	local shopPart = workspace:WaitForChild(Config.World.ShopPartName, 10)
@@ -569,6 +838,32 @@ function UIHandler.Initialize()
 		end
 	end
 	
+	-- Setup ProximityPrompt for sell shop
+	local sellPart = workspace:WaitForChild(Config.World.SellPartName, 10)
+	local sellWindow = mainUI:FindFirstChild("SellWindow")
+	
+	if sellPart and sellWindow then
+		local proximityPrompt = sellPart:FindFirstChildOfClass("ProximityPrompt")
+		
+		if proximityPrompt then
+			proximityPrompt.Triggered:Connect(function(playerWhoTriggered)
+				if playerWhoTriggered == player then
+					sellWindow.Visible = not sellWindow.Visible
+					if sellWindow.Visible then
+						updateSellShopDisplay() -- Update fruits when opening sell shop
+					end
+					print("[UIHandler] Sell shop toggled via ProximityPrompt")
+				end
+			end)
+		else
+			warn("[UIHandler] No ProximityPrompt found on " .. Config.World.SellPartName)
+		end
+	else
+		if not sellPart then
+			warn("[UIHandler] SellPart not found in workspace: " .. Config.World.SellPartName)
+		end
+	end
+	
 	-- Listen for currency updates
 	local updateCurrencyEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.UPDATE_CURRENCY, 10)
 	if updateCurrencyEvent then
@@ -583,6 +878,7 @@ function UIHandler.Initialize()
 		updateInventoryEvent.OnClientEvent:Connect(function(inventory)
 			updateInventoryDisplay(inventory)
 			updateShopPetDisplay() -- Update pet buttons when inventory changes
+			updateSellShopDisplay() -- Update sell shop when inventory changes
 		end)
 	else
 		warn("UpdateInventory RemoteEvent not found!")
@@ -698,6 +994,38 @@ function UIHandler.Initialize()
 					print(string.format("[UIHandler] Still waiting for garden assignment (attempt %d)...", attempts))
 				end
 			end
+		end
+	end)
+end
+
+-- Listen for harvest fruit events
+local harvestFruitEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.HARVEST_FRUIT)
+if harvestFruitEvent then
+	harvestFruitEvent.OnClientEvent:Connect(function(fruitName, amount)
+		print(string.format("[UIHandler] 🍎 Harvested %dx %s!", amount, fruitName))
+		
+		-- Show notification
+		local screenGui = playerGui:FindFirstChild("FeyGardenUI")
+		if screenGui then
+			local notification = Instance.new("TextLabel")
+			notification.Size = UDim2.new(0, 300, 0, 50)
+			notification.Position = UDim2.new(0.5, -150, 0.3, 0)
+			notification.BackgroundColor3 = Color3.fromRGB(40, 180, 40)
+			notification.TextColor3 = Color3.fromRGB(255, 255, 255)
+			notification.Text = string.format("+ %dx %s", amount, fruitName)
+			notification.Font = Enum.Font.GothamBold
+			notification.TextScaled = true
+			notification.Parent = screenGui
+			
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 12)
+			corner.Parent = notification
+			
+			-- Animate and remove
+			task.spawn(function()
+				task.wait(2)
+				notification:Destroy()
+			end)
 		end
 	end)
 end

@@ -388,6 +388,26 @@ function DataService.GetEquippedPet(userId)
 	return profile.EquippedPet
 end
 
+-- Add fruit to inventory
+function DataService.AddFruit(userId, fruitName, amount)
+	local profile = Profiles[userId]
+	if not profile then return false end
+	
+	amount = amount or 1
+	profile.Inventory.Fruits[fruitName] = (profile.Inventory.Fruits[fruitName] or 0) + amount
+	print(string.format("[DataService] Player %d received %dx %s (Total: %d)", 
+		userId, amount, fruitName, profile.Inventory.Fruits[fruitName]))
+	return true
+end
+
+-- Get fruit count
+function DataService.GetFruitCount(userId, fruitName)
+	local profile = Profiles[userId]
+	if not profile then return 0 end
+	
+	return profile.Inventory.Fruits[fruitName] or 0
+end
+
 -- Force save a player's profile (useful for important actions)
 function DataService.ForceSave(userId)
 	return SaveProfile(userId, false)

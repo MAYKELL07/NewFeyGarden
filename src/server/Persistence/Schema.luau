@@ -12,7 +12,8 @@ function Schema.Default()
 		Coins = 100, -- Starting coins
 		Inventory = {
 			Seeds = {}, -- {PlantType = count}
-			Pets = {}   -- {PetType = owned}
+			Pets = {}, -- {PetType = owned}
+			Fruits = {} -- {FruitName = count}
 		},
 		EquippedPet = nil, -- Currently equipped pet type
 		PlantSlots = {}, -- {[slotIndex] = {Type, Stage, WateredUntil, PetBoost}}
@@ -36,9 +37,10 @@ function Schema.Migrate(data)
 	
 	-- Add missing fields safely
 	data.Coins = data.Coins or 100
-	data.Inventory = data.Inventory or {Seeds = {}, Pets = {}}
+	data.Inventory = data.Inventory or {Seeds = {}, Pets = {}, Fruits = {}}
 	data.Inventory.Seeds = data.Inventory.Seeds or {}
 	data.Inventory.Pets = data.Inventory.Pets or {}
+	data.Inventory.Fruits = data.Inventory.Fruits or {}
 	data.EquippedPet = data.EquippedPet or nil
 	data.PlantSlots = data.PlantSlots or {}
 	data.SessionLock = data.SessionLock or nil

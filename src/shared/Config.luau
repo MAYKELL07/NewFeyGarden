@@ -36,8 +36,9 @@ Config.World = {
 	PlayerSignPartName = "Sign",         -- Name of the Part within PlayerSign Model that has the SurfaceGui
 	FloorName = "Floor",                 -- Name of the main floor/platform part in each garden
 	PlotsFolder = "Plots",               -- Name of the folder containing PlantAnchors within each garden
-	TeleportPartName = "TPpart",         -- Name of the part where players spawn in their garden
+	TeleportPartName = "TpPart",         -- Name of the part where players spawn in their garden
 	ShopPartName = "ShopPart",           -- Name of the part that has the ProximityPrompt for opening shop
+	SellPartName = "SellPart",           -- Name of the part that has the ProximityPrompt for opening sell shop
 }
 
 -- ============================================================================
