@@ -29,6 +29,10 @@ local sellFruitEvent = Instance.new("RemoteEvent")
 sellFruitEvent.Name = Constants.EVENTS.SELL_FRUIT
 sellFruitEvent.Parent = ReplicatedStorage
 
+local requestDataEvent = Instance.new("RemoteEvent")
+requestDataEvent.Name = "RequestPlayerData"
+requestDataEvent.Parent = ReplicatedStorage
+
 local updateCurrencyEvent = Instance.new("RemoteEvent")
 updateCurrencyEvent.Name = Constants.EVENTS.UPDATE_CURRENCY
 updateCurrencyEvent.Parent = ReplicatedStorage
@@ -340,6 +344,11 @@ function EconomyService.Initialize()
 	-- Handle sell fruit requests
 	sellFruitEvent.OnServerEvent:Connect(function(player, fruitName, amount)
 		EconomyService.SellFruit(player, fruitName, amount)
+	end)
+	
+	-- Handle request for player data (client can call this to get initial data)
+	requestDataEvent.OnServerEvent:Connect(function(player)
+		EconomyService.SyncPlayerData(player)
 	end)
 	
 	-- Handle harvest rewards (listen for update currency from GardenManager)

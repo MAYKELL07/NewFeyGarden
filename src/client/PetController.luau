@@ -35,19 +35,28 @@ local function createPetModel(petType)
 	end
 	
 	-- Clone the pet mesh
-	local petModel = petMesh:Clone()
+	local clonedPet = petMesh:Clone()
+	
+	-- Always create a Model container for the pet
+	local petModel = Instance.new("Model")
 	petModel.Name = player.Name .. "_Pet"
 	
-	-- Find the main part (should be a MeshPart)
-	local body = petModel:IsA("MeshPart") and petModel or petModel:FindFirstChildWhichIsA("MeshPart")
-	
-	if not body then
-		-- If no MeshPart found, create a container model
-		local container = Instance.new("Model")
-		container.Name = player.Name .. "_Pet"
-		petModel.Parent = container
-		body = petModel
-		petModel = container
+	-- Find or use the main part (should be a MeshPart)
+	local body
+	if clonedPet:IsA("MeshPart") then
+		body = clonedPet
+		body.Parent = petModel
+	else
+		-- If it's already a model, find the MeshPart inside
+		body = clonedPet:FindFirstChildWhichIsA("MeshPart")
+		if body then
+			clonedPet:Destroy()
+			body = body:Clone()
+			body.Parent = petModel
+		else
+			warn("[PetController] No MeshPart found in pet:", petType)
+			return nil
+		end
 	end
 	
 	-- Setup physics
@@ -55,6 +64,8 @@ local function createPetModel(petType)
 		body.Name = "Body"
 		body.CanCollide = false
 		body.Anchored = false
+		body.Size = Vector3.new(2, 2, 2) -- Ensure it has a size
+		body.CustomPhysicalProperties = PhysicalProperties.new(0.7, 0.3, 0.5, 1, 1) -- Light and bouncy
 		
 		-- Add glow effect
 		local light = Instance.new("PointLight")
@@ -65,15 +76,17 @@ local function createPetModel(petType)
 		
 		-- Add floating effect with BodyPosition
 		local bodyPosition = Instance.new("BodyPosition")
-		bodyPosition.MaxForce = Vector3.new(4000, 4000, 4000)
-		bodyPosition.P = 10000
-		bodyPosition.D = 500
+		bodyPosition.MaxForce = Vector3.new(10000, 10000, 10000) -- Stronger force
+		bodyPosition.P = 5000
+		bodyPosition.D = 1000
+		-- Position will be set in updatePetFollow
 		bodyPosition.Parent = body
 		
 		-- Add slight rotation
 		local bodyGyro = Instance.new("BodyGyro")
-		bodyGyro.MaxTorque = Vector3.new(400, 400, 400)
+		bodyGyro.MaxTorque = Vector3.new(4000, 4000, 4000)
 		bodyGyro.P = 3000
+		bodyGyro.D = 500
 		bodyGyro.Parent = body
 		
 		petModel.PrimaryPart = body
@@ -105,13 +118,20 @@ local function updatePetFollow()
 	local offset = Vector3.new(config.FollowDistance, 2, config.FollowDistance)
 	local targetPosition = hrp.Position + offset
 	
-	-- Smooth follow with BodyPosition
-	bodyPosition.Position = targetPosition
-	
 	-- Add bobbing motion
 	local time = tick()
 	local bobOffset = math.sin(time * 2) * 0.5
+	
+	-- Smooth follow with BodyPosition
 	bodyPosition.Position = targetPosition + Vector3.new(0, bobOffset, 0)
+	
+	-- Update BodyGyro for smooth rotation
+	local bodyGyro = petBody:FindFirstChild("BodyGyro")
+	if bodyGyro then
+		-- Slow rotation around Y axis
+		local rotationSpeed = time * 0.5
+		bodyGyro.CFrame = CFrame.Angles(0, rotationSpeed, 0)
+	end
 	
 	-- Apply pet boost to nearby plants
 	local Config = require(ReplicatedStorage.Shared.Config)
@@ -170,13 +190,26 @@ function PetController.SpawnPet(petType)
 		return
 	end
 	
+	-- Parent to workspace first
+	petModel.Parent = Workspace
+	
 	-- Position pet near player
 	if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
 		local hrp = player.Character.HumanoidRootPart
-		petModel:MoveTo(hrp.Position + Vector3.new(3, 2, 3))
+		local spawnPosition = hrp.Position + Vector3.new(3, 2, 3)
+		
+		-- Set the model position
+		if petModel.PrimaryPart then
+			petModel:SetPrimaryPartCFrame(CFrame.new(spawnPosition))
+			
+			-- Initialize BodyPosition to current position
+			local bodyPosition = petModel.PrimaryPart:FindFirstChild("BodyPosition")
+			if bodyPosition then
+				bodyPosition.Position = spawnPosition
+			end
+		end
 	end
 	
-	petModel.Parent = Workspace
 	PetController.CurrentPet = petModel
 	
 	print("Spawned pet:", petType)

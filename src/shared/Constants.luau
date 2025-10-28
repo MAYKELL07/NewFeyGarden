@@ -61,6 +61,13 @@ Constants.GROWTH_STAGES = {
 	BLOOM = "Bloom"
 }
 
+-- Growth Stage Position Offsets (Y offset from PlantAnchor)
+Constants.STAGE_OFFSETS = {
+	[Constants.GROWTH_STAGES.SEED] = Vector3.new(0, 0.5, 0),    -- Small, low to ground
+	[Constants.GROWTH_STAGES.SPROUT] = Vector3.new(0, 1.5, 0),  -- Medium height
+	[Constants.GROWTH_STAGES.BLOOM] = Vector3.new(0, 2.5, 0)    -- Tall, fully grown
+}
+
 -- Plant Configuration
 Constants.PLANT_CONFIG = {
 	[Constants.PLANT_TYPES.CHAMELEONBERRI] = {

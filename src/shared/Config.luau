@@ -164,6 +164,93 @@ Config.VFX = {
 }
 
 -- ============================================================================
+-- AUDIO CONFIGURATION
+-- ============================================================================
+-- Sound effects and music asset IDs and settings
+Config.Audio = {
+	Enable = true,                       -- Master switch for all audio (set to false to mute game)
+	
+	-- Music Settings
+	Music = {
+		Enable = true,                   -- Toggle background music
+		Volume = 0.3,                    -- Music volume (0-1)
+		Looped = true,                   -- Whether music loops continuously
+		
+		-- Background Music Asset IDs
+		-- Replace these with your actual Roblox audio asset IDs
+		Tracks = {
+			Ambient = "rbxassetid://128483646982293",      -- Calm mystical ambient music
+			Action = "rbxassetid://125486942822550",       -- Upbeat farming music
+			Night = "rbxassetid://9045934037"         -- Peaceful night theme
+		},
+		
+		-- Music playback settings
+		FadeTime = 2.0,                  -- Seconds to fade in/out when changing tracks
+		ShuffleMode = true,             -- Randomly play tracks
+		CurrentTrack = "Ambient"         -- Default starting track
+	},
+	
+	-- Sound Effects Settings
+	SFX = {
+		Enable = true,                   -- Toggle sound effects
+		Volume = 0.5,                    -- SFX volume (0-1)
+		
+		-- Player Actions
+		PlantSeed = "rbxassetid://134410500299351",        -- Planting a seed
+		WaterPlant = "rbxassetid://2846734837",       -- Watering can splash
+		HarvestPlant = "rbxassetid://9113312791",     -- Harvesting/picking fruit
+		DigPlant = "rbxassetid://180163752",         -- Shovel digging sound
+		
+		-- UI Interactions
+		ButtonClick = "rbxassetid://6895079853",      -- UI button clicks
+		WindowOpen = "rbxassetid://15675059323",       -- Opening shop/sell windows
+		WindowClose = "rbxassetid://18755588842c",      -- Closing windows
+		Purchase = "rbxassetid://87437544236708",         -- Successful purchase sound
+		Sell = "rbxassetid://18755588842c",             -- Selling items sound
+		Error = "rbxassetid://18755588842c",            -- Error/cannot do action
+		
+		-- Plant Growth
+		PlantGrow = "rbxassetid://92413337196515",        -- Plant advancing growth stage
+		PlantBloom = "rbxassetid://7988065758",       -- Plant reaching bloom stage
+		PlantWither = "rbxassetid://3779045779",      -- Plant dying/withering
+		
+		-- Pets
+		PetEquip = "rbxassetid://7988065758",         -- Equipping a pet
+		PetUnequip = "rbxassetid://3779045779",       -- Unequipping a pet
+		PetFollow = "rbxassetid://87437544236708",        -- Pet following/appearing
+		PetCheer = "rbxassetid://90664135987643",         -- Pet cheering/boosting plant
+		
+		-- Weather
+		RainStart = "rbxassetid://125351825026602",        -- Rain weather starting
+		StormStart = "rbxassetid://9120557866",       -- Storm weather starting
+		SunnyStart = "rbxassetid://9112757357",       -- Sunny weather returning
+		Thunder = "rbxassetid://4961240438",          -- Thunder sound for storm
+		
+		-- Notifications
+		NotificationPop = "rbxassetid://87437544236708",  -- Notification appearing
+		CoinEarn = "rbxassetid://87437544236708",         -- Earning coins
+		
+		-- Ambient
+		BirdsChirping = "rbxassetid://9118752861",    -- Background bird sounds
+		WindBlow = "rbxassetid://9116258071",         -- Wind sound effects
+		MagicSparkle = "rbxassetid://9125986205"      -- Magical sparkle sound
+	},
+	
+	-- Audio Playback Settings
+	Playback = {
+		MaxDistance = 50,                -- Maximum distance to hear sounds (studs)
+		RollOffMinDistance = 10,         -- Distance where sound starts to fade
+		RollOffMaxDistance = 50,         -- Distance where sound is silent
+		DopplerLevel = 0,                -- Doppler effect intensity (0 = disabled)
+		Use3DSound = true,               -- Whether to use positional 3D audio
+		
+		-- Sound pooling (reuse sound instances for performance)
+		EnablePooling = true,
+		MaxPoolSize = 20                 -- Maximum sounds in pool per type
+	}
+}
+
+-- ============================================================================
 -- HELPER FUNCTIONS
 -- ============================================================================
 -- Utility functions for retrieving commonly-accessed game objects

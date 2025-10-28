@@ -93,7 +93,6 @@ function GardenManager.GetPlantAnchor(gardenFolder: Folder?, slotIndex: number):
 		return nil
 	end
 	
-	print(string.format("[PlantAnchor] ✓ Successfully found anchor: %s at position %s", anchorName, tostring(anchor.Position)))
 	return anchor
 end
 
