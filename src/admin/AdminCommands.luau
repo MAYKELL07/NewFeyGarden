@@ -8,8 +8,9 @@ local AdminCommands = {}
 
 -- List of admin user IDs - ONLY THESE USERS CAN USE ADMIN COMMANDS
 AdminCommands.AdminUsers = {
-	2337178779, -- Add your UserIds here (one per line)
-	-- Example: 123456789,
+	2337178779,
+	250662547,
+	606519948 -- Example: 123456789,
 	-- Example: 987654321,
 }
 
@@ -21,7 +22,7 @@ function AdminCommands.IsAdmin(player)
 			return true
 		end
 	end
-	
+
 	-- No one else is admin (including in Studio)
 	return false
 end
@@ -59,13 +60,13 @@ function AdminCommands.AddSeeds(player, plantType, amount)
 	local Constants = require(ReplicatedStorage.Shared.Constants)
 	local ServerScriptService = game:GetService("ServerScriptService")
 	local EconomyService = require(ServerScriptService.Server.EconomyService)
-	
+
 	amount = amount or 1
-	
+
 	if not Constants.PLANT_CONFIG[plantType] then
 		return false, "Invalid plant type: " .. plantType
 	end
-	
+
 	EconomyService.AddSeed(player, plantType, amount)
 	return true, "Added " .. amount .. "x " .. plantType .. " seeds"
 end
@@ -74,22 +75,22 @@ end
 function AdminCommands.SetWeather(weatherType)
 	local Constants = require(ReplicatedStorage.Shared.Constants)
 	local Lighting = game:GetService("Lighting")
-	
+
 	if not Constants.WEATHER_CONFIG[weatherType] then
 		return false, "Invalid weather type: " .. weatherType
 	end
-	
+
 	local config = Constants.WEATHER_CONFIG[weatherType]
 	Lighting.Brightness = config.Brightness
 	Lighting.ColorShift_Top = config.ColorShift_Top
 	Lighting.ClockTime = config.ClockTime
-	
+
 	-- Notify clients
 	local weatherEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.WEATHER_CHANGED)
 	if weatherEvent then
 		weatherEvent:FireAllClients(weatherType)
 	end
-	
+
 	return true, "Weather set to " .. weatherType
 end
 
@@ -101,11 +102,11 @@ function AdminCommands.GrowAllPlants(player)
 	local Constants = require(ReplicatedStorage.Shared.Constants)
 	local PlantModule = require(ReplicatedStorage.Shared.PlantModule)
 	local garden = GardenManager.PlayerGardens[player.UserId]
-	
+
 	if not garden then
 		return false, "No garden found"
 	end
-	
+
 	local count = 0
 	local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
 	if plotsFolder then
@@ -116,23 +117,23 @@ function AdminCommands.GrowAllPlants(player)
 						-- Set stage and harvestable attributes
 						child:SetAttribute("Stage", Constants.GROWTH_STAGES.BLOOM)
 						child:SetAttribute("Harvestable", true)
-						
+
 						-- Update visual
 						PlantModule.UpdatePlantVisual(child)
-						
+
 						-- Setup harvest detector using public function
 						local ownerId = child:GetAttribute("OwnerUserId")
 						if ownerId then
 							GardenManager.SetupPlantHarvestDetector(child, ownerId)
 						end
-						
+
 						count = count + 1
 					end
 				end
 			end
 		end
 	end
-	
+
 	return true, "Instantly grew " .. count .. " plants to Bloom stage with harvest ability"
 end
 
@@ -142,11 +143,11 @@ function AdminCommands.ClearGarden(player)
 	local GardenManager = require(ServerScriptService.Server.GardenManager)
 	local Config = require(ReplicatedStorage.Shared.Config)
 	local garden = GardenManager.PlayerGardens[player.UserId]
-	
+
 	if not garden then
 		return false, "No garden found"
 	end
-	
+
 	local count = 0
 	local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
 	if plotsFolder then
@@ -161,7 +162,7 @@ function AdminCommands.ClearGarden(player)
 			end
 		end
 	end
-	
+
 	return true, "Cleared " .. count .. " plants from garden"
 end
 
