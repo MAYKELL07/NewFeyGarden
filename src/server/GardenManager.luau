@@ -114,7 +114,8 @@ local function clearAnchor(anchor: Instance)
 	end
 end
 
-local function setupPlantHarvestDetector(plantModel: Model, userId: number)
+-- Public function to setup harvest detector (can be called from AdminCommands)
+function GardenManager.SetupPlantHarvestDetector(plantModel: Model, userId: number)
 	-- Only setup harvest detector for bloom stage plants
 	local stage = plantModel:GetAttribute("Stage")
 	if stage ~= Constants.GROWTH_STAGES.BLOOM then
@@ -264,7 +265,7 @@ local function continueGrowthFromStage(plantModel: Model, savedStage: string?)
 	if currentStage == Constants.GROWTH_STAGES.BLOOM then
 		local ownerId = plantModel:GetAttribute("OwnerUserId")
 		if ownerId then
-			setupPlantHarvestDetector(plantModel, ownerId)
+			GardenManager.SetupPlantHarvestDetector(plantModel, ownerId)
 		end
 		return
 	end
@@ -288,7 +289,7 @@ local function continueGrowthFromStage(plantModel: Model, savedStage: string?)
 			if nextStage == Constants.GROWTH_STAGES.BLOOM then
 				local ownerId = plantModel:GetAttribute("OwnerUserId")
 				if ownerId then
-					setupPlantHarvestDetector(plantModel, ownerId)
+					GardenManager.SetupPlantHarvestDetector(plantModel, ownerId)
 				end
 			end
 		end

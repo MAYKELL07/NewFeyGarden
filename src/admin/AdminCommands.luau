@@ -98,6 +98,8 @@ function AdminCommands.GrowAllPlants(player)
 	local ServerScriptService = game:GetService("ServerScriptService")
 	local GardenManager = require(ServerScriptService.Server.GardenManager)
 	local Config = require(ReplicatedStorage.Shared.Config)
+	local Constants = require(ReplicatedStorage.Shared.Constants)
+	local PlantModule = require(ReplicatedStorage.Shared.PlantModule)
 	local garden = GardenManager.PlayerGardens[player.UserId]
 	
 	if not garden then
@@ -111,9 +113,19 @@ function AdminCommands.GrowAllPlants(player)
 			if anchor:IsA("BasePart") then
 				for _, child in ipairs(anchor:GetChildren()) do
 					if child:IsA("Model") and child:GetAttribute("PlantType") then
-						child:SetAttribute("Stage", "Bloom")
-						local PlantModule = require(ReplicatedStorage.Shared.PlantModule)
+						-- Set stage and harvestable attributes
+						child:SetAttribute("Stage", Constants.GROWTH_STAGES.BLOOM)
+						child:SetAttribute("Harvestable", true)
+						
+						-- Update visual
 						PlantModule.UpdatePlantVisual(child)
+						
+						-- Setup harvest detector using public function
+						local ownerId = child:GetAttribute("OwnerUserId")
+						if ownerId then
+							GardenManager.SetupPlantHarvestDetector(child, ownerId)
+						end
+						
 						count = count + 1
 					end
 				end
@@ -121,7 +133,7 @@ function AdminCommands.GrowAllPlants(player)
 		end
 	end
 	
-	return true, "Instantly grew " .. count .. " plants to Bloom stage"
+	return true, "Instantly grew " .. count .. " plants to Bloom stage with harvest ability"
 end
 
 -- Clear player's garden
