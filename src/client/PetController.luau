@@ -21,42 +21,64 @@ local function createPetModel(petType)
 	local config = Constants.PET_CONFIG[petType]
 	if not config then return nil end
 	
-	-- Create pet model
-	local petModel = Instance.new("Model")
+	-- Get pet models from ReplicatedStorage
+	local petsFolder = ReplicatedStorage:FindFirstChild("Pets")
+	if not petsFolder then
+		warn("[PetController] Pets folder not found in ReplicatedStorage")
+		return nil
+	end
+	
+	local petMesh = petsFolder:FindFirstChild(petType)
+	if not petMesh then
+		warn("[PetController] Pet mesh not found for:", petType)
+		return nil
+	end
+	
+	-- Clone the pet mesh
+	local petModel = petMesh:Clone()
 	petModel.Name = player.Name .. "_Pet"
 	
-	-- Create main body
-	local body = Instance.new("Part")
-	body.Name = "Body"
-	body.Size = Vector3.new(2, 2, 2)
-	body.Shape = Enum.PartType.Ball
-	body.Color = config.Color
-	body.Material = Enum.Material.Neon
-	body.CanCollide = false
-	body.Anchored = false
-	body.Parent = petModel
+	-- Find the main part (should be a MeshPart)
+	local body = petModel:IsA("MeshPart") and petModel or petModel:FindFirstChildWhichIsA("MeshPart")
 	
-	-- Add glow effect
-	local light = Instance.new("PointLight")
-	light.Brightness = 1
-	light.Range = 8
-	light.Color = config.Color
-	light.Parent = body
+	if not body then
+		-- If no MeshPart found, create a container model
+		local container = Instance.new("Model")
+		container.Name = player.Name .. "_Pet"
+		petModel.Parent = container
+		body = petModel
+		petModel = container
+	end
 	
-	-- Add floating effect with BodyPosition
-	local bodyPosition = Instance.new("BodyPosition")
-	bodyPosition.MaxForce = Vector3.new(4000, 4000, 4000)
-	bodyPosition.P = 10000
-	bodyPosition.D = 500
-	bodyPosition.Parent = body
+	-- Setup physics
+	if body then
+		body.Name = "Body"
+		body.CanCollide = false
+		body.Anchored = false
+		
+		-- Add glow effect
+		local light = Instance.new("PointLight")
+		light.Brightness = 1
+		light.Range = 8
+		light.Color = config.Color
+		light.Parent = body
+		
+		-- Add floating effect with BodyPosition
+		local bodyPosition = Instance.new("BodyPosition")
+		bodyPosition.MaxForce = Vector3.new(4000, 4000, 4000)
+		bodyPosition.P = 10000
+		bodyPosition.D = 500
+		bodyPosition.Parent = body
+		
+		-- Add slight rotation
+		local bodyGyro = Instance.new("BodyGyro")
+		bodyGyro.MaxTorque = Vector3.new(400, 400, 400)
+		bodyGyro.P = 3000
+		bodyGyro.Parent = body
+		
+		petModel.PrimaryPart = body
+	end
 	
-	-- Add slight rotation
-	local bodyGyro = Instance.new("BodyGyro")
-	bodyGyro.MaxTorque = Vector3.new(400, 400, 400)
-	bodyGyro.P = 3000
-	bodyGyro.Parent = body
-	
-	petModel.PrimaryPart = body
 	petModel:SetAttribute("PetType", petType)
 	
 	return petModel
