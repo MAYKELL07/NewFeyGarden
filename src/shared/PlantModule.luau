@@ -118,19 +118,19 @@ function PlantModule.UpdatePlantVisual(plantModel)
 	
 	if stage == Constants.GROWTH_STAGES.SEED then
 		newMesh = seedMesh
-		scale = 0.5
+		scale = 1.5  -- 3x larger than original 0.5
 		transparency = 0.3
 		lightBrightness = 0
 		
 	elseif stage == Constants.GROWTH_STAGES.SPROUT then
 		newMesh = plantMesh
-		scale = 0.7
+		scale = 2.1  -- 3x larger than original 0.7
 		transparency = 0
 		lightBrightness = 0.5
 		
 	elseif stage == Constants.GROWTH_STAGES.BLOOM then
 		newMesh = plantMesh
-		scale = 1.0
+		scale = 3.0  -- 3x larger than original 1.0
 		transparency = 0
 		lightBrightness = 2
 	end
