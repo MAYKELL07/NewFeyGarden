@@ -24,7 +24,7 @@ function AdminCommands.IsAdmin(player)
 	end
 
 	-- No one else is admin (including in Studio)
-	return false
+	return true --should be false in production
 end
 
 -- Add coins to player

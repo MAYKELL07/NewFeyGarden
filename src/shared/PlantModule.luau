@@ -218,14 +218,14 @@ function PlantModule.CanHarvest(plantModel)
 	return plantModel:GetAttribute("Stage") == Constants.GROWTH_STAGES.BLOOM
 end
 
--- Get harvest value
+-- Get harvest value (returns FruitSellPrice - what player gets for 1 fruit)
 function PlantModule.GetHarvestValue(plantModel)
 	local plantType = plantModel:GetAttribute("PlantType")
 	local config = Constants.PLANT_CONFIG[plantType]
 	
 	if not config then return 0 end
 	
-	return config.SellPrice
+	return config.FruitSellPrice
 end
 
 return PlantModule

@@ -69,131 +69,162 @@ Constants.STAGE_OFFSETS = {
 }
 
 -- Plant Configuration
+-- Economy Breakdown:
+-- - SeedPrice: Cost to buy the seed
+-- - FruitSellPrice: How much you get for selling 1 fruit (players only get 1 fruit per harvest)
+-- - GrowthTime: Base time in seconds to grow from seed to bloom
+-- 
+-- Profit Formula: FruitSellPrice - SeedPrice = Net Profit per harvest
+-- ROI (Return on Investment): (Profit / SeedPrice) * 100 = % return
+-- Profit per Second: Profit / GrowthTime = efficiency rating
+--
+-- Balancing Strategy:
+-- - STARTER PLANTS (Tier 1): Fast growth, low cost, quick returns to hook new players
+-- - MID-TIER PLANTS (Tier 2): Better ROI but longer growth times, scaling rewards
+-- - RARE PLANTS (Tier 3): Expensive, slow growth, but massive profits for late game
+
 Constants.PLANT_CONFIG = {
-	[Constants.PLANT_TYPES.CHAMELEONBERRI] = {
-		SeedPrice = 40,
-		SellPrice = 120,
-		FruitSellPrice = 20,
-		GrowthTime = 50,
-		Color = Color3.fromRGB(200, 100, 255),
-		EmitsLight = false
+	-- === TIER 1: STARTER PLANTS (Fast pace, quick hooks) ===
+	
+	[Constants.PLANT_TYPES.LUMUT] = {
+		SeedPrice = 10,           -- Very cheap starter
+		FruitSellPrice = 25,      -- Profit: 15 coins (150% ROI)
+		GrowthTime = 30,          -- Fast! 0.5 coins/second
+		Color = Color3.fromRGB(200, 255, 150),
+		EmitsLight = true,
+		Tier = 1
 	},
 	[Constants.PLANT_TYPES.CLOUDCAP] = {
-		SeedPrice = 35,
-		SellPrice = 100,
-		FruitSellPrice = 18,
-		GrowthTime = 45,
+		SeedPrice = 15,           -- Cheap starter
+		FruitSellPrice = 35,      -- Profit: 20 coins (133% ROI)
+		GrowthTime = 35,          -- 0.57 coins/second
 		Color = Color3.fromRGB(220, 220, 255),
-		EmitsLight = false
-	},
-	[Constants.PLANT_TYPES.DREAMFRUIT] = {
-		SeedPrice = 60,
-		SellPrice = 180,
-		FruitSellPrice = 30,
-		GrowthTime = 70,
-		Color = Color3.fromRGB(180, 150, 255),
-		EmitsLight = true
-	},
-	[Constants.PLANT_TYPES.DREAMSHROOM] = {
-		SeedPrice = 45,
-		SellPrice = 130,
-		FruitSellPrice = 22,
-		GrowthTime = 55,
-		Color = Color3.fromRGB(150, 100, 200),
-		EmitsLight = true
-	},
-	[Constants.PLANT_TYPES.EVERSPRINGACORN] = {
-		SeedPrice = 50,
-		SellPrice = 150,
-		FruitSellPrice = 25,
-		GrowthTime = 60,
-		Color = Color3.fromRGB(100, 200, 100),
-		EmitsLight = false
-	},
-	[Constants.PLANT_TYPES.FROSTMIND] = {
-		SeedPrice = 55,
-		SellPrice = 160,
-		FruitSellPrice = 28,
-		GrowthTime = 65,
-		Color = Color3.fromRGB(150, 200, 255),
-		EmitsLight = true
-	},
-	[Constants.PLANT_TYPES.GLOWBUD] = {
-		SeedPrice = 50,
-		SellPrice = 150,
-		FruitSellPrice = 25,
-		GrowthTime = 60,
-		Color = Color3.fromRGB(255, 255, 100),
-		EmitsLight = true
-	},
-	[Constants.PLANT_TYPES.LUMUT] = {
-		SeedPrice = 30,
-		SellPrice = 90,
-		FruitSellPrice = 15,
-		GrowthTime = 40,
-		Color = Color3.fromRGB(200, 255, 150),
-		EmitsLight = true
-	},
-	[Constants.PLANT_TYPES.MOONVINE] = {
-		SeedPrice = 70,
-		SellPrice = 200,
-		FruitSellPrice = 35,
-		GrowthTime = 80,
-		Color = Color3.fromRGB(200, 200, 255),
-		EmitsLight = true
+		EmitsLight = false,
+		Tier = 1
 	},
 	[Constants.PLANT_TYPES.PUFFOT] = {
-		SeedPrice = 35,
-		SellPrice = 100,
-		FruitSellPrice = 18,
-		GrowthTime = 45,
+		SeedPrice = 20,           -- Early game
+		FruitSellPrice = 45,      -- Profit: 25 coins (125% ROI)
+		GrowthTime = 40,          -- 0.625 coins/second
 		Color = Color3.fromRGB(255, 200, 150),
-		EmitsLight = false
+		EmitsLight = false,
+		Tier = 1
 	},
-	[Constants.PLANT_TYPES.STARLILY] = {
-		SeedPrice = 65,
-		SellPrice = 190,
-		FruitSellPrice = 32,
-		GrowthTime = 75,
-		Color = Color3.fromRGB(255, 255, 255),
-		EmitsLight = true
+	[Constants.PLANT_TYPES.GLOWBUG] = {
+		SeedPrice = 25,           -- Still affordable
+		FruitSellPrice = 55,      -- Profit: 30 coins (120% ROI)
+		GrowthTime = 45,          -- 0.67 coins/second (best T1 efficiency!)
+		Color = Color3.fromRGB(255, 255, 100),
+		EmitsLight = true,
+		Tier = 1
 	},
+	
+	-- === TIER 2: MID-GAME PLANTS (Better profits, longer commitment) ===
+	
+	[Constants.PLANT_TYPES.TWINKLELEAF] = {
+		SeedPrice = 40,           -- Entry to mid-tier
+		FruitSellPrice = 80,      -- Profit: 40 coins (100% ROI)
+		GrowthTime = 50,          -- 0.8 coins/second
+		Color = Color3.fromRGB(150, 255, 200),
+		EmitsLight = true,
+		Tier = 2
+	},
+	[Constants.PLANT_TYPES.CHAMELEONBERRI] = {
+		SeedPrice = 50,           -- Mid-tier investment
+		FruitSellPrice = 105,     -- Profit: 55 coins (110% ROI)
+		GrowthTime = 55,          -- 1.0 coins/second
+		Color = Color3.fromRGB(200, 100, 255),
+		EmitsLight = false,
+		Tier = 2
+	},
+	[Constants.PLANT_TYPES.DREAMSHROOM] = {
+		SeedPrice = 60,           -- Higher investment
+		FruitSellPrice = 130,     -- Profit: 70 coins (117% ROI)
+		GrowthTime = 60,          -- 1.17 coins/second
+		Color = Color3.fromRGB(150, 100, 200),
+		EmitsLight = true,
+		Tier = 2
+	},
+	[Constants.PLANT_TYPES.EVERSPRINGACORN] = {
+		SeedPrice = 70,           -- Solid mid-tier
+		FruitSellPrice = 155,     -- Profit: 85 coins (121% ROI)
+		GrowthTime = 65,          -- 1.31 coins/second
+		Color = Color3.fromRGB(100, 200, 100),
+		EmitsLight = false,
+		Tier = 2
+	},
+	[Constants.PLANT_TYPES.GLOWBUD] = {
+		SeedPrice = 80,           -- Getting expensive
+		FruitSellPrice = 180,     -- Profit: 100 coins (125% ROI)
+		GrowthTime = 70,          -- 1.43 coins/second
+		Color = Color3.fromRGB(255, 255, 100),
+		EmitsLight = true,
+		Tier = 2
+	},
+	
+	-- === TIER 3: RARE/LATE GAME PLANTS (Big investments, massive returns) ===
+	
 	[Constants.PLANT_TYPES.STARVINEMELON] = {
-		SeedPrice = 55,
-		SellPrice = 165,
-		FruitSellPrice = 28,
-		GrowthTime = 65,
+		SeedPrice = 100,          -- Entry to rare tier
+		FruitSellPrice = 240,     -- Profit: 140 coins (140% ROI)
+		GrowthTime = 80,          -- 1.75 coins/second
 		Color = Color3.fromRGB(255, 200, 100),
-		EmitsLight = true
+		EmitsLight = true,
+		Tier = 3
+	},
+	[Constants.PLANT_TYPES.FROSTMIND] = {
+		SeedPrice = 125,          -- Rare plant
+		FruitSellPrice = 310,     -- Profit: 185 coins (148% ROI)
+		GrowthTime = 90,          -- 2.06 coins/second
+		Color = Color3.fromRGB(150, 200, 255),
+		EmitsLight = true,
+		Tier = 3
+	},
+	[Constants.PLANT_TYPES.DREAMFRUIT] = {
+		SeedPrice = 150,          -- Very rare
+		FruitSellPrice = 385,     -- Profit: 235 coins (157% ROI)
+		GrowthTime = 100,         -- 2.35 coins/second
+		Color = Color3.fromRGB(180, 150, 255),
+		EmitsLight = true,
+		Tier = 3
 	},
 	[Constants.PLANT_TYPES.SUNFLAREMANGO] = {
-		SeedPrice = 60,
-		SellPrice = 175,
-		FruitSellPrice = 30,
-		GrowthTime = 70,
+		SeedPrice = 175,          -- Premium plant
+		FruitSellPrice = 465,     -- Profit: 290 coins (166% ROI)
+		GrowthTime = 110,         -- 2.64 coins/second
 		Color = Color3.fromRGB(255, 150, 50),
-		EmitsLight = true
+		EmitsLight = true,
+		Tier = 3
 	},
-	[Constants.PLANT_TYPES.TWINKLELEAF] = {
-		SeedPrice = 40,
-		SellPrice = 115,
-		FruitSellPrice = 20,
-		GrowthTime = 50,
-		Color = Color3.fromRGB(150, 255, 200),
-		EmitsLight = true
+	[Constants.PLANT_TYPES.STARLILY] = {
+		SeedPrice = 200,          -- Legendary tier
+		FruitSellPrice = 550,     -- Profit: 350 coins (175% ROI)
+		GrowthTime = 120,         -- 2.92 coins/second
+		Color = Color3.fromRGB(255, 255, 255),
+		EmitsLight = true,
+		Tier = 3
+	},
+	[Constants.PLANT_TYPES.MOONVINE] = {
+		SeedPrice = 250,          -- Ultra rare
+		FruitSellPrice = 700,     -- Profit: 450 coins (180% ROI)
+		GrowthTime = 135,         -- 3.33 coins/second
+		Color = Color3.fromRGB(200, 200, 255),
+		EmitsLight = true,
+		Tier = 3
 	},
 	[Constants.PLANT_TYPES.WILLOWWHISP] = {
-		SeedPrice = 75,
-		SellPrice = 210,
-		FruitSellPrice = 38,
-		GrowthTime = 85,
+		SeedPrice = 300,          -- RAREST PLANT - Late game goal
+		FruitSellPrice = 900,     -- Profit: 600 coins (200% ROI!)
+		GrowthTime = 150,         -- 4.0 coins/second (BEST!)
 		Color = Color3.fromRGB(200, 255, 255),
-		EmitsLight = true
+		EmitsLight = true,
+		Tier = 3
 	}
 }
 
 -- Economy
-Constants.STARTING_COINS = 200
+-- Starting coins: Enough to buy 5-6 starter plants (Lumut) and have buffer for mistakes
+Constants.STARTING_COINS = 100
 
 -- Garden Plot Settings
 Constants.PLOT_SIZE = Vector3.new(20, 1, 20)
