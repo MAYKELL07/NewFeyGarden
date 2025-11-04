@@ -110,7 +110,7 @@ Constants.PLANT_CONFIG = {
 		EmitsLight = false,
 		Tier = 1
 	},
-	[Constants.PLANT_TYPES.GLOWBUG] = {
+	[Constants.PLANT_TYPES.GLOWBUD] = {
 		SeedPrice = 25,           -- Still affordable
 		FruitSellPrice = 55,      -- Profit: 30 coins (120% ROI)
 		GrowthTime = 45,          -- 0.67 coins/second (best T1 efficiency!)

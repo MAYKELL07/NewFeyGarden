@@ -36,14 +36,10 @@ local function applyWeather(weatherType)
 	
 	-- Notify all clients
 	weatherEvent:FireAllClients(weatherType)
-	
-	print("Weather changed to:", weatherType)
 end
 
 -- Initialize weather system
 function WeatherController.Initialize()
-	print("WeatherController initialized")
-	
 	-- Set initial weather
 	applyWeather(Constants.WEATHER_TYPES.SUNNY)
 	

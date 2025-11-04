@@ -196,11 +196,6 @@ function PlantModule.GrowPlant(plantModel)
 			-- Emit growth VFX
 			VFXModule.TryEmitGrowth(plantModel)
 			
-			-- Debug info
-			local buffStatus = BuffsModule.GetBuffStatus(plantModel)
-			print(string.format("%s grew to %s (%.2fs, mult: %.2f)", 
-				plantModel.Name, stage, growthTime, buffMultiplier))
-			
 			-- Wait for next stage (except on last stage)
 			if i < #stages then
 				task.wait(growthTime)
@@ -209,7 +204,6 @@ function PlantModule.GrowPlant(plantModel)
 		
 		-- Mark as harvestable
 		plantModel:SetAttribute("Harvestable", true)
-		print(plantModel.Name .. " is now harvestable!")
 	end)
 end
 

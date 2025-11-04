@@ -3,6 +3,7 @@
 -- require(game.ReplicatedStorage.Setup.UISetup).CreateUI()
 -- Creates the UI structure in StarterGui that clients will use
 -- Theme: Mystical Garden with nature-inspired colors
+-- require(game.ReplicatedStorage.Setup.UISetup).CreateUI()
 
 local UISetup = {}
 
@@ -454,24 +455,6 @@ function UISetup.CreateUI()
 	petsPadding.PaddingRight = UDim.new(0, 10)
 	petsPadding.Parent = petsScroll
 	
-	-- Pets toggle button (Bottom Right)
-	local petsButton = Instance.new("TextButton")
-	petsButton.Name = "PetsButton"
-	petsButton.Size = UDim2.new(0.08, 0, 0.08, 0)
-	petsButton.Position = UDim2.new(0.91, 0, 0.86, 0)
-	petsButton.AnchorPoint = Vector2.new(0.5, 0)
-	petsButton.BackgroundColor3 = Color3.fromRGB(100, 120, 150)
-	petsButton.Text = "🐾"
-	petsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-	petsButton.Font = Enum.Font.GothamBold
-	petsButton.TextScaled = true
-	petsButton.ZIndex = 5
-	petsButton.Parent = screenGui
-	
-	addCorner(petsButton, 12)
-	addShadow(petsButton)
-	addGradient(petsButton, Color3.fromRGB(100, 120, 150), Color3.fromRGB(80, 100, 130), 45)
-	
 	-- =============================================================================
 	-- NOTIFICATION CONTAINER
 	-- =============================================================================
@@ -490,6 +473,79 @@ function UISetup.CreateUI()
 	notifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	notifLayout.Parent = notificationContainer
 	
+	-- =============================================================================
+	-- NPC INTERACTION BUTTONS (Top Center) - Only 3 NPCs
+	-- =============================================================================
+	local npcButtonsFrame = Instance.new("Frame")
+	npcButtonsFrame.Name = "NPCButtonsFrame"
+	npcButtonsFrame.Size = UDim2.new(0.3, 0, 0.08, 0)
+	npcButtonsFrame.Position = UDim2.new(0.5, 0, 0.02, 0)
+	npcButtonsFrame.AnchorPoint = Vector2.new(0.5, 0)
+	npcButtonsFrame.BackgroundTransparency = 1
+	npcButtonsFrame.Parent = screenGui
+	
+	local npcLayout = Instance.new("UIListLayout")
+	npcLayout.FillDirection = Enum.FillDirection.Horizontal
+	npcLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	npcLayout.Padding = UDim.new(0, 12)
+	npcLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	npcLayout.Parent = npcButtonsFrame
+	
+	-- Helper to create NPC button
+	local function createNPCButton(name, icon, color, order)
+		local button = Instance.new("TextButton")
+		button.Name = name .. "Button"
+		button.Size = UDim2.new(0, 90, 1, 0)
+		button.BackgroundColor3 = color
+		button.BorderSizePixel = 0
+		button.Font = Enum.Font.GothamBold
+		button.Text = icon
+		button.TextSize = 36
+		button.TextColor3 = Color3.fromRGB(255, 255, 255)
+		button.LayoutOrder = order
+		button.Parent = npcButtonsFrame
+		
+		addCorner(button, 14)
+		addGradient(button, color, Color3.fromRGB(
+			math.max(0, color.R * 255 - 30),
+			math.max(0, color.G * 255 - 30),
+			math.max(0, color.B * 255 - 30)
+		), 45)
+		
+		-- Tooltip
+		local tooltip = Instance.new("TextLabel")
+		tooltip.Name = "Tooltip"
+		tooltip.Size = UDim2.new(1.3, 0, 0.35, 0)
+		tooltip.Position = UDim2.new(0.5, 0, 1.15, 0)
+		tooltip.AnchorPoint = Vector2.new(0.5, 0)
+		tooltip.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+		tooltip.BackgroundTransparency = 0.1
+		tooltip.BorderSizePixel = 0
+		tooltip.Text = name
+		tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
+		tooltip.Font = Enum.Font.GothamBold
+		tooltip.TextSize = 14
+		tooltip.Visible = false
+		tooltip.Parent = button
+		
+		addCorner(tooltip, 8)
+		
+		button.MouseEnter:Connect(function()
+			tooltip.Visible = true
+		end)
+		
+		button.MouseLeave:Connect(function()
+			tooltip.Visible = false
+		end)
+		
+		return button
+	end
+	
+	-- Create 3 NPC buttons
+	createNPCButton("SeedShop", "�", Color3.fromRGB(80, 150, 80), 1)
+	createNPCButton("FruitSeller", "🍎", Color3.fromRGB(200, 150, 50), 2)
+	createNPCButton("PetStore", "�", Color3.fromRGB(150, 100, 200), 3)
+	
 	print("[UISetup] ✅ FeyGardenUI created successfully!")
 	print("[UISetup] UI Structure:")
 	print("  - CurrencyFrame (coins display)")
@@ -499,7 +555,7 @@ function UISetup.CreateUI()
 	print("  - ShopWindow (buy seeds & pets)")
 	print("  - SellWindow (sell fruits)")
 	print("  - PetsWindow (equip/unequip pets)")
-	print("  - PetsButton (toggle pets window)")
+	print("  - NPCButtonsFrame (3 NPC shops: Seed Shop, Fruit Seller, Pet Store)")
 	print("  - NotificationContainer (feedback messages)")
 	print("[UISetup] Ready for client scripts to use!")
 end

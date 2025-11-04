@@ -35,15 +35,26 @@
 - [ ] Add mute/unmute toggle buttons
 
 ### 4. Improve UI/UX
+
+- [x] Add NPC system with dialog interface ✅ **COMPLETED**
+  - Created NPCModule with 4 NPCs (Gardener, Merchant, Mystic, Collector)
+  - Built NPCUIHandler with slide-in panel from right side
+  - 3D viewport showing animated NPC model
+  - Dialog system with typewriter effect
+  - 4 interactive NPC buttons at top-center with tooltips
+- [x] Improve UI button interactions ✅ **COMPLETED**
+  - Added hover effects to all buttons
+  - Added tooltips to NPC buttons
+  - Better visual feedback
 - [ ] Add loading screen during initial data fetch
-- [ ] Improve notification system (currently working but could be better)
-- [ ] Add tooltips to all buttons and items
 - [ ] Add confirmation dialogs for selling items
 - [ ] Improve shop layout (better organization by category)
 - [ ] Add search/filter functionality to shop
 - [ ] Show player statistics (total plants grown, coins earned, etc.)
 - [ ] Add settings menu (audio, graphics, keybinds)
 - [ ] Improve mobile responsiveness
+- [ ] Add camera movement when talking to NPCs
+- [ ] Add proximity triggers for NPCs in world
 
 ---
 

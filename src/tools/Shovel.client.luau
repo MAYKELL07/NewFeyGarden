@@ -15,20 +15,12 @@ if not toolActionEvent then
 	return
 end
 
-print("[Shovel] LocalScript loaded")
-
 -- Handle tool activation
 tool.Activated:Connect(function()
 	local target = mouse.Target
 	
 	if target then
-		print(string.format("[Shovel] Activated - Target: %s", target:GetFullName()))
-		
 		-- Send to server
 		toolActionEvent:FireServer("Shovel", target, mouse.Hit.Position)
-	else
-		print("[Shovel] Activated but no target")
 	end
 end)
-
-print("[Shovel] ✓ Ready to use")

@@ -15,20 +15,12 @@ if not toolActionEvent then
 	return
 end
 
-print("[WateringCan] LocalScript loaded")
-
 -- Handle tool activation
 tool.Activated:Connect(function()
 	local target = mouse.Target
 	
 	if target then
-		print(string.format("[WateringCan] Activated - Target: %s", target:GetFullName()))
-		
 		-- Send to server
 		toolActionEvent:FireServer("WateringCan", target, mouse.Hit.Position)
-	else
-		print("[WateringCan] Activated but no target")
 	end
 end)
-
-print("[WateringCan] ✓ Ready to use")

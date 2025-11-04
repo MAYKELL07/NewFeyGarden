@@ -86,11 +86,8 @@ end
 
 -- Shovel tool handler
 local function handleShovel(player, target, position)
-	print(string.format("[ToolServer] Shovel: Player %s used on target %s", player.Name, target:GetFullName()))
-	
 	-- Check ownership
 	if not playerOwnsGarden(player, target) then
-		warn(string.format("[ToolServer] Player %s doesn't own this garden", player.Name))
 		return
 	end
 	
@@ -98,7 +95,6 @@ local function handleShovel(player, target, position)
 	local plant = getPlantFromTarget(target)
 	
 	if plant then
-		local plantType = plant:GetAttribute("PlantType")
 		local plantPosition = plant:GetBoundingBox().Position
 		
 		-- Destroy the plant
@@ -106,20 +102,13 @@ local function handleShovel(player, target, position)
 		
 		-- Show VFX
 		VFXModule.ShowGrowthEffect(plantPosition)
-		
-		print(string.format("[ToolServer] ✓ %s cleared %s plant", player.Name, plantType))
-	else
-		warn(string.format("[ToolServer] No plant found at target: %s", target:GetFullName()))
 	end
 end
 
 -- Watering Can tool handler
 local function handleWateringCan(player, target, position)
-	print(string.format("[ToolServer] WateringCan: Player %s used on target %s", player.Name, target:GetFullName()))
-	
 	-- Check ownership
 	if not playerOwnsGarden(player, target) then
-		warn(string.format("[ToolServer] Player %s doesn't own this garden", player.Name))
 		return
 	end
 	
@@ -127,7 +116,6 @@ local function handleWateringCan(player, target, position)
 	local plant = getPlantFromTarget(target)
 	
 	if plant then
-		local plantType = plant:GetAttribute("PlantType")
 		local plantPosition = plant:GetBoundingBox().Position
 		
 		-- Water the plant
@@ -136,11 +124,6 @@ local function handleWateringCan(player, target, position)
 		-- Show VFX
 		VFXModule.TryEmitWater(plant)
 		VFXModule.ShowWateringEffect(plantPosition)
-		
-		print(string.format("[ToolServer] ✓ %s watered %s plant for %d seconds", 
-			player.Name, plantType, Config.Tools.WateringCan.WaterSeconds))
-	else
-		warn(string.format("[ToolServer] No plant found at target: %s", target:GetFullName()))
 	end
 end
 
@@ -148,17 +131,11 @@ end
 toolActionEvent.OnServerEvent:Connect(function(player, toolName, target, position)
 	-- Validate inputs
 	if not toolName or not target then 
-		warn(string.format("[ToolServer] Invalid inputs from %s - toolName: %s, target: %s", 
-			player.Name, tostring(toolName), tostring(target)))
 		return 
 	end
 	
-	print(string.format("[ToolServer] Received - Player: %s, Tool: %s, Target: %s", 
-		player.Name, toolName, target:GetFullName()))
-	
 	-- Check cooldown
 	if isOnCooldown(player, toolName) then
-		print(string.format("[ToolServer] %s is on cooldown for %s", player.Name, toolName))
 		return
 	end
 	
@@ -173,7 +150,5 @@ toolActionEvent.OnServerEvent:Connect(function(player, toolName, target, positio
 		warn(string.format("[ToolServer] Unknown tool: %s", toolName))
 	end
 end)
-
-print("🔧 Tool Server Handler Loaded")
 
 return {}

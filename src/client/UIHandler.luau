@@ -914,19 +914,7 @@ function UIHandler.Initialize()
 		end
 	end
 	
-	-- Setup pets button
-	local petsButton = screenGui:WaitForChild("PetsButton", 5)
-	if petsButton then
-		petsButton.MouseButton1Click:Connect(function()
-			if petsWindow then
-				petsWindow.Visible = not petsWindow.Visible
-				if petsWindow.Visible then
-					updatePetsWindow()
-				end
-			end
-		end)
-		print("[UIHandler] PetsButton connected")
-	end
+	-- Note: PetsButton removed - use NPC Pet Store button instead
 	
 	-- Setup proximity prompts
 	local shopPart = workspace:WaitForChild(Config.World.ShopPartName, 10)
@@ -968,6 +956,50 @@ function UIHandler.Initialize()
 		end
 	else
 		warn("[UIHandler] SellPart not found:", Config.World.SellPartName)
+	end
+	
+	-- =============================================================================
+	-- NPC BUTTON CONNECTIONS - 3 Shop NPCs
+	-- =============================================================================
+	local NPCUIHandler
+	pcall(function()
+		NPCUIHandler = require(script.Parent:WaitForChild("NPCUIHandler"))
+	end)
+	
+	if NPCUIHandler then
+		local npcButtonsFrame = screenGui:FindFirstChild("NPCButtonsFrame")
+		if npcButtonsFrame then
+			-- Seed Shop button
+			local seedShopBtn = npcButtonsFrame:FindFirstChild("SeedShopButton")
+			if seedShopBtn then
+				seedShopBtn.MouseButton1Click:Connect(function()
+					playSound("ButtonClick")
+					NPCUIHandler.ShowSeedShop()
+				end)
+			end
+			
+			-- Fruit Seller button
+			local fruitSellerBtn = npcButtonsFrame:FindFirstChild("FruitSellerButton")
+			if fruitSellerBtn then
+				fruitSellerBtn.MouseButton1Click:Connect(function()
+					playSound("ButtonClick")
+					NPCUIHandler.ShowFruitSeller()
+				end)
+			end
+			
+			-- Pet Store button
+			local petStoreBtn = npcButtonsFrame:FindFirstChild("PetStoreButton")
+			if petStoreBtn then
+				petStoreBtn.MouseButton1Click:Connect(function()
+					playSound("ButtonClick")
+					NPCUIHandler.ShowPetStore()
+				end)
+			end
+			
+			print("[UIHandler] 3 NPC shop buttons connected")
+		end
+	else
+		warn("[UIHandler] NPCUIHandler not loaded - NPC buttons disabled")
 	end
 	
 	-- Listen for events

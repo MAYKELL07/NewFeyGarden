@@ -40,7 +40,6 @@ function VFXModule.TryEmitWater(target)
 			)
 		end)
 	end
-	print("VFXModule: Water splash effect triggered on", target.Name)
 	return false
 end
 
@@ -65,7 +64,6 @@ function VFXModule.TryEmitGrowth(target)
 			)
 		end)
 	end
-	print("VFXModule: Growth sparkle effect triggered on", target.Name)
 	return false
 end
 
@@ -89,7 +87,6 @@ function VFXModule.TryEmitPetCheer(target)
 			)
 		end)
 	end
-	print("VFXModule: Pet cheer effect triggered on", target.Name)
 	return false
 end
 
@@ -127,7 +124,6 @@ function VFXModule.ShowWateringEffect(position)
 	if not Config.VFX.Enable then return end
 	
 	VFXModule.CreateSparkleEffect(position + Vector3.new(0, 1, 0), Color3.fromRGB(100, 150, 255))
-	print("VFXModule: Watering effect shown at", position)
 end
 
 -- Show growth effect (enhanced fallback)
@@ -135,7 +131,6 @@ function VFXModule.ShowGrowthEffect(position)
 	if not Config.VFX.Enable then return end
 	
 	VFXModule.CreateSparkleEffect(position + Vector3.new(0, 2, 0), Color3.fromRGB(100, 255, 100))
-	print("VFXModule: Growth effect shown at", position)
 end
 
 return VFXModule

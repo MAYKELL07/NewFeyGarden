@@ -12,7 +12,6 @@ BuffsModule.CurrentWeather = "Sunny"
 -- Set the current weather
 function BuffsModule.SetWeather(weatherType)
 	BuffsModule.CurrentWeather = weatherType
-	print("BuffsModule: Weather set to", weatherType)
 end
 
 -- Get the current weather
@@ -54,7 +53,6 @@ end
 function BuffsModule.WaterPlant(plantModel, duration)
 	duration = duration or Config.Tools.WateringCan.WaterSeconds
 	plantModel:SetAttribute("WateredUntil", os.time() + duration)
-	print("BuffsModule: Plant watered for", duration, "seconds")
 end
 
 -- Set pet boost on a plant

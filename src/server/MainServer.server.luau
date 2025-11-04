@@ -1,8 +1,6 @@
 -- MainServer.server.luau
 -- Main server initialization script for FeyGarden
 
-print("🌿 FeyGarden Server Initializing...")
-
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
@@ -21,8 +19,6 @@ local GardenManager = require(script.Parent.GardenManager)
 
 -- Create leaderstats for players
 Players.PlayerAdded:Connect(function(player)
-	print("MainServer: Setting up leaderstats for", player.Name)
-	
 	-- Wait a moment for DataService to load profile
 	task.wait(0.5)
 	
@@ -52,25 +48,8 @@ Players.PlayerAdded:Connect(function(player)
 end)
 
 -- Initialize all systems
-print("🔧 Initializing server systems...")
 WeatherController.Initialize()
-print("  ✓ WeatherController initialized")
 EconomyService.Initialize()
-print("  ✓ EconomyService initialized")
 GardenManager.Initialize()
-print("  ✓ GardenManager initialized")
--- ToolServer initializes itself on require
-print("  ✓ ToolServer initialized")
 
 print("✨ FeyGarden Server Ready!")
-print("📡 RemoteEvents status:")
-print("  - PlantSeed:", ReplicatedStorage:FindFirstChild(Constants.EVENTS.PLANT_SEED) and "✓" or "✗")
-print("  - HarvestPlant:", ReplicatedStorage:FindFirstChild(Constants.EVENTS.HARVEST_PLANT) and "✓" or "✗")
-print("  - WeatherChanged:", ReplicatedStorage:FindFirstChild(Constants.EVENTS.WEATHER_CHANGED) and "✓" or "✗")
-print("  - UpdateCurrency:", ReplicatedStorage:FindFirstChild(Constants.EVENTS.UPDATE_CURRENCY) and "✓" or "✗")
-print("  - UpdateInventory:", ReplicatedStorage:FindFirstChild(Constants.EVENTS.UPDATE_INVENTORY) and "✓" or "✗")
-print("  - BuySeed:", ReplicatedStorage:FindFirstChild(Constants.EVENTS.BUY_SEED) and "✓" or "✗")
-print("  - BuyPet:", ReplicatedStorage:FindFirstChild(Constants.EVENTS.BUY_PET) and "✓" or "✗")
-print("  - EquipPet:", ReplicatedStorage:FindFirstChild(Constants.EVENTS.EQUIP_PET) and "✓" or "✗")
-print("  - ToolAction:", ReplicatedStorage:FindFirstChild("ToolAction") and "✓" or "✗")
-print("")
