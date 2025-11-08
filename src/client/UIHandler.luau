@@ -28,25 +28,33 @@ local playerCoins = 0
 local currentWeather = Constants.WEATHER_TYPES.SUNNY
 local screenGui = nil
 
+-- ENCHANTED FOREST THEME - Matching UISetup.luau
 local THEME = {
-	MainBackground = Color3.fromRGB(18, 40, 63),
-	MainAccent = Color3.fromRGB(52, 121, 103),
-	MainAccentHover = Color3.fromRGB(68, 157, 134),
-	PanelStart = Color3.fromRGB(26, 56, 77),
-	PanelEnd = Color3.fromRGB(17, 38, 58),
-	PanelStroke = Color3.fromRGB(70, 153, 131),
-	TextPrimary = Color3.fromRGB(244, 231, 205),
-	TextSecondary = Color3.fromRGB(176, 208, 199),
-	GoldAccent = Color3.fromRGB(255, 210, 110),
-	WarningGold = Color3.fromRGB(210, 147, 80),
-	Danger = Color3.fromRGB(184, 78, 78),
-	DangerHover = Color3.fromRGB(214, 108, 108),
-	Notification = Color3.fromRGB(68, 157, 134),
-	NotificationAlt = Color3.fromRGB(36, 84, 101),
-	ShopButton = Color3.fromRGB(62, 146, 128),
-	ShopButtonHover = Color3.fromRGB(82, 176, 154),
-	SellButton = Color3.fromRGB(186, 122, 73),
-	SellButtonHover = Color3.fromRGB(210, 150, 93),
+	-- Backgrounds: Deep forest night
+	ForestDark = Color3.fromRGB(18, 28, 35),
+	ForestDeep = Color3.fromRGB(25, 38, 45),
+	WoodBark = Color3.fromRGB(42, 35, 28),
+	MossGreen = Color3.fromRGB(35, 52, 42),
+	
+	-- Panels: Organic wood and stone
+	WoodPanel = Color3.fromRGB(52, 45, 38),
+	StonePanel = Color3.fromRGB(48, 58, 62),
+	LeafPanel = Color3.fromRGB(40, 58, 48),
+	
+	-- Accents: Magical glows and natural gems
+	TealGem = Color3.fromRGB(88, 160, 140),
+	TealGlow = Color3.fromRGB(110, 190, 170),
+	GoldLeaf = Color3.fromRGB(235, 185, 95),
+	AmberGlow = Color3.fromRGB(255, 200, 120),
+	
+	-- Text: Off-white and pale colors
+	TextLight = Color3.fromRGB(245, 238, 220),
+	TextGold = Color3.fromRGB(240, 200, 130),
+	TextMoss = Color3.fromRGB(180, 220, 190),
+	
+	-- Borders: Natural vine and leaf strokes
+	VineStroke = Color3.fromRGB(88, 160, 108),
+	GlowStroke = Color3.fromRGB(140, 255, 200),
 }
 
 -- Forward declarations
@@ -138,7 +146,7 @@ local function showNotification(message, color, icon)
 	iconLabel.Text = icon or "*"
 	iconLabel.Font = Enum.Font.GothamBold
 	iconLabel.TextScaled = true
-	iconLabel.TextColor3 = THEME.TextPrimary
+	iconLabel.TextColor3 = THEME.TextLight
 	iconLabel.Parent = notif
 
 	local textLabel = Instance.new("TextLabel")
@@ -148,7 +156,7 @@ local function showNotification(message, color, icon)
 	textLabel.Text = message
 	textLabel.Font = Enum.Font.Gotham
 	textLabel.TextSize = 16
-	textLabel.TextColor3 = THEME.TextPrimary
+	textLabel.TextColor3 = THEME.TextLight
 	textLabel.TextWrapped = true
 	textLabel.TextXAlignment = Enum.TextXAlignment.Left
 	textLabel.Parent = notif
@@ -188,7 +196,7 @@ local function updateCurrencyDisplay(coins, isTotal)
 		playerCoins = playerCoins + coins
 		-- Show notification for coin gain/loss
 		if coins > 0 then
-			showNotification("+" .. coins .. " coins earned!", THEME.GoldAccent, "💰")
+			showNotification("+" .. coins .. " coins earned!", THEME.TextGold, "💰")
 		end
 	end
 	
@@ -214,7 +222,7 @@ local function createInventoryItem(plantType, count, container)
 	local itemFrame = Instance.new("Frame")
 	itemFrame.Name = plantType
 	itemFrame.Size = UDim2.new(0, 80, 1, -10)
-	itemFrame.BackgroundColor3 = THEME.PanelStart
+	itemFrame.BackgroundColor3 = THEME.LeafPanel
 	itemFrame.BorderSizePixel = 0
 	itemFrame.Parent = container
 	
@@ -223,14 +231,14 @@ local function createInventoryItem(plantType, count, container)
 	corner.Parent = itemFrame
 	
 	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new(THEME.PanelStart, THEME.PanelEnd)
+	gradient.Color = ColorSequence.new(THEME.LeafPanel, THEME.MossGreen)
 	gradient.Rotation = 90
 	gradient.Parent = itemFrame
 
 	local stroke = Instance.new("UIStroke")
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	stroke.Thickness = 1
-	stroke.Color = THEME.PanelStroke
+	stroke.Color = THEME.VineStroke
 	stroke.Transparency = 0.4
 	stroke.Parent = itemFrame
 	
@@ -240,24 +248,24 @@ local function createInventoryItem(plantType, count, container)
 	button.Text = "🌱"
 	button.TextScaled = true
 	button.Font = Enum.Font.GothamBold
-	button.TextColor3 = config.EmitsLight and THEME.GoldAccent or THEME.TextPrimary
+	button.TextColor3 = config.EmitsLight and THEME.TextGold or THEME.TextLight
 	button.Parent = itemFrame
 	
 	button.MouseButton1Click:Connect(function()
 		if selectedPlantType == plantType then
 			selectedPlantType = nil
-			itemFrame.BackgroundColor3 = THEME.PanelStart
-			showNotification("Seed stored for later.", THEME.NotificationAlt, "👋")
+			itemFrame.BackgroundColor3 = THEME.LeafPanel
+			showNotification("Seed stored for later.", THEME.WoodPanel, "👋")
 		else
 			selectedPlantType = plantType
 			-- Reset all
 			for _, child in ipairs(container:GetChildren()) do
 				if child:IsA("Frame") then
-					child.BackgroundColor3 = THEME.PanelStart
+					child.BackgroundColor3 = THEME.LeafPanel
 				end
 			end
-			itemFrame.BackgroundColor3 = THEME.MainAccent
-			showNotification(plantType .. " prepared for planting!", THEME.MainAccent, "🌱")
+			itemFrame.BackgroundColor3 = THEME.TealGem
+			showNotification(plantType .. " prepared for planting!", THEME.TealGem, "🌱")
 		end
 	end)
 	
@@ -266,7 +274,7 @@ local function createInventoryItem(plantType, count, container)
 	countLabel.Position = UDim2.new(0, 0, 0.7, 0)
 	countLabel.BackgroundTransparency = 1
 	countLabel.Text = tostring(count)
-	countLabel.TextColor3 = THEME.TextPrimary
+	countLabel.TextColor3 = THEME.TextLight
 	countLabel.Font = Enum.Font.GothamBold
 	countLabel.TextScaled = true
 	countLabel.Parent = itemFrame
@@ -278,7 +286,7 @@ local function createFruitItem(fruitName, count, container)
 	local itemFrame = Instance.new("Frame")
 	itemFrame.Name = fruitName
 	itemFrame.Size = UDim2.new(0, 80, 1, -10)
-	itemFrame.BackgroundColor3 = THEME.PanelStart
+	itemFrame.BackgroundColor3 = THEME.WoodPanel
 	itemFrame.BorderSizePixel = 0
 	itemFrame.Parent = container
 	
@@ -287,14 +295,14 @@ local function createFruitItem(fruitName, count, container)
 	corner.Parent = itemFrame
 	
 	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new(THEME.PanelStart, THEME.PanelEnd)
+	gradient.Color = ColorSequence.new(THEME.WoodPanel, THEME.WoodBark)
 	gradient.Rotation = 90
 	gradient.Parent = itemFrame
 
 	local stroke = Instance.new("UIStroke")
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 	stroke.Thickness = 1
-	stroke.Color = THEME.PanelStroke
+	stroke.Color = THEME.GoldLeaf
 	stroke.Transparency = 0.4
 	stroke.Parent = itemFrame
 	
@@ -303,7 +311,7 @@ local function createFruitItem(fruitName, count, container)
 	icon.BackgroundTransparency = 1
 	icon.Text = "🍎"
 	icon.TextScaled = true
-	icon.TextColor3 = THEME.TextPrimary
+	icon.TextColor3 = THEME.TextLight
 	icon.Parent = itemFrame
 	
 	local countLabel = Instance.new("TextLabel")
@@ -311,7 +319,7 @@ local function createFruitItem(fruitName, count, container)
 	countLabel.Position = UDim2.new(0, 0, 0.7, 0)
 	countLabel.BackgroundTransparency = 1
 	countLabel.Text = tostring(count)
-	countLabel.TextColor3 = THEME.TextPrimary
+	countLabel.TextColor3 = THEME.TextLight
 	countLabel.Font = Enum.Font.GothamBold
 	countLabel.TextScaled = true
 	countLabel.Parent = itemFrame
@@ -421,25 +429,25 @@ local function createShopItem(itemName, itemType, config, container)
 	local itemFrame = Instance.new("Frame")
 	itemFrame.Name = itemName
 	itemFrame.Size = UDim2.new(1, 0, 0, 80)
-	itemFrame.BackgroundColor3 = THEME.PanelStart
+	itemFrame.BackgroundColor3 = THEME.WoodPanel
 	itemFrame.BorderSizePixel = 0
 	itemFrame.ZIndex = 11
 	itemFrame.Parent = container
 	
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
+	corner.CornerRadius = UDim.new(0, 12)
 	corner.Parent = itemFrame
 	
 	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new(THEME.PanelStart, THEME.PanelEnd)
+	gradient.Color = ColorSequence.new(THEME.WoodPanel, THEME.WoodBark)
 	gradient.Rotation = 90
 	gradient.Parent = itemFrame
 
 	local stroke = Instance.new("UIStroke")
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	stroke.Thickness = 1
-	stroke.Color = THEME.PanelStroke
-	stroke.Transparency = 0.4
+	stroke.Thickness = 2
+	stroke.Color = THEME.VineStroke
+	stroke.Transparency = 0.3
 	stroke.Parent = itemFrame
 	
 	-- Icon
@@ -449,9 +457,8 @@ local function createShopItem(itemName, itemType, config, container)
 	icon.BackgroundTransparency = 1
 	icon.Text = itemType == "seed" and "🌱" or "🐾"
 	icon.TextScaled = true
-	icon.TextColor3 = THEME.TextPrimary
 	icon.Font = Enum.Font.GothamBold
-	icon.TextColor3 = itemType == "seed" and (config.EmitsLight and THEME.GoldAccent or THEME.MainAccent) or Color3.fromRGB(168, 213, 255)
+	icon.TextColor3 = itemType == "seed" and (config.EmitsLight and THEME.TextGold or THEME.TextMoss) or THEME.TealGlow
 	icon.ZIndex = 12
 	icon.Parent = itemFrame
 	
@@ -461,7 +468,7 @@ local function createShopItem(itemName, itemType, config, container)
 	nameLabel.Position = UDim2.new(0.15, 0, 0.1, 0)
 	nameLabel.BackgroundTransparency = 1
 	nameLabel.Text = itemName
-	nameLabel.TextColor3 = THEME.TextPrimary
+	nameLabel.TextColor3 = THEME.TextLight
 	nameLabel.Font = Enum.Font.GothamBold
 	nameLabel.TextScaled = true
 	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -474,7 +481,7 @@ local function createShopItem(itemName, itemType, config, container)
 	descLabel.Position = UDim2.new(0.15, 0, 0.55, 0)
 	descLabel.BackgroundTransparency = 1
 	descLabel.Text = itemType == "seed" and ("Grows in " .. (config.GrowthTime or "?") .. "s") or ("Boost: +" .. math.floor((1 - (config.WaterBoost or 1)) * 100) .. "%")
-	descLabel.TextColor3 = THEME.TextSecondary
+	descLabel.TextColor3 = THEME.TextMoss
 	descLabel.Font = Enum.Font.Gotham
 	descLabel.TextScaled = true
 	descLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -487,7 +494,7 @@ local function createShopItem(itemName, itemType, config, container)
 	priceLabel.Position = UDim2.new(0.62, 0, 0.25, 0)
 	priceLabel.BackgroundTransparency = 1
 	priceLabel.Text = "💰 " .. price
-	priceLabel.TextColor3 = THEME.GoldAccent
+	priceLabel.TextColor3 = THEME.TextGold
 	priceLabel.Font = Enum.Font.GothamBold
 	priceLabel.TextScaled = true
 	priceLabel.ZIndex = 12
@@ -497,16 +504,16 @@ local function createShopItem(itemName, itemType, config, container)
 	local buyButton = Instance.new("TextButton")
 	buyButton.Size = UDim2.new(0.15, 0, 0.5, 0)
 	buyButton.Position = UDim2.new(0.83, 0, 0.25, 0)
-	buyButton.BackgroundColor3 = THEME.ShopButton
+	buyButton.BackgroundColor3 = THEME.TealGem
 	buyButton.Text = "BUY"
-	buyButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	buyButton.TextColor3 = THEME.TextLight
 	buyButton.Font = Enum.Font.GothamBold
 	buyButton.TextScaled = true
 	buyButton.ZIndex = 12
 	buyButton.Parent = itemFrame
 	
 	local buyCorner = Instance.new("UICorner")
-	buyCorner.CornerRadius = UDim.new(0, 8)
+	buyCorner.CornerRadius = UDim.new(0, 10)
 	buyCorner.Parent = buyButton
 	
 	buyButton.MouseButton1Click:Connect(function()
@@ -528,16 +535,24 @@ local function createShopItem(itemName, itemType, config, container)
 	
 	-- Hover effect
 	buyButton.MouseEnter:Connect(function()
-		buyButton.BackgroundColor3 = THEME.ShopButtonHover
+		buyButton.BackgroundColor3 = THEME.TealGlow
 	end)
 	buyButton.MouseLeave:Connect(function()
-		buyButton.BackgroundColor3 = THEME.ShopButton
+		buyButton.BackgroundColor3 = THEME.TealGem
 	end)
 end
 
 local function populateShop()
 	if not screenGui then return end
-	local shopScroll = screenGui.ShopWindow:WaitForChild("ScrollingFrame")
+	local shopWindow = screenGui:FindFirstChild("ShopWindow")
+	if not shopWindow then return end
+	
+	local leftPanel = shopWindow:FindFirstChild("LeftPanel")
+	local shopScroll = leftPanel and leftPanel:FindFirstChild("ScrollingFrame") or shopWindow:FindFirstChild("ScrollingFrame")
+	if not shopScroll then 
+		warn("[UIHandler] Could not find shop ScrollingFrame")
+		return 
+	end
 	
 	-- Clear existing
 	for _, child in ipairs(shopScroll:GetChildren()) do
@@ -567,29 +582,29 @@ local function createPetItem(petType, container)
 	local itemFrame = Instance.new("Frame")
 	itemFrame.Name = petType
 	itemFrame.Size = UDim2.new(1, 0, 0, 70)
-	itemFrame.BackgroundColor3 = isEquipped and THEME.MainAccent or THEME.PanelStart
+	itemFrame.BackgroundColor3 = isEquipped and THEME.TealGem or THEME.WoodPanel
 	itemFrame.BorderSizePixel = 0
 	itemFrame.ZIndex = 11
 	itemFrame.Parent = container
 	
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
+	corner.CornerRadius = UDim.new(0, 12)
 	corner.Parent = itemFrame
 	
 	local gradient = Instance.new("UIGradient")
 	if isEquipped then
-	gradient.Color = ColorSequence.new(THEME.MainAccent, THEME.PanelEnd)
-else
-	gradient.Color = ColorSequence.new(THEME.PanelStart, THEME.PanelEnd)
-end
+		gradient.Color = ColorSequence.new(THEME.TealGem, THEME.ForestDeep)
+	else
+		gradient.Color = ColorSequence.new(THEME.WoodPanel, THEME.WoodBark)
+	end
 	gradient.Rotation = 90
 	gradient.Parent = itemFrame
 
 	local stroke = Instance.new("UIStroke")
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	stroke.Thickness = 1
-	stroke.Color = THEME.PanelStroke
-	stroke.Transparency = 0.4
+	stroke.Thickness = 2
+	stroke.Color = isEquipped and THEME.GlowStroke or THEME.VineStroke
+	stroke.Transparency = 0.3
 	stroke.Parent = itemFrame
 	
 	-- Icon
@@ -599,7 +614,7 @@ end
 	icon.BackgroundTransparency = 1
 	icon.Text = "🐾"
 	icon.TextScaled = true
-	icon.TextColor3 = THEME.TextPrimary
+	icon.TextColor3 = THEME.TextLight
 	icon.Font = Enum.Font.GothamBold
 	icon.ZIndex = 12
 	icon.Parent = itemFrame
@@ -610,7 +625,7 @@ end
 	nameLabel.Position = UDim2.new(0.15, 0, 0.1, 0)
 	nameLabel.BackgroundTransparency = 1
 	nameLabel.Text = petType
-	nameLabel.TextColor3 = THEME.TextPrimary
+	nameLabel.TextColor3 = THEME.TextLight
 	nameLabel.Font = Enum.Font.GothamBold
 	nameLabel.TextScaled = true
 	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -623,7 +638,7 @@ end
 	boostLabel.Position = UDim2.new(0.15, 0, 0.6, 0)
 	boostLabel.BackgroundTransparency = 1
 	boostLabel.Text = "Boost: " .. (config.WaterBoost * 100) .. "%"
-	boostLabel.TextColor3 = THEME.TextSecondary
+	boostLabel.TextColor3 = THEME.TextMoss
 	boostLabel.Font = Enum.Font.Gotham
 	boostLabel.TextSize = 12
 	boostLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -635,9 +650,9 @@ end
 		local equippedLabel = Instance.new("TextLabel")
 		equippedLabel.Size = UDim2.new(0.25, 0, 0.5, 0)
 		equippedLabel.Position = UDim2.new(0.72, 0, 0.25, 0)
-		equippedLabel.BackgroundColor3 = THEME.MainAccent
+		equippedLabel.BackgroundColor3 = THEME.TealGlow
 		equippedLabel.Text = "✓ EQUIPPED"
-		equippedLabel.TextColor3 = THEME.TextPrimary
+		equippedLabel.TextColor3 = THEME.TextLight
 		equippedLabel.Font = Enum.Font.GothamBold
 		equippedLabel.TextSize = 11
 		equippedLabel.ZIndex = 12
@@ -651,9 +666,9 @@ end
 		local unequipButton = Instance.new("TextButton")
 		unequipButton.Size = UDim2.new(0.2, 0, 0.4, 0)
 		unequipButton.Position = UDim2.new(0.55, 0, 0.3, 0)
-		unequipButton.BackgroundColor3 = THEME.Danger
+		unequipButton.BackgroundColor3 = THEME.WoodBark
 		unequipButton.Text = "Unequip"
-		unequipButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+		unequipButton.TextColor3 = THEME.TextLight
 		unequipButton.Font = Enum.Font.GothamBold
 		unequipButton.TextSize = 11
 		unequipButton.ZIndex = 12
@@ -669,24 +684,24 @@ end
 			if equipEvent then
 				equipEvent:FireServer("") -- Empty string to unequip
 				playSound("PetUnequip")
-				showNotification("Pet unequipped", THEME.NotificationAlt, "🐾")
+				showNotification("Pet unequipped", THEME.WoodPanel, "🐾")
 			end
 		end)
 		
 		unequipButton.MouseEnter:Connect(function()
-			unequipButton.BackgroundColor3 = THEME.DangerHover
+			unequipButton.BackgroundColor3 = THEME.ForestDark
 		end)
 		unequipButton.MouseLeave:Connect(function()
-			unequipButton.BackgroundColor3 = THEME.Danger
+			unequipButton.BackgroundColor3 = THEME.WoodBark
 		end)
 	else
 		-- Equip button
 		local equipButton = Instance.new("TextButton")
 		equipButton.Size = UDim2.new(0.25, 0, 0.6, 0)
 		equipButton.Position = UDim2.new(0.72, 0, 0.2, 0)
-		equipButton.BackgroundColor3 = THEME.ShopButton
+		equipButton.BackgroundColor3 = THEME.TealGem
 		equipButton.Text = "Equip"
-		equipButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+		equipButton.TextColor3 = THEME.TextLight
 		equipButton.Font = Enum.Font.GothamBold
 		equipButton.TextScaled = true
 		equipButton.ZIndex = 12
@@ -702,15 +717,15 @@ end
 			if equipEvent then
 				equipEvent:FireServer(petType)
 				playSound("PetEquip")
-				showNotification("Equipped " .. petType, THEME.MainAccent, "🐾")
+				showNotification("Equipped " .. petType, THEME.TealGem, "🐾")
 			end
 		end)
 		
 		equipButton.MouseEnter:Connect(function()
-			equipButton.BackgroundColor3 = THEME.ShopButtonHover
+			equipButton.BackgroundColor3 = THEME.TealGlow
 		end)
 		equipButton.MouseLeave:Connect(function()
-			equipButton.BackgroundColor3 = THEME.ShopButton
+			equipButton.BackgroundColor3 = THEME.TealGem
 		end)
 	end
 end
@@ -719,7 +734,13 @@ updatePetsWindow = function()
 	if not screenGui then return end
 	local petsWindow = screenGui:FindFirstChild("PetsWindow")
 	if not petsWindow then return end
-	local petsScroll = petsWindow:WaitForChild("ScrollingFrame")
+	
+	local leftPanel = petsWindow:FindFirstChild("LeftPanel")
+	local petsScroll = leftPanel and leftPanel:FindFirstChild("ScrollingFrame") or petsWindow:FindFirstChild("ScrollingFrame")
+	if not petsScroll then 
+		warn("[UIHandler] Could not find pets ScrollingFrame")
+		return 
+	end
 	
 	-- Clear existing
 	for _, child in ipairs(petsScroll:GetChildren()) do
@@ -784,25 +805,25 @@ local function createSellItem(fruitName, count, container)
 	local itemFrame = Instance.new("Frame")
 	itemFrame.Name = fruitName
 	itemFrame.Size = UDim2.new(1, 0, 0, 80)
-	itemFrame.BackgroundColor3 = THEME.PanelStart
+	itemFrame.BackgroundColor3 = THEME.WoodPanel
 	itemFrame.BorderSizePixel = 0
 	itemFrame.ZIndex = 11
 	itemFrame.Parent = container
 	
 	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
+	corner.CornerRadius = UDim.new(0, 12)
 	corner.Parent = itemFrame
 	
 	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new(THEME.PanelStart, THEME.PanelEnd)
+	gradient.Color = ColorSequence.new(THEME.WoodPanel, THEME.WoodBark)
 	gradient.Rotation = 90
 	gradient.Parent = itemFrame
 
 	local stroke = Instance.new("UIStroke")
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	stroke.Thickness = 1
-	stroke.Color = THEME.PanelStroke
-	stroke.Transparency = 0.4
+	stroke.Thickness = 2
+	stroke.Color = THEME.GoldLeaf
+	stroke.Transparency = 0.3
 	stroke.Parent = itemFrame
 	
 	-- Icon
@@ -812,7 +833,7 @@ local function createSellItem(fruitName, count, container)
 	icon.BackgroundTransparency = 1
 	icon.Text = "🍎"
 	icon.TextScaled = true
-	icon.TextColor3 = THEME.TextPrimary
+	icon.TextColor3 = THEME.TextLight
 	icon.Font = Enum.Font.GothamBold
 	icon.ZIndex = 12
 	icon.Parent = itemFrame
@@ -823,7 +844,7 @@ local function createSellItem(fruitName, count, container)
 	nameLabel.Position = UDim2.new(0.15, 0, 0.1, 0)
 	nameLabel.BackgroundTransparency = 1
 	nameLabel.Text = fruitName
-	nameLabel.TextColor3 = THEME.TextPrimary
+	nameLabel.TextColor3 = THEME.TextLight
 	nameLabel.Font = Enum.Font.GothamBold
 	nameLabel.TextScaled = true
 	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -836,7 +857,7 @@ local function createSellItem(fruitName, count, container)
 	countLabel.Position = UDim2.new(0.15, 0, 0.55, 0)
 	countLabel.BackgroundTransparency = 1
 	countLabel.Text = "You have: " .. count
-	countLabel.TextColor3 = THEME.TextSecondary
+	countLabel.TextColor3 = THEME.TextMoss
 	countLabel.Font = Enum.Font.Gotham
 	countLabel.TextScaled = true
 	countLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -849,7 +870,7 @@ local function createSellItem(fruitName, count, container)
 	priceLabel.Position = UDim2.new(0.52, 0, 0.25, 0)
 	priceLabel.BackgroundTransparency = 1
 	priceLabel.Text = "💰 " .. sellPrice .. " each"
-	priceLabel.TextColor3 = THEME.GoldAccent
+	priceLabel.TextColor3 = THEME.TextGold
 	priceLabel.Font = Enum.Font.GothamBold
 	priceLabel.TextScaled = true
 	priceLabel.ZIndex = 12
@@ -859,16 +880,16 @@ local function createSellItem(fruitName, count, container)
 	local sell1Button = Instance.new("TextButton")
 	sell1Button.Size = UDim2.new(0.12, 0, 0.5, 0)
 	sell1Button.Position = UDim2.new(0.75, 0, 0.25, 0)
-	sell1Button.BackgroundColor3 = THEME.SellButton
+	sell1Button.BackgroundColor3 = THEME.TealGem
 	sell1Button.Text = "SELL 1"
-	sell1Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	sell1Button.TextColor3 = THEME.TextLight
 	sell1Button.Font = Enum.Font.GothamBold
 	sell1Button.TextScaled = true
 	sell1Button.ZIndex = 12
 	sell1Button.Parent = itemFrame
 	
 	local sell1Corner = Instance.new("UICorner")
-	sell1Corner.CornerRadius = UDim.new(0, 8)
+	sell1Corner.CornerRadius = UDim.new(0, 10)
 	sell1Corner.Parent = sell1Button
 	
 	sell1Button.MouseButton1Click:Connect(function()
@@ -879,7 +900,7 @@ local function createSellItem(fruitName, count, container)
 			playSound("Sell")
 			-- Show selling notification
 			local plantType = fruitName:gsub("Fruit$", "")
-			showNotification("Sold 1x " .. plantType .. " for " .. sellPrice .. " coins", THEME.WarningGold, "💰")
+			showNotification("Sold 1x " .. plantType .. " for " .. sellPrice .. " coins", THEME.GoldLeaf, "💰")
 		end
 	end)
 	
@@ -887,16 +908,16 @@ local function createSellItem(fruitName, count, container)
 	local sellAllButton = Instance.new("TextButton")
 	sellAllButton.Size = UDim2.new(0.12, 0, 0.5, 0)
 	sellAllButton.Position = UDim2.new(0.875, 0, 0.25, 0)
-	sellAllButton.BackgroundColor3 = THEME.WarningGold
+	sellAllButton.BackgroundColor3 = THEME.GoldLeaf
 	sellAllButton.Text = "SELL ALL"
-	sellAllButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	sellAllButton.TextColor3 = THEME.ForestDark
 	sellAllButton.Font = Enum.Font.GothamBold
 	sellAllButton.TextScaled = true
 	sellAllButton.ZIndex = 12
 	sellAllButton.Parent = itemFrame
 	
 	local sellAllCorner = Instance.new("UICorner")
-	sellAllCorner.CornerRadius = UDim.new(0, 8)
+	sellAllCorner.CornerRadius = UDim.new(0, 10)
 	sellAllCorner.Parent = sellAllButton
 	
 	sellAllButton.MouseButton1Click:Connect(function()
@@ -930,7 +951,15 @@ end
 
 updateSellShop = function()
 	if not screenGui then return end
-	local sellScroll = screenGui.SellWindow:WaitForChild("ScrollingFrame")
+	local sellWindow = screenGui:FindFirstChild("SellWindow")
+	if not sellWindow then return end
+	
+	local leftPanel = sellWindow:FindFirstChild("LeftPanel")
+	local sellScroll = leftPanel and leftPanel:FindFirstChild("ScrollingFrame") or sellWindow:FindFirstChild("ScrollingFrame")
+	if not sellScroll then 
+		warn("[UIHandler] Could not find sell ScrollingFrame")
+		return 
+	end
 	
 	-- Clear existing
 	for _, child in ipairs(sellScroll:GetChildren()) do
@@ -966,7 +995,8 @@ function UIHandler.Initialize()
 	-- Setup shop window
 	local shopWindow = screenGui:WaitForChild("ShopWindow", 5)
 	if shopWindow then
-		local shopCloseButton = shopWindow:WaitForChild("CloseButton", 5)
+		local titleBar = shopWindow:FindFirstChild("TitleBar")
+		local shopCloseButton = titleBar and titleBar:FindFirstChild("CloseButton") or shopWindow:FindFirstChild("CloseButton")
 		if shopCloseButton then
 			shopCloseButton.MouseButton1Click:Connect(function()
 				shopWindow.Visible = false
@@ -979,7 +1009,8 @@ function UIHandler.Initialize()
 	-- Setup sell window
 	local sellWindow = screenGui:WaitForChild("SellWindow", 5)
 	if sellWindow then
-		local sellCloseButton = sellWindow:WaitForChild("CloseButton", 5)
+		local titleBar = sellWindow:FindFirstChild("TitleBar")
+		local sellCloseButton = titleBar and titleBar:FindFirstChild("CloseButton") or sellWindow:FindFirstChild("CloseButton")
 		if sellCloseButton then
 			sellCloseButton.MouseButton1Click:Connect(function()
 				sellWindow.Visible = false
@@ -992,7 +1023,8 @@ function UIHandler.Initialize()
 	-- Setup pets window
 	local petsWindow = screenGui:WaitForChild("PetsWindow", 5)
 	if petsWindow then
-		local petsCloseButton = petsWindow:WaitForChild("CloseButton", 5)
+		local titleBar = petsWindow:FindFirstChild("TitleBar")
+		local petsCloseButton = titleBar and titleBar:FindFirstChild("CloseButton") or petsWindow:FindFirstChild("CloseButton")
 		if petsCloseButton then
 			petsCloseButton.MouseButton1Click:Connect(function()
 				petsWindow.Visible = false
