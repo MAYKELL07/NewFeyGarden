@@ -57,6 +57,28 @@ function UISetup.CreateUI()
 		gradient.Parent = parent
 		return gradient
 	end
+
+	-- Helper function to add consistent stroke outline
+	local function addStroke(parent, color, thickness, transparency)
+		local stroke = Instance.new("UIStroke")
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.Thickness = thickness or 1.5
+		stroke.Color = color or Color3.fromRGB(70, 153, 131)
+		stroke.Transparency = transparency or 0.35
+		stroke.Parent = parent
+		return stroke
+	end
+
+	local theme = {
+		background = Color3.fromRGB(12, 26, 44),
+		backgroundAlt = Color3.fromRGB(21, 45, 68),
+		panel = Color3.fromRGB(31, 68, 84),
+		panelDark = Color3.fromRGB(18, 40, 63),
+		accent = Color3.fromRGB(68, 157, 134),
+		accentHover = Color3.fromRGB(88, 187, 162),
+		gold = Color3.fromRGB(255, 210, 110),
+		stroke = Color3.fromRGB(70, 153, 131)
+	}
 	
 	print("[UISetup] Creating FeyGarden UI...")
 	
@@ -241,7 +263,7 @@ function UISetup.CreateUI()
 	shopWindow.Size = UDim2.new(0.5, 0, 0.7, 0)
 	shopWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
 	shopWindow.AnchorPoint = Vector2.new(0.5, 0.5)
-	shopWindow.BackgroundColor3 = Color3.fromRGB(45, 35, 55)
+	shopWindow.BackgroundColor3 = theme.panel
 	shopWindow.BorderSizePixel = 0
 	shopWindow.Visible = false
 	shopWindow.ZIndex = 10
@@ -249,7 +271,8 @@ function UISetup.CreateUI()
 	
 	addCorner(shopWindow, 20)
 	addShadow(shopWindow)
-	addGradient(shopWindow, Color3.fromRGB(45, 35, 55), Color3.fromRGB(35, 25, 45), 135)
+	addGradient(shopWindow, theme.panel, theme.panelDark, 135)
+	addStroke(shopWindow, theme.stroke, 2, 0.2)
 	
 	-- Shop title
 	local shopTitle = Instance.new("TextLabel")
@@ -258,7 +281,7 @@ function UISetup.CreateUI()
 	shopTitle.Position = UDim2.new(0.05, 0, 0.05, 0)
 	shopTitle.BackgroundTransparency = 1
 	shopTitle.Text = "🏪 Garden Shop"
-	shopTitle.TextColor3 = Color3.fromRGB(200, 255, 200)
+	shopTitle.TextColor3 = theme.gold
 	shopTitle.Font = Enum.Font.GothamBold
 	shopTitle.TextScaled = true
 	shopTitle.ZIndex = 11
@@ -269,7 +292,7 @@ function UISetup.CreateUI()
 	shopCloseButton.Name = "CloseButton"
 	shopCloseButton.Size = UDim2.new(0.08, 0, 0.08, 0)
 	shopCloseButton.Position = UDim2.new(0.9, 0, 0.05, 0)
-	shopCloseButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+	shopCloseButton.BackgroundColor3 = theme.accent
 	shopCloseButton.Text = "✖"
 	shopCloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 	shopCloseButton.Font = Enum.Font.GothamBold
@@ -284,16 +307,17 @@ function UISetup.CreateUI()
 	shopScroll.Name = "ScrollingFrame"
 	shopScroll.Size = UDim2.new(0.9, 0, 0.75, 0)
 	shopScroll.Position = UDim2.new(0.05, 0, 0.18, 0)
-	shopScroll.BackgroundColor3 = Color3.fromRGB(30, 25, 35)
+	shopScroll.BackgroundColor3 = theme.background
 	shopScroll.BorderSizePixel = 0
 	shopScroll.ScrollBarThickness = 8
-	shopScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 80, 120)
+	shopScroll.ScrollBarImageColor3 = theme.accent
 	shopScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	shopScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 	shopScroll.ZIndex = 11
 	shopScroll.Parent = shopWindow
 	
 	addCorner(shopScroll, 12)
+	addStroke(shopScroll, theme.stroke, 1, 0.45)
 	
 	local shopLayout = Instance.new("UIListLayout")
 	shopLayout.Padding = UDim.new(0, 10)
@@ -315,7 +339,7 @@ function UISetup.CreateUI()
 	sellWindow.Size = UDim2.new(0.5, 0, 0.7, 0)
 	sellWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
 	sellWindow.AnchorPoint = Vector2.new(0.5, 0.5)
-	sellWindow.BackgroundColor3 = Color3.fromRGB(50, 40, 35) -- Warm brown
+	sellWindow.BackgroundColor3 = theme.panel -- Warm brown
 	sellWindow.BorderSizePixel = 0
 	sellWindow.Visible = false
 	sellWindow.ZIndex = 10
@@ -323,7 +347,8 @@ function UISetup.CreateUI()
 	
 	addCorner(sellWindow, 20)
 	addShadow(sellWindow)
-	addGradient(sellWindow, Color3.fromRGB(50, 40, 35), Color3.fromRGB(40, 30, 25), 135)
+	addGradient(sellWindow, theme.panel, theme.panelDark, 135)
+	addStroke(sellWindow, theme.stroke, 2, 0.2)
 	
 	-- Sell title
 	local sellTitle = Instance.new("TextLabel")
@@ -332,7 +357,7 @@ function UISetup.CreateUI()
 	sellTitle.Position = UDim2.new(0.05, 0, 0.05, 0)
 	sellTitle.BackgroundTransparency = 1
 	sellTitle.Text = "💰 Fruit Market"
-	sellTitle.TextColor3 = Color3.fromRGB(255, 200, 100)
+	sellTitle.TextColor3 = theme.gold
 	sellTitle.Font = Enum.Font.GothamBold
 	sellTitle.TextScaled = true
 	sellTitle.ZIndex = 11
@@ -343,7 +368,7 @@ function UISetup.CreateUI()
 	sellCloseButton.Name = "CloseButton"
 	sellCloseButton.Size = UDim2.new(0.08, 0, 0.08, 0)
 	sellCloseButton.Position = UDim2.new(0.9, 0, 0.05, 0)
-	sellCloseButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+	sellCloseButton.BackgroundColor3 = theme.accent
 	sellCloseButton.Text = "✖"
 	sellCloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 	sellCloseButton.Font = Enum.Font.GothamBold
@@ -358,16 +383,17 @@ function UISetup.CreateUI()
 	sellScroll.Name = "ScrollingFrame"
 	sellScroll.Size = UDim2.new(0.9, 0, 0.75, 0)
 	sellScroll.Position = UDim2.new(0.05, 0, 0.18, 0)
-	sellScroll.BackgroundColor3 = Color3.fromRGB(35, 30, 25)
+	sellScroll.BackgroundColor3 = theme.background
 	sellScroll.BorderSizePixel = 0
 	sellScroll.ScrollBarThickness = 8
-	sellScroll.ScrollBarImageColor3 = Color3.fromRGB(120, 100, 80)
+	sellScroll.ScrollBarImageColor3 = theme.accent
 	sellScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	sellScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 	sellScroll.ZIndex = 11
 	sellScroll.Parent = sellWindow
 	
 	addCorner(sellScroll, 12)
+	addStroke(sellScroll, theme.stroke, 1, 0.45)
 	
 	local sellLayout = Instance.new("UIListLayout")
 	sellLayout.Padding = UDim.new(0, 10)
@@ -389,7 +415,7 @@ function UISetup.CreateUI()
 	petsWindow.Size = UDim2.new(0.4, 0, 0.6, 0)
 	petsWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
 	petsWindow.AnchorPoint = Vector2.new(0.5, 0.5)
-	petsWindow.BackgroundColor3 = Color3.fromRGB(40, 45, 50) -- Cool grey
+	petsWindow.BackgroundColor3 = theme.panel -- Cool grey
 	petsWindow.BorderSizePixel = 0
 	petsWindow.Visible = false
 	petsWindow.ZIndex = 10
@@ -397,7 +423,8 @@ function UISetup.CreateUI()
 	
 	addCorner(petsWindow, 20)
 	addShadow(petsWindow)
-	addGradient(petsWindow, Color3.fromRGB(40, 45, 50), Color3.fromRGB(30, 35, 40), 135)
+	addGradient(petsWindow, theme.panel, theme.panelDark, 135)
+	addStroke(petsWindow, theme.stroke, 2, 0.2)
 	
 	-- Pets title
 	local petsTitle = Instance.new("TextLabel")
@@ -406,7 +433,7 @@ function UISetup.CreateUI()
 	petsTitle.Position = UDim2.new(0.05, 0, 0.05, 0)
 	petsTitle.BackgroundTransparency = 1
 	petsTitle.Text = "🐾 My Pets"
-	petsTitle.TextColor3 = Color3.fromRGB(200, 220, 255)
+	petsTitle.TextColor3 = theme.gold
 	petsTitle.Font = Enum.Font.GothamBold
 	petsTitle.TextScaled = true
 	petsTitle.ZIndex = 11
@@ -417,7 +444,7 @@ function UISetup.CreateUI()
 	petsCloseButton.Name = "CloseButton"
 	petsCloseButton.Size = UDim2.new(0.08, 0, 0.08, 0)
 	petsCloseButton.Position = UDim2.new(0.9, 0, 0.05, 0)
-	petsCloseButton.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+	petsCloseButton.BackgroundColor3 = theme.accent
 	petsCloseButton.Text = "✖"
 	petsCloseButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 	petsCloseButton.Font = Enum.Font.GothamBold
@@ -432,16 +459,17 @@ function UISetup.CreateUI()
 	petsScroll.Name = "ScrollingFrame"
 	petsScroll.Size = UDim2.new(0.9, 0, 0.75, 0)
 	petsScroll.Position = UDim2.new(0.05, 0, 0.18, 0)
-	petsScroll.BackgroundColor3 = Color3.fromRGB(25, 30, 35)
+	petsScroll.BackgroundColor3 = theme.background
 	petsScroll.BorderSizePixel = 0
 	petsScroll.ScrollBarThickness = 8
-	petsScroll.ScrollBarImageColor3 = Color3.fromRGB(100, 120, 140)
+	petsScroll.ScrollBarImageColor3 = theme.accent
 	petsScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	petsScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 	petsScroll.ZIndex = 11
 	petsScroll.Parent = petsWindow
 	
 	addCorner(petsScroll, 12)
+	addStroke(petsScroll, theme.stroke, 1, 0.45)
 	
 	local petsLayout = Instance.new("UIListLayout")
 	petsLayout.Padding = UDim.new(0, 10)
@@ -454,6 +482,24 @@ function UISetup.CreateUI()
 	petsPadding.PaddingLeft = UDim.new(0, 10)
 	petsPadding.PaddingRight = UDim.new(0, 10)
 	petsPadding.Parent = petsScroll
+	
+	-- Pets toggle button (Bottom Right)
+	local petsButton = Instance.new("TextButton")
+	petsButton.Name = "PetsButton"
+	petsButton.Size = UDim2.new(0.08, 0, 0.08, 0)
+	petsButton.Position = UDim2.new(0.91, 0, 0.86, 0)
+	petsButton.AnchorPoint = Vector2.new(0.5, 0)
+	petsButton.BackgroundColor3 = Color3.fromRGB(100, 120, 150)
+	petsButton.Text = "🐾"
+	petsButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+	petsButton.Font = Enum.Font.GothamBold
+	petsButton.TextScaled = true
+	petsButton.ZIndex = 5
+	petsButton.Parent = screenGui
+	
+	addCorner(petsButton, 12)
+	addShadow(petsButton)
+	addGradient(petsButton, Color3.fromRGB(100, 120, 150), Color3.fromRGB(80, 100, 130), 45)
 	
 	-- =============================================================================
 	-- NOTIFICATION CONTAINER
@@ -473,79 +519,6 @@ function UISetup.CreateUI()
 	notifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	notifLayout.Parent = notificationContainer
 	
-	-- =============================================================================
-	-- NPC INTERACTION BUTTONS (Top Center) - Only 3 NPCs
-	-- =============================================================================
-	local npcButtonsFrame = Instance.new("Frame")
-	npcButtonsFrame.Name = "NPCButtonsFrame"
-	npcButtonsFrame.Size = UDim2.new(0.3, 0, 0.08, 0)
-	npcButtonsFrame.Position = UDim2.new(0.5, 0, 0.02, 0)
-	npcButtonsFrame.AnchorPoint = Vector2.new(0.5, 0)
-	npcButtonsFrame.BackgroundTransparency = 1
-	npcButtonsFrame.Parent = screenGui
-	
-	local npcLayout = Instance.new("UIListLayout")
-	npcLayout.FillDirection = Enum.FillDirection.Horizontal
-	npcLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-	npcLayout.Padding = UDim.new(0, 12)
-	npcLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	npcLayout.Parent = npcButtonsFrame
-	
-	-- Helper to create NPC button
-	local function createNPCButton(name, icon, color, order)
-		local button = Instance.new("TextButton")
-		button.Name = name .. "Button"
-		button.Size = UDim2.new(0, 90, 1, 0)
-		button.BackgroundColor3 = color
-		button.BorderSizePixel = 0
-		button.Font = Enum.Font.GothamBold
-		button.Text = icon
-		button.TextSize = 36
-		button.TextColor3 = Color3.fromRGB(255, 255, 255)
-		button.LayoutOrder = order
-		button.Parent = npcButtonsFrame
-		
-		addCorner(button, 14)
-		addGradient(button, color, Color3.fromRGB(
-			math.max(0, color.R * 255 - 30),
-			math.max(0, color.G * 255 - 30),
-			math.max(0, color.B * 255 - 30)
-		), 45)
-		
-		-- Tooltip
-		local tooltip = Instance.new("TextLabel")
-		tooltip.Name = "Tooltip"
-		tooltip.Size = UDim2.new(1.3, 0, 0.35, 0)
-		tooltip.Position = UDim2.new(0.5, 0, 1.15, 0)
-		tooltip.AnchorPoint = Vector2.new(0.5, 0)
-		tooltip.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-		tooltip.BackgroundTransparency = 0.1
-		tooltip.BorderSizePixel = 0
-		tooltip.Text = name
-		tooltip.TextColor3 = Color3.fromRGB(255, 255, 255)
-		tooltip.Font = Enum.Font.GothamBold
-		tooltip.TextSize = 14
-		tooltip.Visible = false
-		tooltip.Parent = button
-		
-		addCorner(tooltip, 8)
-		
-		button.MouseEnter:Connect(function()
-			tooltip.Visible = true
-		end)
-		
-		button.MouseLeave:Connect(function()
-			tooltip.Visible = false
-		end)
-		
-		return button
-	end
-	
-	-- Create 3 NPC buttons
-	createNPCButton("SeedShop", "�", Color3.fromRGB(80, 150, 80), 1)
-	createNPCButton("FruitSeller", "🍎", Color3.fromRGB(200, 150, 50), 2)
-	createNPCButton("PetStore", "�", Color3.fromRGB(150, 100, 200), 3)
-	
 	print("[UISetup] ✅ FeyGardenUI created successfully!")
 	print("[UISetup] UI Structure:")
 	print("  - CurrencyFrame (coins display)")
@@ -555,8 +528,9 @@ function UISetup.CreateUI()
 	print("  - ShopWindow (buy seeds & pets)")
 	print("  - SellWindow (sell fruits)")
 	print("  - PetsWindow (equip/unequip pets)")
-	print("  - NPCButtonsFrame (3 NPC shops: Seed Shop, Fruit Seller, Pet Store)")
+	print("  - PetsButton (toggle pet inventory)")
 	print("  - NotificationContainer (feedback messages)")
+	print("[UISetup] Use ProximityPrompts on ShopPart, SellPart, and PetShopPart to open windows!")
 	print("[UISetup] Ready for client scripts to use!")
 end
 
