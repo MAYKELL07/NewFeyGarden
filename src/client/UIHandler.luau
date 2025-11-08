@@ -31,15 +31,15 @@ local screenGui = nil
 -- ENCHANTED FOREST THEME - Matching UISetup.luau
 local THEME = {
 	-- Backgrounds: Deep forest night
-	ForestDark = Color3.fromRGB(18, 28, 35),
-	ForestDeep = Color3.fromRGB(25, 38, 45),
-	WoodBark = Color3.fromRGB(42, 35, 28),
-	MossGreen = Color3.fromRGB(35, 52, 42),
+	ForestDark = Color3.fromRGB(25, 50, 35),
+	ForestDeep = Color3.fromRGB(35, 60, 45),
+	WoodBark = Color3.fromRGB(50, 60, 45),
+	MossGreen = Color3.fromRGB(45, 70, 55),
 	
 	-- Panels: Organic wood and stone
-	WoodPanel = Color3.fromRGB(52, 45, 38),
-	StonePanel = Color3.fromRGB(48, 58, 62),
-	LeafPanel = Color3.fromRGB(40, 58, 48),
+	WoodPanel = Color3.fromRGB(60, 70, 55),
+	StonePanel = Color3.fromRGB(60, 75, 65),
+	LeafPanel = Color3.fromRGB(50, 75, 60),
 	
 	-- Accents: Magical glows and natural gems
 	TealGem = Color3.fromRGB(88, 160, 140),
@@ -66,6 +66,37 @@ local function playSound(soundName)
 	if AudioManager then
 		AudioManager.PlaySFX(soundName)
 	end
+end
+
+-- Helper to hide/show HUD elements
+local function hideHUD()
+	if not screenGui then return end
+	local currencyFrame = screenGui:FindFirstChild("CurrencyFrame")
+	local weatherFrame = screenGui:FindFirstChild("WeatherFrame")
+	local inventoryFrame = screenGui:FindFirstChild("InventoryFrame")
+	local fruitsFrame = screenGui:FindFirstChild("FruitsFrame")
+	local petsButton = screenGui:FindFirstChild("PetsButton")
+	
+	if currencyFrame then currencyFrame.Visible = false end
+	if weatherFrame then weatherFrame.Visible = false end
+	if inventoryFrame then inventoryFrame.Visible = false end
+	if fruitsFrame then fruitsFrame.Visible = false end
+	if petsButton then petsButton.Visible = false end
+end
+
+local function showHUD()
+	if not screenGui then return end
+	local currencyFrame = screenGui:FindFirstChild("CurrencyFrame")
+	local weatherFrame = screenGui:FindFirstChild("WeatherFrame")
+	local inventoryFrame = screenGui:FindFirstChild("InventoryFrame")
+	local fruitsFrame = screenGui:FindFirstChild("FruitsFrame")
+	local petsButton = screenGui:FindFirstChild("PetsButton")
+	
+	if currencyFrame then currencyFrame.Visible = true end
+	if weatherFrame then weatherFrame.Visible = true end
+	if inventoryFrame then inventoryFrame.Visible = true end
+	if fruitsFrame then fruitsFrame.Visible = true end
+	if petsButton then petsButton.Visible = true end
 end
 
 -- =============================================================================
@@ -995,12 +1026,12 @@ function UIHandler.Initialize()
 	-- Setup shop window
 	local shopWindow = screenGui:WaitForChild("ShopWindow", 5)
 	if shopWindow then
-		local titleBar = shopWindow:FindFirstChild("TitleBar")
-		local shopCloseButton = titleBar and titleBar:FindFirstChild("CloseButton") or shopWindow:FindFirstChild("CloseButton")
+		local shopCloseButton = shopWindow:FindFirstChild("CloseButton")
 		if shopCloseButton then
 			shopCloseButton.MouseButton1Click:Connect(function()
 				shopWindow.Visible = false
 				NPCUIHandler.RestoreCamera()
+				showHUD()
 				playSound("WindowClose")
 			end)
 		end
@@ -1009,12 +1040,12 @@ function UIHandler.Initialize()
 	-- Setup sell window
 	local sellWindow = screenGui:WaitForChild("SellWindow", 5)
 	if sellWindow then
-		local titleBar = sellWindow:FindFirstChild("TitleBar")
-		local sellCloseButton = titleBar and titleBar:FindFirstChild("CloseButton") or sellWindow:FindFirstChild("CloseButton")
+		local sellCloseButton = sellWindow:FindFirstChild("CloseButton")
 		if sellCloseButton then
 			sellCloseButton.MouseButton1Click:Connect(function()
 				sellWindow.Visible = false
 				NPCUIHandler.RestoreCamera()
+				showHUD()
 				playSound("WindowClose")
 			end)
 		end
@@ -1029,6 +1060,7 @@ function UIHandler.Initialize()
 			petsCloseButton.MouseButton1Click:Connect(function()
 				petsWindow.Visible = false
 				NPCUIHandler.RestoreCamera()
+				showHUD()
 				playSound("WindowClose")
 			end)
 		end
@@ -1057,6 +1089,7 @@ function UIHandler.Initialize()
 					NPCUIHandler.MoveCameraToNPC("ShopCamera")
 					populateShop()
 					shopWindow.Visible = true
+					hideHUD()
 					playSound("WindowOpen")
 				end
 			end)
@@ -1077,6 +1110,7 @@ function UIHandler.Initialize()
 					NPCUIHandler.MoveCameraToNPC("SellCamera")
 					updateSellShop()
 					sellWindow.Visible = true
+					hideHUD()
 					playSound("WindowOpen")
 				end
 			end)
@@ -1100,6 +1134,7 @@ function UIHandler.Initialize()
 					NPCUIHandler.MoveCameraToNPC("PetCamera")
 					updatePetsWindow()
 					petsWindow.Visible = true
+					hideHUD()
 					playSound("WindowOpen")
 				end
 			end)

@@ -22,6 +22,7 @@ function UISetup.CreateUI()
 	screenGui.Name = "FeyGardenUI"
 	screenGui.ResetOnSpawn = false
 	screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	screenGui.IgnoreGuiInset = true
 	screenGui.Parent = StarterGui
 	
 	-- Helper function to create organic rounded corners (wood/vine aesthetic)
@@ -85,15 +86,15 @@ function UISetup.CreateUI()
 	-- Deep forest tones (dark blues, greens, browns) with gold/teal accents
 	local theme = {
 		-- Backgrounds: Deep forest night
-		forestDark = Color3.fromRGB(18, 28, 35),       -- Dark forest background
-		forestDeep = Color3.fromRGB(25, 38, 45),        -- Deep wood
-		woodBark = Color3.fromRGB(42, 35, 28),          -- Matte wood brown
-		mossGreen = Color3.fromRGB(35, 52, 42),         -- Moss overlay
+		forestDark = Color3.fromRGB(25, 50, 35),       -- Dark forest background
+		forestDeep = Color3.fromRGB(35, 60, 45),        -- Deep wood
+		woodBark = Color3.fromRGB(50, 60, 45),          -- Matte wood brown
+		mossGreen = Color3.fromRGB(45, 70, 55),         -- Moss overlay
 		
 		-- Panels: Organic wood and stone
-		woodPanel = Color3.fromRGB(52, 45, 38),         -- Weathered wood panel
-		stonePanel = Color3.fromRGB(48, 58, 62),        -- Ancient stone
-		leafPanel = Color3.fromRGB(40, 58, 48),         -- Leaf-covered surface
+		woodPanel = Color3.fromRGB(60, 70, 55),         -- Weathered wood panel
+		stonePanel = Color3.fromRGB(60, 75, 65),        -- Ancient stone
+		leafPanel = Color3.fromRGB(50, 75, 60),         -- Leaf-covered surface
 		
 		-- Accents: Magical glows and natural gems
 		tealGem = Color3.fromRGB(88, 160, 140),         -- Teal gem accent
@@ -313,92 +314,44 @@ function UISetup.CreateUI()
 	fruitPadding.Parent = fruitsContainer
 	
 	-- =============================================================================
-	-- SHOP WINDOW (Modal) - 3 Column Layout: Store | NPC | Inventory
+	-- SHOP WINDOW (Modal) - 3 Column Fullscreen: Store | NPC | Inventory
 	-- =============================================================================
 	local shopWindow = Instance.new("Frame")
 	shopWindow.Name = "ShopWindow"
-	shopWindow.Size = UDim2.new(0.85, 0, 0.8, 0)
-	shopWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
-	shopWindow.AnchorPoint = Vector2.new(0.5, 0.5)
+	shopWindow.Size = UDim2.new(1, 0, 1, 0)
+	shopWindow.Position = UDim2.new(0, 0, 0, 0)
 	shopWindow.BackgroundColor3 = theme.forestDeep
+	shopWindow.BackgroundTransparency = 1
 	shopWindow.BorderSizePixel = 0
 	shopWindow.Visible = false
 	shopWindow.ZIndex = 10
 	shopWindow.Parent = screenGui
 	
-	addCorner(shopWindow, 28)
-	addShadow(shopWindow)
-	addGradient(shopWindow, theme.forestDeep, theme.forestDark, 135)
-	addStroke(shopWindow, theme.tealGem, 3, 0.15)
-	addGlow(shopWindow, theme.glowStroke)
-	
-	-- Shop title bar
-	local shopTitleBar = Instance.new("Frame")
-	shopTitleBar.Name = "TitleBar"
-	shopTitleBar.Size = UDim2.new(1, 0, 0.08, 0)
-	shopTitleBar.Position = UDim2.new(0, 0, 0, 0)
-	shopTitleBar.BackgroundColor3 = theme.woodPanel
-	shopTitleBar.BorderSizePixel = 0
-	shopTitleBar.ZIndex = 11
-	shopTitleBar.Parent = shopWindow
-	
-	addCorner(shopTitleBar, 28)
-	addGradient(shopTitleBar, theme.woodPanel, theme.woodBark, 0)
-	
-	-- Shop title
-	local shopTitle = Instance.new("TextLabel")
-	shopTitle.Name = "Title"
-	shopTitle.Size = UDim2.new(0.6, 0, 1, 0)
-	shopTitle.Position = UDim2.new(0.2, 0, 0, 0)
-	shopTitle.BackgroundTransparency = 1
-	shopTitle.Text = "🏪 Garden Shop"
-	shopTitle.TextColor3 = theme.textGold
-	shopTitle.Font = Enum.Font.GothamBold
-	shopTitle.TextScaled = true
-	shopTitle.ZIndex = 12
-	shopTitle.Parent = shopTitleBar
-	
-	local shopTitleStroke = Instance.new("UIStroke")
-	shopTitleStroke.Color = theme.forestDark
-	shopTitleStroke.Thickness = 3
-	shopTitleStroke.Parent = shopTitle
-	
-	-- Close button
-	local shopCloseButton = Instance.new("TextButton")
-	shopCloseButton.Name = "CloseButton"
-	shopCloseButton.Size = UDim2.new(0.06, 0, 0.7, 0)
-	shopCloseButton.Position = UDim2.new(0.93, 0, 0.15, 0)
-	shopCloseButton.BackgroundColor3 = theme.woodBark
-	shopCloseButton.Text = "✖"
-	shopCloseButton.TextColor3 = theme.textLight
-	shopCloseButton.Font = Enum.Font.GothamBold
-	shopCloseButton.TextScaled = true
-	shopCloseButton.ZIndex = 12
-	shopCloseButton.Parent = shopTitleBar
-	
-	addCorner(shopCloseButton, 12)
-	addStroke(shopCloseButton, theme.goldLeaf, 2, 0.2)
-	
-	-- LEFT PANEL - Store Items
+	-- LEFT PANEL - Store Items (35%)
 	local shopLeftPanel = Instance.new("Frame")
 	shopLeftPanel.Name = "LeftPanel"
-	shopLeftPanel.Size = UDim2.new(0.48, 0, 0.88, 0)
-	shopLeftPanel.Position = UDim2.new(0.01, 0, 0.1, 0)
+	shopLeftPanel.Size = UDim2.new(0.35, -10, 1, -120)
+	shopLeftPanel.Position = UDim2.new(0, 10, 0, 60)
 	shopLeftPanel.BackgroundColor3 = theme.woodBark
 	shopLeftPanel.BorderSizePixel = 0
 	shopLeftPanel.ZIndex = 11
 	shopLeftPanel.Parent = shopWindow
 	
-	addCorner(shopLeftPanel, 20)
-	addStroke(shopLeftPanel, theme.vineStroke, 2, 0.35)
+	-- Rounded corners only on top-right and bottom-right
+	local leftCorner = Instance.new("UICorner")
+	leftCorner.CornerRadius = UDim.new(0, 25)
+	leftCorner.Parent = shopLeftPanel
+	
+	addStroke(shopLeftPanel, theme.vineStroke, 3, 0.35)
 	addGradient(shopLeftPanel, theme.woodBark, theme.forestDark, 90)
+	addShadow(shopLeftPanel)
 	
 	local shopLeftTitle = Instance.new("TextLabel")
 	shopLeftTitle.Name = "PanelTitle"
 	shopLeftTitle.Size = UDim2.new(0.9, 0, 0.06, 0)
 	shopLeftTitle.Position = UDim2.new(0.05, 0, 0.02, 0)
 	shopLeftTitle.BackgroundTransparency = 1
-	shopLeftTitle.Text = "🛒 Store"
+	shopLeftTitle.Text = "🛒 Store Items"
 	shopLeftTitle.TextColor3 = theme.textGold
 	shopLeftTitle.Font = Enum.Font.GothamBold
 	shopLeftTitle.TextScaled = true
@@ -406,13 +359,18 @@ function UISetup.CreateUI()
 	shopLeftTitle.ZIndex = 12
 	shopLeftTitle.Parent = shopLeftPanel
 	
+	local shopLeftTitleStroke = Instance.new("UIStroke")
+	shopLeftTitleStroke.Color = theme.forestDark
+	shopLeftTitleStroke.Thickness = 2
+	shopLeftTitleStroke.Parent = shopLeftTitle
+	
 	local shopScroll = Instance.new("ScrollingFrame")
 	shopScroll.Name = "ScrollingFrame"
 	shopScroll.Size = UDim2.new(0.94, 0, 0.9, 0)
 	shopScroll.Position = UDim2.new(0.03, 0, 0.09, 0)
 	shopScroll.BackgroundTransparency = 1
 	shopScroll.BorderSizePixel = 0
-	shopScroll.ScrollBarThickness = 8
+	shopScroll.ScrollBarThickness = 10
 	shopScroll.ScrollBarImageColor3 = theme.tealGem
 	shopScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	shopScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -420,54 +378,80 @@ function UISetup.CreateUI()
 	shopScroll.Parent = shopLeftPanel
 	
 	local shopLayout = Instance.new("UIListLayout")
-	shopLayout.Padding = UDim.new(0, 8)
+	shopLayout.Padding = UDim.new(0, 10)
 	shopLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	shopLayout.Parent = shopScroll
 	
 	local shopPadding = Instance.new("UIPadding")
-	shopPadding.PaddingTop = UDim.new(0, 5)
-	shopPadding.PaddingBottom = UDim.new(0, 5)
-	shopPadding.PaddingLeft = UDim.new(0, 5)
-	shopPadding.PaddingRight = UDim.new(0, 5)
+	shopPadding.PaddingTop = UDim.new(0, 8)
+	shopPadding.PaddingBottom = UDim.new(0, 8)
+	shopPadding.PaddingLeft = UDim.new(0, 8)
+	shopPadding.PaddingRight = UDim.new(0, 8)
 	shopPadding.Parent = shopScroll
 	
-	-- MIDDLE PANEL - NPC Display (Hidden/Transparent - no context)
+	-- MIDDLE PANEL - NPC Display (30%) - INVISIBLE SPACER
 	local shopMiddlePanel = Instance.new("Frame")
 	shopMiddlePanel.Name = "MiddlePanel"
-	shopMiddlePanel.Size = UDim2.new(0, 0, 0.88, 0)
-	shopMiddlePanel.Position = UDim2.new(0.5, 0, 0.1, 0)
+	shopMiddlePanel.Size = UDim2.new(0.3, 0, 1, 0)
+	shopMiddlePanel.Position = UDim2.new(0.35, 0, 0, 0)
 	shopMiddlePanel.BackgroundTransparency = 1
 	shopMiddlePanel.BorderSizePixel = 0
-	shopMiddlePanel.Visible = false
 	shopMiddlePanel.ZIndex = 11
 	shopMiddlePanel.Parent = shopWindow
 	
-	-- RIGHT PANEL - Player Inventory
+	-- Close button (top-right corner in spacing area)
+	local shopCloseButton = Instance.new("TextButton")
+	shopCloseButton.Name = "CloseButton"
+	shopCloseButton.Size = UDim2.new(0, 130, 0, 35)
+	shopCloseButton.Position = UDim2.new(1, -145, 0, 15)
+	shopCloseButton.BackgroundColor3 = theme.woodBark
+	shopCloseButton.Text = "✖ CLOSE"
+	shopCloseButton.TextColor3 = theme.textLight
+	shopCloseButton.Font = Enum.Font.GothamBold
+	shopCloseButton.TextSize = 18
+	shopCloseButton.ZIndex = 13
+	shopCloseButton.Parent = shopWindow
+	
+	addCorner(shopCloseButton, 12)
+	addStroke(shopCloseButton, theme.goldLeaf, 3, 0.3)
+	addShadow(shopCloseButton)
+	
+	-- RIGHT PANEL - Player Inventory (35%)
 	local shopRightPanel = Instance.new("Frame")
 	shopRightPanel.Name = "RightPanel"
-	shopRightPanel.Size = UDim2.new(0.48, 0, 0.88, 0)
-	shopRightPanel.Position = UDim2.new(0.51, 0, 0.1, 0)
+	shopRightPanel.Size = UDim2.new(0.35, -10, 1, -120)
+	shopRightPanel.Position = UDim2.new(0.65, 0, 0, 60)
 	shopRightPanel.BackgroundColor3 = theme.leafPanel
 	shopRightPanel.BorderSizePixel = 0
 	shopRightPanel.ZIndex = 11
 	shopRightPanel.Parent = shopWindow
 	
-	addCorner(shopRightPanel, 20)
-	addStroke(shopRightPanel, theme.vineStroke, 2, 0.35)
+	-- Rounded corners only on top-left and bottom-left
+	local rightCorner = Instance.new("UICorner")
+	rightCorner.CornerRadius = UDim.new(0, 25)
+	rightCorner.Parent = shopRightPanel
+	
+	addStroke(shopRightPanel, theme.vineStroke, 3, 0.35)
 	addGradient(shopRightPanel, theme.leafPanel, theme.mossGreen, 90)
+	addShadow(shopRightPanel)
 	
 	local shopRightTitle = Instance.new("TextLabel")
 	shopRightTitle.Name = "PanelTitle"
 	shopRightTitle.Size = UDim2.new(0.9, 0, 0.06, 0)
 	shopRightTitle.Position = UDim2.new(0.05, 0, 0.02, 0)
 	shopRightTitle.BackgroundTransparency = 1
-	shopRightTitle.Text = "🎒 My Inventory"
+	shopRightTitle.Text = "🎒 My Seeds"
 	shopRightTitle.TextColor3 = theme.textMoss
 	shopRightTitle.Font = Enum.Font.GothamBold
 	shopRightTitle.TextScaled = true
 	shopRightTitle.TextXAlignment = Enum.TextXAlignment.Left
 	shopRightTitle.ZIndex = 12
 	shopRightTitle.Parent = shopRightPanel
+	
+	local shopRightTitleStroke = Instance.new("UIStroke")
+	shopRightTitleStroke.Color = theme.forestDark
+	shopRightTitleStroke.Thickness = 2
+	shopRightTitleStroke.Parent = shopRightTitle
 	
 	-- Inventory container for seeds
 	local shopInventoryScroll = Instance.new("ScrollingFrame")
@@ -476,7 +460,7 @@ function UISetup.CreateUI()
 	shopInventoryScroll.Position = UDim2.new(0.03, 0, 0.09, 0)
 	shopInventoryScroll.BackgroundTransparency = 1
 	shopInventoryScroll.BorderSizePixel = 0
-	shopInventoryScroll.ScrollBarThickness = 8
+	shopInventoryScroll.ScrollBarThickness = 10
 	shopInventoryScroll.ScrollBarImageColor3 = theme.tealGem
 	shopInventoryScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	shopInventoryScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -484,104 +468,55 @@ function UISetup.CreateUI()
 	shopInventoryScroll.Parent = shopRightPanel
 	
 	local inventoryLayout = Instance.new("UIListLayout")
-	inventoryLayout.Padding = UDim.new(0, 8)
+	inventoryLayout.Padding = UDim.new(0, 10)
 	inventoryLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	inventoryLayout.Parent = shopInventoryScroll
 	
 	local inventoryPadding = Instance.new("UIPadding")
-	inventoryPadding.PaddingTop = UDim.new(0, 5)
-	inventoryPadding.PaddingBottom = UDim.new(0, 5)
-	inventoryPadding.PaddingLeft = UDim.new(0, 5)
-	inventoryPadding.PaddingRight = UDim.new(0, 5)
+	inventoryPadding.PaddingTop = UDim.new(0, 8)
+	inventoryPadding.PaddingBottom = UDim.new(0, 8)
+	inventoryPadding.PaddingLeft = UDim.new(0, 8)
+	inventoryPadding.PaddingRight = UDim.new(0, 8)
 	inventoryPadding.Parent = shopInventoryScroll
 	
 	-- =============================================================================
-	-- SELL WINDOW (Modal) - 3 Column Layout: Sellable Items | NPC | Fruits Owned
+	-- SELL WINDOW (Modal) - 3 Column Fullscreen: Sellable | NPC | Fruits Owned
 	-- =============================================================================
 	local sellWindow = Instance.new("Frame")
 	sellWindow.Name = "SellWindow"
-	sellWindow.Size = UDim2.new(0.85, 0, 0.8, 0)
-	sellWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
-	sellWindow.AnchorPoint = Vector2.new(0.5, 0.5)
+	sellWindow.Size = UDim2.new(1, 0, 1, 0)
+	sellWindow.Position = UDim2.new(0, 0, 0, 0)
 	sellWindow.BackgroundColor3 = theme.forestDeep
+	sellWindow.BackgroundTransparency = 1
 	sellWindow.BorderSizePixel = 0
 	sellWindow.Visible = false
 	sellWindow.ZIndex = 10
 	sellWindow.Parent = screenGui
 	
-	addCorner(sellWindow, 28)
-	addShadow(sellWindow)
-	addGradient(sellWindow, theme.forestDeep, theme.forestDark, 135)
-	addStroke(sellWindow, theme.goldLeaf, 3, 0.15)
-	addGlow(sellWindow, theme.amberGlow)
-	
-	-- Sell title bar
-	local sellTitleBar = Instance.new("Frame")
-	sellTitleBar.Name = "TitleBar"
-	sellTitleBar.Size = UDim2.new(1, 0, 0.08, 0)
-	sellTitleBar.Position = UDim2.new(0, 0, 0, 0)
-	sellTitleBar.BackgroundColor3 = theme.woodPanel
-	sellTitleBar.BorderSizePixel = 0
-	sellTitleBar.ZIndex = 11
-	sellTitleBar.Parent = sellWindow
-	
-	addCorner(sellTitleBar, 28)
-	addGradient(sellTitleBar, theme.woodPanel, theme.woodBark, 0)
-	
-	-- Sell title
-	local sellTitle = Instance.new("TextLabel")
-	sellTitle.Name = "Title"
-	sellTitle.Size = UDim2.new(0.6, 0, 1, 0)
-	sellTitle.Position = UDim2.new(0.2, 0, 0, 0)
-	sellTitle.BackgroundTransparency = 1
-	sellTitle.Text = "💰 Fruit Market"
-	sellTitle.TextColor3 = theme.textGold
-	sellTitle.Font = Enum.Font.GothamBold
-	sellTitle.TextScaled = true
-	sellTitle.ZIndex = 12
-	sellTitle.Parent = sellTitleBar
-	
-	local sellTitleStroke = Instance.new("UIStroke")
-	sellTitleStroke.Color = theme.forestDark
-	sellTitleStroke.Thickness = 3
-	sellTitleStroke.Parent = sellTitle
-	
-	-- Close button
-	local sellCloseButton = Instance.new("TextButton")
-	sellCloseButton.Name = "CloseButton"
-	sellCloseButton.Size = UDim2.new(0.06, 0, 0.7, 0)
-	sellCloseButton.Position = UDim2.new(0.93, 0, 0.15, 0)
-	sellCloseButton.BackgroundColor3 = theme.woodBark
-	sellCloseButton.Text = "✖"
-	sellCloseButton.TextColor3 = theme.textLight
-	sellCloseButton.Font = Enum.Font.GothamBold
-	sellCloseButton.TextScaled = true
-	sellCloseButton.ZIndex = 12
-	sellCloseButton.Parent = sellTitleBar
-	
-	addCorner(sellCloseButton, 12)
-	addStroke(sellCloseButton, theme.goldLeaf, 2, 0.2)
-	
-	-- LEFT PANEL - Sellable Fruits
+	-- LEFT PANEL - Sellable Fruits (35%)
 	local sellLeftPanel = Instance.new("Frame")
 	sellLeftPanel.Name = "LeftPanel"
-	sellLeftPanel.Size = UDim2.new(0.48, 0, 0.88, 0)
-	sellLeftPanel.Position = UDim2.new(0.01, 0, 0.1, 0)
+	sellLeftPanel.Size = UDim2.new(0.35, -10, 1, -120)
+	sellLeftPanel.Position = UDim2.new(0, 10, 0, 60)
 	sellLeftPanel.BackgroundColor3 = theme.woodBark
 	sellLeftPanel.BorderSizePixel = 0
 	sellLeftPanel.ZIndex = 11
 	sellLeftPanel.Parent = sellWindow
 	
-	addCorner(sellLeftPanel, 20)
-	addStroke(sellLeftPanel, theme.goldLeaf, 2, 0.3)
+	local sellLeftCorner = Instance.new("UICorner")
+	sellLeftCorner.CornerRadius = UDim.new(0, 25)
+	sellLeftCorner.Parent = sellLeftPanel
+	
+	addStroke(sellLeftPanel, theme.goldLeaf, 3, 0.3)
 	addGradient(sellLeftPanel, theme.woodBark, theme.forestDark, 90)
+	addShadow(sellLeftPanel)
 	
 	local sellLeftTitle = Instance.new("TextLabel")
 	sellLeftTitle.Name = "PanelTitle"
 	sellLeftTitle.Size = UDim2.new(0.9, 0, 0.06, 0)
 	sellLeftTitle.Position = UDim2.new(0.05, 0, 0.02, 0)
 	sellLeftTitle.BackgroundTransparency = 1
-	sellLeftTitle.Text = "💎 Sell Fruits"
+	sellLeftTitle.Text = "� Sell Your Harvest"
 	sellLeftTitle.TextColor3 = theme.textGold
 	sellLeftTitle.Font = Enum.Font.GothamBold
 	sellLeftTitle.TextScaled = true
@@ -589,13 +524,18 @@ function UISetup.CreateUI()
 	sellLeftTitle.ZIndex = 12
 	sellLeftTitle.Parent = sellLeftPanel
 	
+	local sellLeftTitleStroke = Instance.new("UIStroke")
+	sellLeftTitleStroke.Color = theme.forestDark
+	sellLeftTitleStroke.Thickness = 2
+	sellLeftTitleStroke.Parent = sellLeftTitle
+	
 	local sellScroll = Instance.new("ScrollingFrame")
 	sellScroll.Name = "ScrollingFrame"
 	sellScroll.Size = UDim2.new(0.94, 0, 0.9, 0)
 	sellScroll.Position = UDim2.new(0.03, 0, 0.09, 0)
 	sellScroll.BackgroundTransparency = 1
 	sellScroll.BorderSizePixel = 0
-	sellScroll.ScrollBarThickness = 8
+	sellScroll.ScrollBarThickness = 10
 	sellScroll.ScrollBarImageColor3 = theme.goldLeaf
 	sellScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	sellScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -603,41 +543,63 @@ function UISetup.CreateUI()
 	sellScroll.Parent = sellLeftPanel
 	
 	local sellLayout = Instance.new("UIListLayout")
-	sellLayout.Padding = UDim.new(0, 8)
+	sellLayout.Padding = UDim.new(0, 10)
 	sellLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	sellLayout.Parent = sellScroll
 	
 	local sellPadding = Instance.new("UIPadding")
-	sellPadding.PaddingTop = UDim.new(0, 5)
-	sellPadding.PaddingBottom = UDim.new(0, 5)
-	sellPadding.PaddingLeft = UDim.new(0, 5)
-	sellPadding.PaddingRight = UDim.new(0, 5)
+	sellPadding.PaddingTop = UDim.new(0, 8)
+	sellPadding.PaddingBottom = UDim.new(0, 8)
+	sellPadding.PaddingLeft = UDim.new(0, 8)
+	sellPadding.PaddingRight = UDim.new(0, 8)
 	sellPadding.Parent = sellScroll
 	
-	-- MIDDLE PANEL - NPC Merchant (Hidden/Transparent - no context)
+	-- MIDDLE PANEL - NPC Merchant (30%) - INVISIBLE SPACER
 	local sellMiddlePanel = Instance.new("Frame")
 	sellMiddlePanel.Name = "MiddlePanel"
-	sellMiddlePanel.Size = UDim2.new(0, 0, 0.88, 0)
-	sellMiddlePanel.Position = UDim2.new(0.5, 0, 0.1, 0)
+	sellMiddlePanel.Size = UDim2.new(0.3, 0, 1, 0)
+	sellMiddlePanel.Position = UDim2.new(0.35, 0, 0, 0)
 	sellMiddlePanel.BackgroundTransparency = 1
 	sellMiddlePanel.BorderSizePixel = 0
-	sellMiddlePanel.Visible = false
 	sellMiddlePanel.ZIndex = 11
 	sellMiddlePanel.Parent = sellWindow
 	
-	-- RIGHT PANEL - Player's Fruits
+	-- Close button (top-right corner in spacing area)
+	local sellCloseButton = Instance.new("TextButton")
+	sellCloseButton.Name = "CloseButton"
+	sellCloseButton.Size = UDim2.new(0, 130, 0, 35)
+	sellCloseButton.Position = UDim2.new(1, -145, 0, 15)
+	sellCloseButton.BackgroundColor3 = theme.woodBark
+	sellCloseButton.Text = "✖ CLOSE"
+	sellCloseButton.TextColor3 = theme.textLight
+	sellCloseButton.Font = Enum.Font.GothamBold
+	sellCloseButton.TextSize = 18
+	sellCloseButton.ZIndex = 13
+	sellCloseButton.Parent = sellWindow
+	
+	addCorner(sellCloseButton, 12)
+	addStroke(sellCloseButton, theme.goldLeaf, 3, 0.3)
+	addShadow(sellCloseButton)
+	addStroke(sellCloseButton, theme.goldLeaf, 3, 0.3)
+	addShadow(sellCloseButton)
+	
+	-- RIGHT PANEL - Player's Fruits (35%)
 	local sellRightPanel = Instance.new("Frame")
 	sellRightPanel.Name = "RightPanel"
-	sellRightPanel.Size = UDim2.new(0.48, 0, 0.88, 0)
-	sellRightPanel.Position = UDim2.new(0.51, 0, 0.1, 0)
+	sellRightPanel.Size = UDim2.new(0.35, -10, 1, -120)
+	sellRightPanel.Position = UDim2.new(0.65, 0, 0, 60)
 	sellRightPanel.BackgroundColor3 = theme.leafPanel
 	sellRightPanel.BorderSizePixel = 0
 	sellRightPanel.ZIndex = 11
 	sellRightPanel.Parent = sellWindow
 	
-	addCorner(sellRightPanel, 20)
-	addStroke(sellRightPanel, theme.goldLeaf, 2, 0.3)
+	local sellRightCorner = Instance.new("UICorner")
+	sellRightCorner.CornerRadius = UDim.new(0, 25)
+	sellRightCorner.Parent = sellRightPanel
+	
+	addStroke(sellRightPanel, theme.goldLeaf, 3, 0.3)
 	addGradient(sellRightPanel, theme.leafPanel, theme.mossGreen, 90)
+	addShadow(sellRightPanel)
 	
 	local sellRightTitle = Instance.new("TextLabel")
 	sellRightTitle.Name = "PanelTitle"
@@ -652,6 +614,11 @@ function UISetup.CreateUI()
 	sellRightTitle.ZIndex = 12
 	sellRightTitle.Parent = sellRightPanel
 	
+	local sellRightTitleStroke = Instance.new("UIStroke")
+	sellRightTitleStroke.Color = theme.forestDark
+	sellRightTitleStroke.Thickness = 2
+	sellRightTitleStroke.Parent = sellRightTitle
+	
 	-- Fruit inventory display
 	local sellInventoryScroll = Instance.new("ScrollingFrame")
 	sellInventoryScroll.Name = "InventoryScroll"
@@ -659,7 +626,7 @@ function UISetup.CreateUI()
 	sellInventoryScroll.Position = UDim2.new(0.03, 0, 0.09, 0)
 	sellInventoryScroll.BackgroundTransparency = 1
 	sellInventoryScroll.BorderSizePixel = 0
-	sellInventoryScroll.ScrollBarThickness = 8
+	sellInventoryScroll.ScrollBarThickness = 10
 	sellInventoryScroll.ScrollBarImageColor3 = theme.goldLeaf
 	sellInventoryScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	sellInventoryScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -667,15 +634,15 @@ function UISetup.CreateUI()
 	sellInventoryScroll.Parent = sellRightPanel
 	
 	local sellInventoryLayout = Instance.new("UIListLayout")
-	sellInventoryLayout.Padding = UDim.new(0, 8)
+	sellInventoryLayout.Padding = UDim.new(0, 10)
 	sellInventoryLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	sellInventoryLayout.Parent = sellInventoryScroll
 	
 	local sellInventoryPadding = Instance.new("UIPadding")
-	sellInventoryPadding.PaddingTop = UDim.new(0, 5)
-	sellInventoryPadding.PaddingBottom = UDim.new(0, 5)
-	sellInventoryPadding.PaddingLeft = UDim.new(0, 5)
-	sellInventoryPadding.PaddingRight = UDim.new(0, 5)
+	sellInventoryPadding.PaddingTop = UDim.new(0, 8)
+	sellInventoryPadding.PaddingBottom = UDim.new(0, 8)
+	sellInventoryPadding.PaddingLeft = UDim.new(0, 8)
+	sellInventoryPadding.PaddingRight = UDim.new(0, 8)
 	sellInventoryPadding.Parent = sellInventoryScroll
 	
 	-- =============================================================================
