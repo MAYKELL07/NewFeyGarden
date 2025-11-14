@@ -199,7 +199,7 @@ function TutorialUI.Initialize()
 		TutorialUI.Stop()
 	end)
 	
-	print("[TutorialUI] Interface initialized")
+	-- print("[TutorialUI] Interface initialized")
 end
 
 -- Show tutorial step
@@ -231,7 +231,7 @@ function TutorialUI.ShowStep(stepIndex)
 		tween:Play()
 	end
 	
-	print("[TutorialUI] Showing step:", stepIndex, "-", step.Title)
+	-- print("[TutorialUI] Showing step:", stepIndex, "-", step.Title)
 end
 
 -- Start tutorial
@@ -260,7 +260,7 @@ function TutorialUI.Start()
 		end
 	end)
 	
-	print("[TutorialUI] Tutorial started")
+	-- print("[TutorialUI] Tutorial started")
 end
 
 -- Stop tutorial
@@ -279,7 +279,7 @@ function TutorialUI.Stop()
 		end)
 	end
 	
-	print("[TutorialUI] Tutorial stopped")
+	-- print("[TutorialUI] Tutorial stopped")
 end
 
 -- Check if should show tutorial (for new players)

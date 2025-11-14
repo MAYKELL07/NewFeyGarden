@@ -4,6 +4,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local Config = require(ReplicatedStorage.Shared.Config)
@@ -11,36 +12,52 @@ local VFXModule = require(ReplicatedStorage.Shared.VFXModule)
 
 local player = Players.LocalPlayer
 
--- Create weather particles for rainy/stormy weather
-local function createRainEffect()
-	local rainPart = Instance.new("Part")
-	rainPart.Name = "RainEffect"
-	rainPart.Size = Vector3.new(200, 1, 200) -- Larger coverage
-	rainPart.Position = Vector3.new(0, 80, 0) -- Higher up
-	rainPart.Transparency = 1
-	rainPart.Anchored = true
-	rainPart.CanCollide = false
-	rainPart.Parent = Workspace
-	
-	local rainEmitter = Instance.new("ParticleEmitter")
-	rainEmitter.Name = "Rain"
-	rainEmitter.Texture = "rbxasset://textures/particles/smoke_main.dds"
-	rainEmitter.Color = ColorSequence.new(Color3.fromRGB(150, 200, 240))
-	rainEmitter.Size = NumberSequence.new(0.4, 0.6) -- Larger droplets
-	rainEmitter.Transparency = NumberSequence.new(0.3, 0.7) -- More visible
-	rainEmitter.Lifetime = NumberRange.new(3, 4) -- Last longer
-	rainEmitter.Rate = 200 -- Much more rain
-	rainEmitter.Speed = NumberRange.new(50, 60) -- Faster fall
-	rainEmitter.SpreadAngle = Vector2.new(2, 2) -- Nearly straight down
-	rainEmitter.Acceleration = Vector3.new(0, -80, 0) -- Gravity effect
-	rainEmitter.EmissionDirection = Enum.NormalId.Bottom
-	rainEmitter.LightEmission = 0.3 -- Slight glow
-	rainEmitter.Parent = rainPart
-	
-	return rainPart
+-- Find the Particles part in Workspace
+local particlesPart = Workspace:WaitForChild("Particles", 10)
+if not particlesPart then
+	warn("Particles part not found in Workspace!")
+	return
 end
 
-local currentRainEffect = nil
+-- Get particle emitters
+local glowEmitter = particlesPart:FindFirstChild("Glow")
+local rainEmitter = particlesPart:FindFirstChild("Rain")
+local stormEmitter = particlesPart:FindFirstChild("Storm")
+
+if not glowEmitter or not rainEmitter or not stormEmitter then
+	warn("Weather particle emitters not found! Expected: Glow, Rain, Storm")
+	return
+end
+
+-- Function to smoothly transition particle emitters
+local function setParticleEnabled(emitter, enabled, fadeTime)
+	fadeTime = fadeTime or 3
+	
+	if enabled then
+		-- Fade in
+		emitter.Enabled = true
+		local startRate = emitter.Rate
+		emitter.Rate = 0
+		
+		local tweenInfo = TweenInfo.new(fadeTime, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
+		local tween = TweenService:Create(emitter, tweenInfo, {Rate = startRate})
+		tween:Play()
+	else
+		-- Fade out
+		local tweenInfo = TweenInfo.new(fadeTime, Enum.EasingStyle.Sine, Enum.EasingDirection.In)
+		local tween = TweenService:Create(emitter, tweenInfo, {Rate = 0})
+		tween:Play()
+		
+		task.delay(fadeTime, function()
+			emitter.Enabled = false
+		end)
+	end
+end
+
+-- Store original rates for restoring
+local originalGlowRate = glowEmitter.Rate
+local originalRainRate = rainEmitter.Rate
+local originalStormRate = stormEmitter.Rate
 
 -- Show plant boost indicators when weather benefits them
 local function showPlantBoostEffects(weatherType)
@@ -71,6 +88,40 @@ local function showPlantBoostEffects(weatherType)
 	end
 end
 
+-- Apply weather particle effects
+local function applyWeatherEffects(weatherType)
+	local fadeTime = 5 -- 5 second smooth transition
+	
+	if weatherType == Constants.WEATHER_TYPES.SUNNY then
+		-- Sunny: Enable Glow, disable Rain and Storm
+		setParticleEnabled(glowEmitter, true, fadeTime)
+		setParticleEnabled(rainEmitter, false, fadeTime)
+		setParticleEnabled(stormEmitter, false, fadeTime)
+		
+		-- Restore original rates
+		glowEmitter.Rate = originalGlowRate
+		
+	elseif weatherType == Constants.WEATHER_TYPES.RAINY then
+		-- Rainy: Enable Rain, disable Glow and Storm
+		setParticleEnabled(glowEmitter, false, fadeTime)
+		setParticleEnabled(rainEmitter, true, fadeTime)
+		setParticleEnabled(stormEmitter, false, fadeTime)
+		
+		-- Restore original rates
+		rainEmitter.Rate = originalRainRate
+		
+	elseif weatherType == Constants.WEATHER_TYPES.STORMY then
+		-- Stormy: Enable both Rain and Storm, disable Glow
+		setParticleEnabled(glowEmitter, false, fadeTime)
+		setParticleEnabled(rainEmitter, true, fadeTime)
+		setParticleEnabled(stormEmitter, true, fadeTime)
+		
+		-- Restore original rates
+		rainEmitter.Rate = originalRainRate
+		stormEmitter.Rate = originalStormRate
+	end
+end
+
 -- Listen for weather changes
 local weatherEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.WEATHER_CHANGED, 10)
 if not weatherEvent then
@@ -79,22 +130,15 @@ if not weatherEvent then
 end
 
 weatherEvent.OnClientEvent:Connect(function(weatherType)
-	print("Weather changed to:", weatherType)
-	
-	-- Remove old rain effect
-	if currentRainEffect then
-		currentRainEffect:Destroy()
-		currentRainEffect = nil
-	end
-	
-	-- Add rain effect for rainy/stormy weather
-	if weatherType == Constants.WEATHER_TYPES.RAINY or weatherType == Constants.WEATHER_TYPES.STORMY then
-		currentRainEffect = createRainEffect()
-	end
+	-- Apply smooth particle transition
+	applyWeatherEffects(weatherType)
 	
 	-- Show boost effects on plants
 	task.wait(0.5) -- Small delay for dramatic effect
 	showPlantBoostEffects(weatherType)
 end)
 
-print("WeatherEffects client initialized")
+-- Initialize with sunny weather
+applyWeatherEffects(Constants.WEATHER_TYPES.SUNNY)
+
+-- print("WeatherEffects client initialized")

@@ -158,7 +158,7 @@ local function updatePetFollow()
 								if distance <= PET_BOOST_RADIUS then
 									if not child:GetAttribute("PetBoost") then
 										child:SetAttribute("PetBoost", true)
-										print(string.format("[PetController] Pet boosting plant at distance %.1f", distance))
+										-- print(string.format("[PetController] Pet boosting plant at distance %.1f", distance))
 									end
 								else
 									-- Remove boost if too far
@@ -212,12 +212,12 @@ function PetController.SpawnPet(petType)
 	
 	PetController.CurrentPet = petModel
 	
-	print("Spawned pet:", petType)
+	-- print("Spawned pet:", petType)
 end
 
 -- Initialize pet controller
 function PetController.Initialize()
-	print("PetController initialized")
+	-- print("PetController initialized")
 	
 	-- Listen for inventory updates to spawn equipped pet
 	local updateInventoryEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.UPDATE_INVENTORY)

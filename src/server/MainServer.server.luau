@@ -51,5 +51,3 @@ end)
 WeatherController.Initialize()
 EconomyService.Initialize()
 GardenManager.Initialize()
-
-print("✨ FeyGarden Server Ready!")

@@ -3,6 +3,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
+local TweenService = game:GetService("TweenService")
 
 local Constants = require(ReplicatedStorage.Shared.Constants)
 local BuffsModule = require(ReplicatedStorage.Shared.BuffsModule)
@@ -15,7 +16,7 @@ local weatherEvent = Instance.new("RemoteEvent")
 weatherEvent.Name = Constants.EVENTS.WEATHER_CHANGED
 weatherEvent.Parent = ReplicatedStorage
 
--- Apply weather settings to lighting
+-- Apply weather settings to lighting with smooth transitions
 local function applyWeather(weatherType)
 	local config = Constants.WEATHER_CONFIG[weatherType]
 	
@@ -26,15 +27,25 @@ local function applyWeather(weatherType)
 	
 	WeatherController.CurrentWeather = weatherType
 	
-	-- Update lighting
-	Lighting.Brightness = config.Brightness
-	Lighting.ColorShift_Top = config.ColorShift_Top
-	Lighting.ClockTime = config.ClockTime
+	-- Smooth transition for lighting (10 seconds)
+	local tweenInfo = TweenInfo.new(
+		10, -- Duration
+		Enum.EasingStyle.Sine,
+		Enum.EasingDirection.InOut
+	)
+	
+	local lightingTween = TweenService:Create(Lighting, tweenInfo, {
+		Brightness = config.Brightness,
+		ColorShift_Top = config.ColorShift_Top,
+		ClockTime = config.ClockTime
+	})
+	
+	lightingTween:Play()
 	
 	-- Update BuffsModule
 	BuffsModule.SetWeather(weatherType)
 	
-	-- Notify all clients
+	-- Notify all clients for particle effects
 	weatherEvent:FireAllClients(weatherType)
 end
 

@@ -97,7 +97,7 @@ end
 local function setupPlantParticles(plantModel)
 	if trackedPlants[plantModel] then return end
 	
-	print(string.format("[BuffParticles] Setting up particles for plant: %s", plantModel.Name))
+	-- print(string.format("[BuffParticles] Setting up particles for plant: %s", plantModel.Name))
 	
 	-- Find the main part of the plant to attach particles
 	local attachPart = plantModel.PrimaryPart or plantModel:FindFirstChildWhichIsA("BasePart")
@@ -106,7 +106,7 @@ local function setupPlantParticles(plantModel)
 		return 
 	end
 	
-	print(string.format("[BuffParticles] Attaching particles to: %s", attachPart.Name))
+	-- print(string.format("[BuffParticles] Attaching particles to: %s", attachPart.Name))
 	
 	-- Create emitters
 	local weatherEmitter = createWeatherParticle()
@@ -124,7 +124,7 @@ local function setupPlantParticles(plantModel)
 		pet = petEmitter
 	}
 	
-	print(string.format("[BuffParticles] ✓ Particles created for %s", plantModel.Name))
+	-- print(string.format("[BuffParticles] ✓ Particles created for %s", plantModel.Name))
 end
 
 -- Update particle states based on buffs
@@ -138,9 +138,9 @@ local function updatePlantParticles(plantModel)
 	if emitters.weather.Enabled ~= hasWeatherBuff then
 		emitters.weather.Enabled = hasWeatherBuff
 		if hasWeatherBuff then
-			print(string.format("[BuffParticles] Weather particles enabled for %s (Weather: %s)", plantModel.Name, currentWeather))
+			-- print(string.format("[BuffParticles] Weather particles enabled for %s (Weather: %s)", plantModel.Name, currentWeather))
 		else
-			print(string.format("[BuffParticles] Weather particles disabled for %s (Weather: %s)", plantModel.Name, currentWeather))
+			-- print(string.format("[BuffParticles] Weather particles disabled for %s (Weather: %s)", plantModel.Name, currentWeather))
 		end
 	end
 	
@@ -158,9 +158,9 @@ local function updatePlantParticles(plantModel)
 	if emitters.watered.Enabled ~= isWatered then
 		emitters.watered.Enabled = isWatered
 		if isWatered then
-			print(string.format("[BuffParticles] Watered particles enabled for %s", plantModel.Name))
+			-- print(string.format("[BuffParticles] Watered particles enabled for %s", plantModel.Name))
 		else
-			print(string.format("[BuffParticles] Watered particles disabled for %s", plantModel.Name))
+			-- print(string.format("[BuffParticles] Watered particles disabled for %s", plantModel.Name))
 		end
 	end
 	
@@ -169,9 +169,9 @@ local function updatePlantParticles(plantModel)
 	if emitters.pet.Enabled ~= hasPetBuff then
 		emitters.pet.Enabled = hasPetBuff
 		if hasPetBuff then
-			print(string.format("[BuffParticles] Pet particles enabled for %s", plantModel.Name))
+			-- print(string.format("[BuffParticles] Pet particles enabled for %s", plantModel.Name))
 		else
-			print(string.format("[BuffParticles] Pet particles disabled for %s", plantModel.Name))
+			-- print(string.format("[BuffParticles] Pet particles disabled for %s", plantModel.Name))
 		end
 	end
 end
@@ -219,21 +219,21 @@ end
 
 -- Initialize
 function BuffParticles.Initialize()
-	print("[BuffParticles] Initializing...")
+	-- print("[BuffParticles] Initializing...")
 	
 	-- Listen for weather changes
 	local weatherEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.WEATHER_CHANGED, 10)
 	if weatherEvent then
 		weatherEvent.OnClientEvent:Connect(function(weatherType)
 			currentWeather = weatherType
-			print(string.format("[BuffParticles] Weather changed to: %s", weatherType))
+			-- print(string.format("[BuffParticles] Weather changed to: %s", weatherType))
 			
 			-- Immediately update all plants
 			for plant, _ in pairs(trackedPlants) do
 				updatePlantParticles(plant)
 			end
 		end)
-		print("[BuffParticles] ✓ Weather event listener connected")
+		-- print("[BuffParticles] ✓ Weather event listener connected")
 	else
 		warn("[BuffParticles] WeatherChanged event not found!")
 	end
@@ -251,7 +251,7 @@ function BuffParticles.Initialize()
 		end
 	end)
 	
-	print("[BuffParticles] ✓ Initialized - Buff particles enabled")
+	-- print("[BuffParticles] ✓ Initialized - Buff particles enabled")
 end
 
 return BuffParticles

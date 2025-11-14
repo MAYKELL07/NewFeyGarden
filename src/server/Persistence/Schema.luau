@@ -9,7 +9,7 @@ Schema.CurrentVersion = 1
 function Schema.Default()
 	return {
 		Version = Schema.CurrentVersion,
-		Coins = 100, -- Starting coins
+		Coins = 1000000000, -- Starting coins
 		Inventory = {
 			Seeds = {}, -- {PlantType = count}
 			Pets = {}, -- {PetType = owned}
@@ -36,7 +36,7 @@ function Schema.Migrate(data)
 	end
 	
 	-- Add missing fields safely
-	data.Coins = data.Coins or 100
+	data.Coins = data.Coins or 10000000000
 	data.Inventory = data.Inventory or {Seeds = {}, Pets = {}, Fruits = {}}
 	data.Inventory.Seeds = data.Inventory.Seeds or {}
 	data.Inventory.Pets = data.Inventory.Pets or {}

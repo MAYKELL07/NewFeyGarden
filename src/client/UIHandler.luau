@@ -8,6 +8,7 @@ local TweenService = game:GetService("TweenService")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+local PlantModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("PlantModule"))
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -22,7 +23,6 @@ pcall(function()
 end)
 
 local UIHandler = {}
-local selectedPlantType = nil
 local playerInventory = {Seeds = {}, Pets = {}, Fruits = {}}
 local playerCoins = 0
 local currentWeather = Constants.WEATHER_TYPES.SUNNY
@@ -55,11 +55,20 @@ local THEME = {
 	-- Borders: Natural vine and leaf strokes
 	VineStroke = Color3.fromRGB(88, 160, 108),
 	GlowStroke = Color3.fromRGB(140, 255, 200),
+	
+	-- UI Elements
+	Notification = Color3.fromRGB(88, 160, 140), -- Teal notification background
+	NotificationAlt = Color3.fromRGB(110, 190, 170), -- Lighter teal for gradient
+	PanelStroke = Color3.fromRGB(70, 140, 120), -- Panel border
 }
 
 -- Forward declarations
 local updateSellShop
 local updatePetsWindow
+local updateFullInventory
+local showNotification
+local updateShopInventoryGrid
+local updateSellInventoryGrid
 
 -- Helper to play UI sounds
 local function playSound(soundName)
@@ -73,30 +82,251 @@ local function hideHUD()
 	if not screenGui then return end
 	local currencyFrame = screenGui:FindFirstChild("CurrencyFrame")
 	local weatherFrame = screenGui:FindFirstChild("WeatherFrame")
-	local inventoryFrame = screenGui:FindFirstChild("InventoryFrame")
-	local fruitsFrame = screenGui:FindFirstChild("FruitsFrame")
+	local hotbarFrame = screenGui:FindFirstChild("HotbarFrame")
 	local petsButton = screenGui:FindFirstChild("PetsButton")
+	local navigationFrame = screenGui:FindFirstChild("NavigationFrame")
 	
 	if currencyFrame then currencyFrame.Visible = false end
 	if weatherFrame then weatherFrame.Visible = false end
-	if inventoryFrame then inventoryFrame.Visible = false end
-	if fruitsFrame then fruitsFrame.Visible = false end
+	if hotbarFrame then hotbarFrame.Visible = false end
 	if petsButton then petsButton.Visible = false end
+	if navigationFrame then navigationFrame.Visible = false end
 end
 
 local function showHUD()
 	if not screenGui then return end
 	local currencyFrame = screenGui:FindFirstChild("CurrencyFrame")
 	local weatherFrame = screenGui:FindFirstChild("WeatherFrame")
-	local inventoryFrame = screenGui:FindFirstChild("InventoryFrame")
-	local fruitsFrame = screenGui:FindFirstChild("FruitsFrame")
+	local hotbarFrame = screenGui:FindFirstChild("HotbarFrame")
 	local petsButton = screenGui:FindFirstChild("PetsButton")
+	local navigationFrame = screenGui:FindFirstChild("NavigationFrame")
 	
 	if currencyFrame then currencyFrame.Visible = true end
 	if weatherFrame then weatherFrame.Visible = true end
-	if inventoryFrame then inventoryFrame.Visible = true end
-	if fruitsFrame then fruitsFrame.Visible = true end
+	if hotbarFrame then hotbarFrame.Visible = true end
 	if petsButton then petsButton.Visible = true end
+	if navigationFrame then navigationFrame.Visible = true end
+end
+
+-- =============================================================================
+-- HOTBAR AND INVENTORY MANAGEMENT
+-- =============================================================================
+local selectedSlot = 1
+local hotbarData = {} -- {[slot] = {type = "Seed"/"Fruit", name = "string", count = number}}
+local currentInventoryFilter = "All"
+
+-- Helper to get item icon
+local function getItemIcon(itemName, itemType)
+	-- Check if it's a known plant type
+	local plantConfig = Constants.PLANT_CONFIG[itemName]
+	if plantConfig then
+		return "🌱" -- Seed icon
+	end
+	
+	-- Default icons based on type
+	if itemType == "Fruit" then
+		return "🍎"
+	elseif itemType == "Seed" then
+		return "🌱"
+	end
+	
+	return "📦" -- Default
+end
+
+local function selectHotbarSlot(slotNumber)
+	if not screenGui then return end
+	local hotbarFrame = screenGui:FindFirstChild("HotbarFrame")
+	if not hotbarFrame then return end
+	
+	-- Deselect old slot
+	local oldSlot = hotbarFrame:FindFirstChild("Slot" .. selectedSlot)
+	if oldSlot then
+		local oldStroke = oldSlot:FindFirstChild("UIStroke")
+		if oldStroke then
+			oldStroke.Color = THEME.TealGem
+			oldStroke.Thickness = 2
+		end
+	end
+	
+	-- Select new slot
+	selectedSlot = slotNumber
+	local newSlot = hotbarFrame:FindFirstChild("Slot" .. slotNumber)
+	if newSlot then
+		local newStroke = newSlot:FindFirstChild("UIStroke")
+		if newStroke then
+			newStroke.Color = THEME.GoldLeaf
+			newStroke.Thickness = 3
+		end
+	end
+	
+	playSound("Click")
+end
+
+local function updateHotbar()
+	if not screenGui then return end
+	local hotbarFrame = screenGui:FindFirstChild("HotbarFrame")
+	if not hotbarFrame then return end
+	
+	for i = 1, 6 do
+		local slot = hotbarFrame:FindFirstChild("Slot" .. i)
+		if slot then
+			local itemIcon = slot:FindFirstChild("ItemIcon")
+			local itemCount = slot:FindFirstChild("ItemCount")
+			
+			if hotbarData[i] then
+				local data = hotbarData[i]
+				
+				-- Check actual inventory count
+				local actualCount = 0
+				if data.type == "Seed" and playerInventory.Seeds then
+					actualCount = playerInventory.Seeds[data.name] or 0
+				elseif data.type == "Fruit" and playerInventory.Fruits then
+					actualCount = playerInventory.Fruits[data.name] or 0
+				end
+				
+				-- Clear slot if item count is 0
+				if actualCount == 0 then
+					hotbarData[i] = nil
+					if itemIcon then itemIcon.Text = "" end
+					if itemCount then itemCount.Text = "" end
+				else
+					-- Update the count in hotbarData
+					hotbarData[i].count = actualCount
+					
+					if itemIcon then
+						itemIcon.Text = getItemIcon(data.name, data.type)
+					end
+					if itemCount and actualCount > 0 then
+						itemCount.Text = tostring(actualCount)
+					else
+						if itemCount then itemCount.Text = "" end
+					end
+				end
+			else
+				if itemIcon then itemIcon.Text = "" end
+				if itemCount then itemCount.Text = "" end
+			end
+		end
+	end
+end
+
+local function createInventoryItem(itemName, itemCount, itemType)
+	local item = Instance.new("Frame")
+	item.Name = itemName
+	item.Size = UDim2.new(0, 90, 0, 90)
+	item.BackgroundColor3 = THEME.ForestDeep
+	item.BorderSizePixel = 0
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = item
+	
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = itemType == "Seed" and THEME.TealGem or THEME.GoldLeaf
+	stroke.Thickness = 2
+	stroke.Transparency = 0.3
+	stroke.Parent = item
+	
+	local icon = Instance.new("TextLabel")
+	icon.Name = "Icon"
+	icon.Size = UDim2.new(0, 45, 0, 45)
+	icon.Position = UDim2.new(0.5, 0, 0, 15)
+	icon.AnchorPoint = Vector2.new(0.5, 0)
+	icon.BackgroundTransparency = 1
+	icon.Text = getItemIcon(itemName, itemType)
+	icon.TextScaled = true
+	icon.Font = Enum.Font.GothamBold
+	icon.Parent = item
+	
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Name = "Name"
+	nameLabel.Size = UDim2.new(1, -10, 0, 15)
+	nameLabel.Position = UDim2.new(0, 5, 1, -28)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = itemName
+	nameLabel.TextColor3 = THEME.TextLight
+	nameLabel.Font = Enum.Font.Gotham
+	nameLabel.TextSize = 10
+	nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+	nameLabel.Parent = item
+	
+	local countLabel = Instance.new("TextLabel")
+	countLabel.Name = "Count"
+	countLabel.Size = UDim2.new(0, 30, 0, 20)
+	countLabel.Position = UDim2.new(1, -32, 1, -22)
+	countLabel.BackgroundTransparency = 1
+	countLabel.Text = tostring(itemCount)
+	countLabel.TextColor3 = THEME.TextLight
+	countLabel.Font = Enum.Font.GothamBold
+	countLabel.TextSize = 14
+	countLabel.TextXAlignment = Enum.TextXAlignment.Right
+	countLabel.Parent = item
+	
+	local countStroke = Instance.new("UIStroke")
+	countStroke.Color = THEME.ForestDark
+	countStroke.Thickness = 2
+	countStroke.Parent = countLabel
+	
+	-- Click to add to selected hotbar slot
+	local button = Instance.new("TextButton")
+	button.Name = "Button"
+	button.Size = UDim2.new(1, 0, 1, 0)
+	button.BackgroundTransparency = 1
+	button.Text = ""
+	button.Parent = item
+	
+	button.MouseButton1Click:Connect(function()
+		-- Add to currently selected hotbar slot
+		hotbarData[selectedSlot] = {type = itemType, name = itemName, count = itemCount}
+		updateHotbar()
+		playSound("Click")
+		showNotification("Added " .. itemName .. " to Slot " .. selectedSlot, THEME.TealGem, getItemIcon(itemName, itemType))
+	end)
+	
+	return item
+end
+
+local function updateFullInventory()
+	if not screenGui or not playerInventory then return end
+	local inventoryWindow = screenGui:FindFirstChild("InventoryWindow")
+	if not inventoryWindow or not inventoryWindow.Visible then return end
+	
+	local gridContainer = inventoryWindow:FindFirstChild("GridContainer")
+	if not gridContainer then return end
+	
+	-- Clear existing items
+	for _, child in ipairs(gridContainer:GetChildren()) do
+		if child:IsA("Frame") then child:Destroy() end
+	end
+	
+	-- Add seeds
+	if currentInventoryFilter == "All" or currentInventoryFilter == "Seeds" then
+		if playerInventory.Seeds then
+			for seedName, count in pairs(playerInventory.Seeds) do
+				if count > 0 then
+					local item = createInventoryItem(seedName, count, "Seed")
+					item.Parent = gridContainer
+				end
+			end
+		end
+	end
+	
+	-- Add fruits
+	if currentInventoryFilter == "All" or currentInventoryFilter == "Fruits" then
+		if playerInventory.Fruits then
+			for fruitName, count in pairs(playerInventory.Fruits) do
+				if count > 0 then
+					local item = createInventoryItem(fruitName, count, "Fruit")
+					item.Parent = gridContainer
+				end
+			end
+		end
+	end
+end
+
+local function filterInventory(filterType)
+	currentInventoryFilter = filterType
+	updateFullInventory()
 end
 
 -- =============================================================================
@@ -138,7 +368,7 @@ end
 -- =============================================================================
 -- NOTIFICATION SYSTEM
 -- =============================================================================
-local function showNotification(message, color, icon)
+showNotification = function(message, color, icon)
 	if not screenGui then return end
 	local container = screenGui:FindFirstChild("NotificationContainer")
 	if not container then return end
@@ -243,165 +473,39 @@ local function updateCurrencyDisplay(coins, isTotal)
 end
 
 -- =============================================================================
--- INVENTORY UPDATE
+-- INVENTORY DISPLAY (updated by server)
 -- =============================================================================
-local function createInventoryItem(plantType, count, container)
-	if not screenGui then return end
-	local config = Constants.PLANT_CONFIG[plantType]
-	if not config then return end
-	
-	local itemFrame = Instance.new("Frame")
-	itemFrame.Name = plantType
-	itemFrame.Size = UDim2.new(0, 80, 1, -10)
-	itemFrame.BackgroundColor3 = THEME.LeafPanel
-	itemFrame.BorderSizePixel = 0
-	itemFrame.Parent = container
-	
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = itemFrame
-	
-	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new(THEME.LeafPanel, THEME.MossGreen)
-	gradient.Rotation = 90
-	gradient.Parent = itemFrame
-
-	local stroke = Instance.new("UIStroke")
-	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	stroke.Thickness = 1
-	stroke.Color = THEME.VineStroke
-	stroke.Transparency = 0.4
-	stroke.Parent = itemFrame
-	
-	local button = Instance.new("TextButton")
-	button.Size = UDim2.new(1, 0, 0.7, 0)
-	button.BackgroundTransparency = 1
-	button.Text = "🌱"
-	button.TextScaled = true
-	button.Font = Enum.Font.GothamBold
-	button.TextColor3 = config.EmitsLight and THEME.TextGold or THEME.TextLight
-	button.Parent = itemFrame
-	
-	button.MouseButton1Click:Connect(function()
-		if selectedPlantType == plantType then
-			selectedPlantType = nil
-			itemFrame.BackgroundColor3 = THEME.LeafPanel
-			showNotification("Seed stored for later.", THEME.WoodPanel, "👋")
-		else
-			selectedPlantType = plantType
-			-- Reset all
-			for _, child in ipairs(container:GetChildren()) do
-				if child:IsA("Frame") then
-					child.BackgroundColor3 = THEME.LeafPanel
-				end
-			end
-			itemFrame.BackgroundColor3 = THEME.TealGem
-			showNotification(plantType .. " prepared for planting!", THEME.TealGem, "🌱")
-		end
-	end)
-	
-	local countLabel = Instance.new("TextLabel")
-	countLabel.Size = UDim2.new(1, 0, 0.3, 0)
-	countLabel.Position = UDim2.new(0, 0, 0.7, 0)
-	countLabel.BackgroundTransparency = 1
-	countLabel.Text = tostring(count)
-	countLabel.TextColor3 = THEME.TextLight
-	countLabel.Font = Enum.Font.GothamBold
-	countLabel.TextScaled = true
-	countLabel.Parent = itemFrame
-	
-	return itemFrame
-end
-
-local function createFruitItem(fruitName, count, container)
-	local itemFrame = Instance.new("Frame")
-	itemFrame.Name = fruitName
-	itemFrame.Size = UDim2.new(0, 80, 1, -10)
-	itemFrame.BackgroundColor3 = THEME.WoodPanel
-	itemFrame.BorderSizePixel = 0
-	itemFrame.Parent = container
-	
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = itemFrame
-	
-	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new(THEME.WoodPanel, THEME.WoodBark)
-	gradient.Rotation = 90
-	gradient.Parent = itemFrame
-
-	local stroke = Instance.new("UIStroke")
-	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	stroke.Thickness = 1
-	stroke.Color = THEME.GoldLeaf
-	stroke.Transparency = 0.4
-	stroke.Parent = itemFrame
-	
-	local icon = Instance.new("TextLabel")
-	icon.Size = UDim2.new(1, 0, 0.7, 0)
-	icon.BackgroundTransparency = 1
-	icon.Text = "🍎"
-	icon.TextScaled = true
-	icon.TextColor3 = THEME.TextLight
-	icon.Parent = itemFrame
-	
-	local countLabel = Instance.new("TextLabel")
-	countLabel.Size = UDim2.new(1, 0, 0.3, 0)
-	countLabel.Position = UDim2.new(0, 0, 0.7, 0)
-	countLabel.BackgroundTransparency = 1
-	countLabel.Text = tostring(count)
-	countLabel.TextColor3 = THEME.TextLight
-	countLabel.Font = Enum.Font.GothamBold
-	countLabel.TextScaled = true
-	countLabel.Parent = itemFrame
-	
-	return itemFrame
-end
-
 local function updateInventoryDisplay(inventory)
 	if not screenGui then return end
 	playerInventory = inventory
 	
-	-- Auto-unselect if seed count is 0
-	if selectedPlantType then
-		local seedCount = inventory.Seeds and inventory.Seeds[selectedPlantType] or 0
-		if seedCount <= 0 then
-			selectedPlantType = nil
+	-- Update hotbar with new counts
+	for slot, data in pairs(hotbarData) do
+		if data.type == "Seed" and inventory.Seeds then
+			data.count = inventory.Seeds[data.name] or 0
+		elseif data.type == "Fruit" and inventory.Fruits then
+			data.count = inventory.Fruits[data.name] or 0
 		end
 	end
+	updateHotbar()
 	
-	-- Update seeds
-	local seedContainer = screenGui.InventoryFrame:WaitForChild("SeedContainer")
-	for _, child in ipairs(seedContainer:GetChildren()) do
-		if child:IsA("Frame") then child:Destroy() end
+	-- Update inventory window if it's open
+	local inventoryWindow = screenGui:FindFirstChild("InventoryWindow")
+	if inventoryWindow and inventoryWindow.Visible then
+		updateFullInventory()
 	end
 	
-	if inventory.Seeds then
-		for plantType, count in pairs(inventory.Seeds) do
-			if count > 0 then
-				createInventoryItem(plantType, count, seedContainer)
-			end
-		end
-	end
-	
-	-- Update fruits
-	local fruitsContainer = screenGui.FruitsFrame:WaitForChild("FruitsContainer")
-	for _, child in ipairs(fruitsContainer:GetChildren()) do
-		if child:IsA("Frame") then child:Destroy() end
-	end
-	
-	if inventory.Fruits then
-		for fruitName, count in pairs(inventory.Fruits) do
-			if count > 0 then
-				createFruitItem(fruitName, count, fruitsContainer)
-			end
-		end
+	-- Update shop inventory grid if shop is open
+	local shopWindow = screenGui:FindFirstChild("ShopWindow")
+	if shopWindow and shopWindow.Visible then
+		updateShopInventoryGrid()
 	end
 	
 	-- Update sell shop if it's open
 	local sellWindow = screenGui:FindFirstChild("SellWindow")
 	if sellWindow and sellWindow.Visible then
 		updateSellShop()
+		updateSellInventoryGrid()
 	end
 	
 	-- Update pets window if it's open
@@ -519,10 +623,30 @@ local function createShopItem(itemName, itemType, config, container)
 	descLabel.ZIndex = 12
 	descLabel.Parent = itemFrame
 	
+	-- Owned count
+	local ownedCount = 0
+	if itemType == "seed" then
+		ownedCount = playerInventory.Seeds and playerInventory.Seeds[itemName] or 0
+	elseif itemType == "pet" then
+		ownedCount = (playerInventory.Pets and playerInventory.Pets[itemName]) and 1 or 0
+	end
+	
+	local ownedLabel = Instance.new("TextLabel")
+	ownedLabel.Size = UDim2.new(0.22, 0, 0.25, 0)
+	ownedLabel.Position = UDim2.new(0.6, 0, 0.1, 0)
+	ownedLabel.BackgroundTransparency = 1
+	ownedLabel.Text = "Owned: " .. ownedCount
+	ownedLabel.TextColor3 = THEME.TextMoss
+	ownedLabel.Font = Enum.Font.Gotham
+	ownedLabel.TextSize = 12
+	ownedLabel.TextXAlignment = Enum.TextXAlignment.Right
+	ownedLabel.ZIndex = 12
+	ownedLabel.Parent = itemFrame
+	
 	-- Price
 	local priceLabel = Instance.new("TextLabel")
 	priceLabel.Size = UDim2.new(0.2, 0, 0.3, 0)
-	priceLabel.Position = UDim2.new(0.62, 0, 0.25, 0)
+	priceLabel.Position = UDim2.new(0.62, 0, 0.4, 0)
 	priceLabel.BackgroundTransparency = 1
 	priceLabel.Text = "💰 " .. price
 	priceLabel.TextColor3 = THEME.TextGold
@@ -590,14 +714,9 @@ local function populateShop()
 		if child:IsA("Frame") then child:Destroy() end
 	end
 	
-	-- Add seeds
+	-- Add only seeds (pets have their own window)
 	for plantType, config in pairs(Constants.PLANT_CONFIG) do
 		createShopItem(plantType, "seed", config, shopScroll)
-	end
-	
-	-- Add pets
-	for petType, config in pairs(Constants.PET_CONFIG) do
-		createShopItem(petType, "pet", config, shopScroll)
 	end
 end
 
@@ -1007,11 +1126,69 @@ updateSellShop = function()
 	end
 end
 
+-- Update shop right panel with grid inventory
+updateShopInventoryGrid = function()
+	if not screenGui then return end
+	local shopWindow = screenGui:FindFirstChild("ShopWindow")
+	if not shopWindow then return end
+	
+	local rightPanel = shopWindow:FindFirstChild("RightPanel")
+	local inventoryScroll = rightPanel and rightPanel:FindFirstChild("InventoryScroll")
+	if not inventoryScroll then return end
+	
+	-- Clear existing items
+	for _, child in ipairs(inventoryScroll:GetChildren()) do
+		if child:IsA("Frame") then child:Destroy() end
+	end
+	
+	-- Add seeds from inventory as grid items
+	if playerInventory.Seeds then
+		for seedName, count in pairs(playerInventory.Seeds) do
+			if count > 0 then
+				local item = createInventoryItem(seedName, count, "Seed")
+				if item then
+					item.Parent = inventoryScroll
+				end
+			end
+		end
+	end
+end
+
+-- Update sell right panel with grid inventory
+updateSellInventoryGrid = function()
+	if not screenGui then return end
+	local sellWindow = screenGui:FindFirstChild("SellWindow")
+	if not sellWindow then return end
+	
+	local rightPanel = sellWindow:FindFirstChild("RightPanel")
+	local inventoryScroll = rightPanel and rightPanel:FindFirstChild("InventoryScroll")
+	if not inventoryScroll then return end
+	
+	-- Clear existing items
+	for _, child in ipairs(inventoryScroll:GetChildren()) do
+		if child:IsA("Frame") then child:Destroy() end
+	end
+	
+	-- Add fruits from inventory as grid items
+	if playerInventory.Fruits then
+		for fruitName, count in pairs(playerInventory.Fruits) do
+			if count > 0 then
+				local item = createInventoryItem(fruitName, count, "Fruit")
+				if item then
+					item.Parent = inventoryScroll
+				end
+			end
+		end
+	end
+end
+
 -- =============================================================================
 -- INITIALIZE
 -- =============================================================================
 function UIHandler.Initialize()
-	print("[UIHandler] Initializing with pre-built UI...")
+	-- Hide Roblox default backpack
+	local StarterGui = game:GetService("StarterGui")
+	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
 	
 	-- Wait for UI to exist
 	screenGui = playerGui:WaitForChild("FeyGardenUI", 10)
@@ -1021,10 +1198,100 @@ function UIHandler.Initialize()
 		return
 	end
 	
-	print("[UIHandler] Found FeyGardenUI!")
-	
-	-- Setup shop window
+	-- =============================================================================
+	-- WINDOW REFERENCES
+	-- =============================================================================
 	local shopWindow = screenGui:WaitForChild("ShopWindow", 5)
+	local sellWindow = screenGui:WaitForChild("SellWindow", 5)
+	local petsWindow = screenGui:WaitForChild("PetsWindow", 5)
+	local inventoryWindow = screenGui:WaitForChild("InventoryWindow", 5)
+	
+	-- =============================================================================
+	-- NAVIGATION BUTTONS (Top Center)
+	-- =============================================================================
+	local navigationFrame = screenGui:WaitForChild("NavigationFrame", 5)
+	if navigationFrame then
+		-- SEEDS Button - Opens shop window
+		local seedsButton = navigationFrame:FindFirstChild("SeedsButton")
+		if seedsButton then
+			seedsButton.MouseButton1Click:Connect(function()
+				if shopWindow then
+					NPCUIHandler.MoveCameraToNPC("ShopCamera")
+					populateShop()
+					updateShopInventoryGrid()
+					shopWindow.Visible = true
+					hideHUD()
+					playSound("WindowOpen")
+				end
+			end)
+		end
+		
+		-- GARDEN Button - Teleports to player's garden
+		local gardenButton = navigationFrame:FindFirstChild("GardenButton")
+		if gardenButton then
+			gardenButton.MouseButton1Click:Connect(function()
+				local player = game.Players.LocalPlayer
+				local character = player.Character
+				if not character then return end
+				
+				local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+				if not humanoidRootPart then return end
+				
+				-- Find player's assigned garden
+				local gardensFolder = workspace:FindFirstChild(Config.World.GardensFolder)
+				if not gardensFolder then 
+					warn("[UIHandler] Gardens folder not found")
+					return
+				end
+				
+				-- Search for garden with player's name on the sign
+				for _, garden in ipairs(gardensFolder:GetChildren()) do
+					if garden:IsA("Folder") then
+						local playerSign = garden:FindFirstChild(Config.World.PlayerSignName)
+						if playerSign then
+							local signPart = playerSign:FindFirstChild(Config.World.PlayerSignPartName)
+							if signPart then
+								local surfaceGui = signPart:FindFirstChild("SurfaceGui")
+								if surfaceGui then
+									local textLabel = surfaceGui:FindFirstChild("TextLabel")
+									if textLabel and textLabel.Text == player.Name then
+										-- Found player's garden, teleport to TpPart or Floor
+										local tpPart = garden:FindFirstChild(Config.World.TeleportPartName) or garden:FindFirstChild(Config.World.FloorName)
+										if tpPart then
+											humanoidRootPart.CFrame = tpPart.CFrame + Vector3.new(0, 5, 0)
+											playSound("Click")
+											return
+										end
+									end
+								end
+							end
+						end
+					end
+				end
+				
+				warn("[UIHandler] Could not find player's garden")
+			end)
+		end
+		
+		-- SELL Button - Opens sell window
+		local sellButton = navigationFrame:FindFirstChild("SellButton")
+		if sellButton then
+			sellButton.MouseButton1Click:Connect(function()
+				if sellWindow then
+					NPCUIHandler.MoveCameraToNPC("SellCamera")
+					updateSellShop()
+					updateSellInventoryGrid()
+					sellWindow.Visible = true
+					hideHUD()
+					playSound("WindowOpen")
+				end
+			end)
+		end
+	end
+	
+	-- =============================================================================
+	-- SHOP WINDOW SETUP
+	-- =============================================================================
 	if shopWindow then
 		local shopCloseButton = shopWindow:FindFirstChild("CloseButton")
 		if shopCloseButton then
@@ -1037,8 +1304,9 @@ function UIHandler.Initialize()
 		end
 	end
 	
-	-- Setup sell window
-	local sellWindow = screenGui:WaitForChild("SellWindow", 5)
+	-- =============================================================================
+	-- SELL WINDOW SETUP
+	-- =============================================================================
 	if sellWindow then
 		local sellCloseButton = sellWindow:FindFirstChild("CloseButton")
 		if sellCloseButton then
@@ -1051,8 +1319,9 @@ function UIHandler.Initialize()
 		end
 	end
 	
-	-- Setup pets window
-	local petsWindow = screenGui:WaitForChild("PetsWindow", 5)
+	-- =============================================================================
+	-- PETS WINDOW SETUP
+	-- =============================================================================
 	if petsWindow then
 		local titleBar = petsWindow:FindFirstChild("TitleBar")
 		local petsCloseButton = titleBar and titleBar:FindFirstChild("CloseButton") or petsWindow:FindFirstChild("CloseButton")
@@ -1088,12 +1357,13 @@ function UIHandler.Initialize()
 				if shopWindow then
 					NPCUIHandler.MoveCameraToNPC("ShopCamera")
 					populateShop()
+					updateShopInventoryGrid()
 					shopWindow.Visible = true
 					hideHUD()
 					playSound("WindowOpen")
 				end
 			end)
-			print("[UIHandler] Shop ProximityPrompt connected")
+-- -- print("[UIHandler] Shop ProximityPrompt connected")
 		else
 			warn("[UIHandler] No ProximityPrompt found on ShopPart")
 		end
@@ -1109,12 +1379,12 @@ function UIHandler.Initialize()
 				if sellWindow then
 					NPCUIHandler.MoveCameraToNPC("SellCamera")
 					updateSellShop()
+					updateSellInventoryGrid()
 					sellWindow.Visible = true
 					hideHUD()
 					playSound("WindowOpen")
 				end
 			end)
-			print("[UIHandler] Sell ProximityPrompt connected")
 		else
 			warn("[UIHandler] No ProximityPrompt found on SellPart")
 		end
@@ -1138,6 +1408,7 @@ function UIHandler.Initialize()
 					playSound("WindowOpen")
 				end
 			end)
+-- -- print("[UIHandler] Shop ProximityPrompt connected")
 		else
 			warn("[UIHandler] No ProximityPrompt found on PetShopPart")
 		end
@@ -1145,23 +1416,113 @@ function UIHandler.Initialize()
 		warn("[UIHandler] PetShopPart not found in workspace")
 	end
 	
+	-- =============================================================================
+	-- INVENTORY WINDOW (Press B)
+	-- =============================================================================
+	if inventoryWindow then
+		local invCloseButton = inventoryWindow:FindFirstChild("TitleBar") and inventoryWindow.TitleBar:FindFirstChild("CloseButton")
+		if invCloseButton then
+			invCloseButton.MouseButton1Click:Connect(function()
+				inventoryWindow.Visible = false
+				playSound("WindowClose")
+			end)
+		end
+		
+		-- Set up tab buttons
+		local tabContainer = inventoryWindow:FindFirstChild("TabContainer")
+		if tabContainer then
+			local seedsTab = tabContainer:FindFirstChild("SeedsTab")
+			local fruitsTab = tabContainer:FindFirstChild("FruitsTab")
+			local allTab = tabContainer:FindFirstChild("AllTab")
+			
+			if seedsTab then
+				seedsTab.MouseButton1Click:Connect(function()
+					filterInventory("Seeds")
+				end)
+			end
+			if fruitsTab then
+				fruitsTab.MouseButton1Click:Connect(function()
+					filterInventory("Fruits")
+				end)
+			end
+			if allTab then
+				allTab.MouseButton1Click:Connect(function()
+					filterInventory("All")
+				end)
+			end
+		end
+		
+-- -- print("[UIHandler] Inventory window set up")
+	end
+	
+	-- =============================================================================
+	-- HOTBAR SETUP - Click slots to select
+	-- =============================================================================
+	local hotbarFrame = screenGui:WaitForChild("HotbarFrame", 5)
+	if hotbarFrame then
+		for i = 1, 6 do
+			local slot = hotbarFrame:FindFirstChild("Slot" .. i)
+			if slot then
+				local slotButton = slot:FindFirstChild("SlotButton")
+				if slotButton then
+					slotButton.MouseButton1Click:Connect(function()
+						selectHotbarSlot(i)
+					end)
+				end
+			end
+		end
+		-- Select slot 1 by default
+		selectHotbarSlot(1)
+	end
+	
+	-- =============================================================================
+	-- KEYBOARD CONTROLS
+	-- =============================================================================
+	local UserInputService = game:GetService("UserInputService")
+	
+	UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		if gameProcessed then return end
+		
+		-- Press B to toggle inventory
+		if input.KeyCode == Enum.KeyCode.B and inventoryWindow then
+			inventoryWindow.Visible = not inventoryWindow.Visible
+			if inventoryWindow.Visible then
+				updateFullInventory()
+				playSound("WindowOpen")
+			else
+				playSound("WindowClose")
+			end
+		end
+		
+		-- Press 1-6 to select hotbar slots
+		local numberKeys = {
+			[Enum.KeyCode.One] = 1,
+			[Enum.KeyCode.Two] = 2,
+			[Enum.KeyCode.Three] = 3,
+			[Enum.KeyCode.Four] = 4,
+			[Enum.KeyCode.Five] = 5,
+			[Enum.KeyCode.Six] = 6,
+		}
+		
+		if numberKeys[input.KeyCode] then
+			selectHotbarSlot(numberKeys[input.KeyCode])
+		end
+	end)
+	
 	-- Listen for events
 	local updateCurrencyEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.UPDATE_CURRENCY, 10)
 	if updateCurrencyEvent then
 		updateCurrencyEvent.OnClientEvent:Connect(updateCurrencyDisplay)
-		print("[UIHandler] Connected to UPDATE_CURRENCY")
 	end
 	
 	local updateInventoryEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.UPDATE_INVENTORY, 10)
 	if updateInventoryEvent then
 		updateInventoryEvent.OnClientEvent:Connect(updateInventoryDisplay)
-		print("[UIHandler] Connected to UPDATE_INVENTORY")
 	end
 	
 	local weatherChangedEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.WEATHER_CHANGED, 10)
 	if weatherChangedEvent then
 		weatherChangedEvent.OnClientEvent:Connect(updateWeatherDisplay)
-		print("[UIHandler] Connected to WEATHER_CHANGED")
 	end
 	
 	local harvestFruitEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.HARVEST_FRUIT, 10)
@@ -1169,22 +1530,23 @@ function UIHandler.Initialize()
 		harvestFruitEvent.OnClientEvent:Connect(function(fruitName, amount)
 			showNotification("+" .. amount .. "x " .. fruitName, THEME.MainAccent, "🍎")
 		end)
-		print("[UIHandler] Connected to HARVEST_FRUIT")
 	end
 	
 	-- Request initial player data from server
 	local requestDataEvent = ReplicatedStorage:WaitForChild("RequestPlayerData", 10)
 	if requestDataEvent then
 		requestDataEvent:FireServer()
-		print("[UIHandler] Requested initial player data")
 	end
-	
-	print("[UIHandler] ✅ Initialized successfully!")
 end
 
--- Export selected plant type getter
+-- Export selected plant type getter (from hotbar)
 function UIHandler.GetSelectedPlantType()
-	return selectedPlantType
+	-- Get the item in the currently selected hotbar slot
+	local slotData = hotbarData[selectedSlot]
+	if slotData and slotData.type == "Seed" and slotData.count > 0 then
+		return slotData.name
+	end
+	return nil
 end
 
 return UIHandler

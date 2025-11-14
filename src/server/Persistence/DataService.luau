@@ -160,20 +160,7 @@ local function SaveProfile(userId, isShuttingDown)
 	IsSaving[userId] = false
 	
 	if success then
-		print(string.format("[DataService] ✓ Saved profile for UserId %d (Coins: %d, Seeds: %d types, Plants: %d slots)", 
-			userId, 
-			profile.Coins or 0,
-			(function()
-				local count = 0
-				for _ in pairs(profile.Inventory.Seeds or {}) do count = count + 1 end
-				return count
-			end)(),
-			(function()
-				local count = 0
-				for _ in pairs(profile.PlantSlots or {}) do count = count + 1 end
-				return count
-			end)()
-		))
+		-- print(string.format("[DataService] ✓ Saved profile for UserId %d (Coins: %d, Seeds: %d types, Plants: %d slots)", userId, profile.Coins or 0, seedCount, plantCount))
 	else
 		warn(string.format("[DataService] ✗ Failed to save profile for UserId %d", userId))
 	end
@@ -211,7 +198,7 @@ Players.PlayerAdded:Connect(function(player)
 	DataLoaded[player.UserId] = loaded
 	
 	if loaded then
-		print(string.format("[DataService] ✓ Loaded profile for %s (UserId: %d)", player.Name, player.UserId))
+		-- print(string.format("[DataService] ✓ Loaded profile for %s (UserId: %d)", player.Name, player.UserId))
 	else
 		warn(string.format("[DataService] ⚠ Using default profile for %s (UserId: %d)", player.Name, player.UserId))
 	end
@@ -229,7 +216,7 @@ end)
 
 -- Shutdown: Save all profiles
 game:BindToClose(function()
-	print("[DataService] Server shutting down - saving all profiles...")
+	-- print("[DataService] Server shutting down - saving all profiles...")
 	
 	local savePromises = {}
 	for userId, _ in pairs(Profiles) do
@@ -240,7 +227,7 @@ game:BindToClose(function()
 	
 	-- Wait for all saves to complete (with timeout)
 	task.wait(5)
-	print("[DataService] Shutdown save complete")
+	-- print("[DataService] Shutdown save complete")
 end)
 
 -- Public API
@@ -376,7 +363,7 @@ function DataService.EquipPet(userId, petType)
 	end
 	
 	profile.EquippedPet = petType
-	print(string.format("[DataService] Player %d equipped pet: %s", userId, petType))
+	-- print(string.format("[DataService] Player %d equipped pet: %s", userId, petType))
 	return true
 end
 
@@ -395,8 +382,7 @@ function DataService.AddFruit(userId, fruitName, amount)
 	
 	amount = amount or 1
 	profile.Inventory.Fruits[fruitName] = (profile.Inventory.Fruits[fruitName] or 0) + amount
-	print(string.format("[DataService] Player %d received %dx %s (Total: %d)", 
-		userId, amount, fruitName, profile.Inventory.Fruits[fruitName]))
+	-- print(string.format("[DataService] Player %d received %dx %s (Total: %d)", userId, amount, fruitName, profile.Inventory.Fruits[fruitName]))
 	return true
 end
 

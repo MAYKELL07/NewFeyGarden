@@ -284,11 +284,11 @@ end
 
 local function savePlantSlots(userId: number, gardenFolder: Folder)
 	if not Config.Economy.EnablePersistence then
-		print("[SavePlants] Persistence disabled, skipping save")
+		-- print("[SavePlants] Persistence disabled, skipping save")
 		return
 	end
 	
-	print(string.format("[SavePlants] Saving plant slots for UserId %d in %s", userId, gardenFolder.Name))
+-- print(string.format("[SavePlants] Saving plant slots for UserId %d in %s", userId, gardenFolder.Name))
 	local savedCount = 0
 	local clearedCount = 0
 	
@@ -301,7 +301,7 @@ local function savePlantSlots(userId: number, gardenFolder: Folder)
 			if payload then
 				DataService.SetPlantSlot(userId, slotIndex, payload)
 				savedCount = savedCount + 1
-				print(string.format("[SavePlants] ✓ Saved slot %d: %s (Stage: %s)", slotIndex, payload.Type, payload.Stage))
+-- print(string.format("[SavePlants] ✓ Saved slot %d: %s (Stage: %s)", slotIndex, payload.Type, payload.Stage))
 			else
 				DataService.ClearPlantSlot(userId, slotIndex)
 				clearedCount = clearedCount + 1
@@ -313,11 +313,11 @@ local function savePlantSlots(userId: number, gardenFolder: Folder)
 		end
 	end
 	
-	print(string.format("[SavePlants] ✅ Save complete - %d saved, %d cleared", savedCount, clearedCount))
+-- print(string.format("[SavePlants] ✅ Save complete - %d saved, %d cleared", savedCount, clearedCount))
 end
 
 local function restorePlantSlots(userId: number, gardenFolder: Folder)
-	print(string.format("[RestorePlants] Starting restoration for UserId %d in %s", userId, gardenFolder.Name))
+-- print(string.format("[RestorePlants] Starting restoration for UserId %d in %s", userId, gardenFolder.Name))
 	
 	local cache = ensurePlayerCache(userId)
 
@@ -331,7 +331,7 @@ local function restorePlantSlots(userId: number, gardenFolder: Folder)
 	end
 
 	if not Config.Garden.RestorePlantsOnJoin then
-		print("[RestorePlants] RestorePlantsOnJoin is disabled in config")
+		-- print("[RestorePlants] RestorePlantsOnJoin is disabled in config")
 		return
 	end
 
@@ -339,19 +339,18 @@ local function restorePlantSlots(userId: number, gardenFolder: Folder)
 	local slotCount = 0
 	for _ in pairs(savedSlots) do slotCount = slotCount + 1 end
 	
-	print(string.format("[RestorePlants] Found %d saved plant slots for UserId %d", slotCount, userId))
+-- print(string.format("[RestorePlants] Found %d saved plant slots for UserId %d", slotCount, userId))
 	
 	local restoredCount = 0
 	for slotIndex, state in pairs(savedSlots) do
-		print(string.format("[RestorePlants] Processing slot %s: %s", tostring(slotIndex), 
-			type(state) == "table" and string.format("Type=%s, Stage=%s", state.Type or "nil", state.Stage or "nil") or "invalid"))
+		-- print(string.format("[RestorePlants] Processing slot %s: %s", tostring(slotIndex), type(state) == "table" and string.format("Type=%s, Stage=%s", state.Type or "nil", state.Stage or "nil") or "invalid"))
 		
 		local numericIndex = tonumber(slotIndex)
 		if numericIndex and isValidSlot(numericIndex) then
 			if type(state) == "table" and type(state.Type) == "string" then
 				local anchor = GardenManager.GetPlantAnchor(gardenFolder, numericIndex)
 				if anchor then
-					print(string.format("[RestorePlants] Creating plant: %s at slot %d", state.Type, numericIndex))
+-- print(string.format("[RestorePlants] Creating plant: %s at slot %d", state.Type, numericIndex))
 					
 					local plantModel = PlantModule.CreatePlantModel(state.Type, anchor.Position)
 					if plantModel then
@@ -360,17 +359,16 @@ local function restorePlantSlots(userId: number, gardenFolder: Folder)
 						plantModel:SetAttribute("SlotIndex", numericIndex)
 						plantModel:SetAttribute("WateredUntil", state.WateredUntil or 0)
 						plantModel:SetAttribute("PetBoost", state.PetBoost or false)
-						plantModel.Parent = anchor
+					plantModel.Parent = anchor
 
-						continueGrowthFromStage(plantModel, state.Stage)
-						cache[numericIndex] = plantModel
-						restoredCount = restoredCount + 1
-						
-						print(string.format("[RestorePlants] ✓ Restored %s in slot %d (Stage: %s)", 
-							state.Type, numericIndex, state.Stage or "SEED"))
-					else
-						warn(string.format("[RestorePlants] ✗ Failed to create plant model for %s", state.Type))
-					end
+					continueGrowthFromStage(plantModel, state.Stage)
+					cache[numericIndex] = plantModel
+					restoredCount = restoredCount + 1
+					
+					-- print(string.format("[RestorePlants] ✓ Restored %s in slot %d (Stage: %s)", state.Type, numericIndex, state.Stage or "SEED"))
+				else
+					warn(string.format("[RestorePlants] ✗ Failed to create plant model for %s", state.Type))
+				end
 				else
 					warn(string.format("[RestorePlants] ✗ No anchor found for slot %d", numericIndex))
 				end
@@ -382,7 +380,7 @@ local function restorePlantSlots(userId: number, gardenFolder: Folder)
 		end
 	end
 	
-	print(string.format("[RestorePlants] ✅ Restoration complete - %d/%d plants restored", restoredCount, slotCount))
+-- print(string.format("[RestorePlants] ✅ Restoration complete - %d/%d plants restored", restoredCount, slotCount))
 end
 
 local function findGardenForPlayer(userId: number): Folder?
@@ -485,7 +483,7 @@ end
 
 function GardenManager.AssignGarden(player: Player): (boolean, string?)
 	if GardenManager.PlayerGardens[player.UserId] then
-		print(string.format("[AssignGarden] %s already has a garden assigned", player.Name))
+-- print(string.format("[AssignGarden] %s already has a garden assigned", player.Name))
 		return true, nil
 	end
 
@@ -495,7 +493,7 @@ function GardenManager.AssignGarden(player: Player): (boolean, string?)
 		return false, "No available gardens"
 	end
 
-	print(string.format("[AssignGarden] Assigning %s to %s", garden.Name, player.Name))
+-- print(string.format("[AssignGarden] Assigning %s to %s", garden.Name, player.Name))
 
 	GardenManager.PlayerGardens[player.UserId] = garden
 	GardenManager.GardenAssignments[garden.Name] = player.UserId
@@ -511,7 +509,7 @@ function GardenManager.AssignGarden(player: Player): (boolean, string?)
 		
 		if humanoidRootPart then
 			humanoidRootPart.CFrame = tpPart.CFrame + Vector3.new(0, 3, 0) -- Teleport slightly above the part
-			print(string.format("[AssignGarden] Teleported %s to their garden", player.Name))
+-- print(string.format("[AssignGarden] Teleported %s to their garden", player.Name))
 		end
 	else
 		warn(string.format("[AssignGarden] No %s found in %s", Config.World.TeleportPartName, garden.Name))
@@ -530,7 +528,7 @@ function GardenManager.AssignGarden(player: Player): (boolean, string?)
 				attempts = attempts + 1
 			end
 			if DataService.IsDataLoaded(player.UserId) then
-				print(string.format("[AssignGarden] DataService ready after %d attempts, restoring plants", attempts))
+-- print(string.format("[AssignGarden] DataService ready after %d attempts, restoring plants", attempts))
 				restorePlantSlots(player.UserId, garden)
 			else
 				warn(string.format("[AssignGarden] DataService never loaded for %s, skipping plant restoration", player.Name))
@@ -543,7 +541,7 @@ function GardenManager.AssignGarden(player: Player): (boolean, string?)
 	-- Ensure ClickDetectors are set up
 	setupClickDetectors(garden)
 
-	print(string.format("[AssignGarden] ✓ Successfully assigned %s to %s", garden.Name, player.Name))
+-- print(string.format("[AssignGarden] ✓ Successfully assigned %s to %s", garden.Name, player.Name))
 	return true, nil
 end
 
@@ -607,48 +605,48 @@ local function getPlantInSlot(player: Player, slotIndex: number): Model?
 end
 
 function GardenManager.PlantSeed(player: Player, slotIndex: number, plantType: string): (boolean, string?)
-	print(string.format("[PlantSeed] %s attempting to plant %s in slot %d", player.Name, plantType, slotIndex))
+-- print(string.format("[PlantSeed] %s attempting to plant %s in slot %d", player.Name, plantType, slotIndex))
 	
 	if not isValidSlot(slotIndex) then
-		print(string.format("[PlantSeed] FAILED - Invalid slot index: %d (max: %d)", slotIndex, Config.Garden.SlotsPerGarden))
+-- print(string.format("[PlantSeed] FAILED - Invalid slot index: %d (max: %d)", slotIndex, Config.Garden.SlotsPerGarden))
 		return false, "Invalid slot index"
 	end
 
 	if type(plantType) ~= "string" then
-		print(string.format("[PlantSeed] FAILED - Invalid plant type: %s", tostring(plantType)))
+-- print(string.format("[PlantSeed] FAILED - Invalid plant type: %s", tostring(plantType)))
 		return false, "Invalid plant type"
 	end
 
 	local garden = GardenManager.PlayerGardens[player.UserId]
 	if not garden then
-		print(string.format("[PlantSeed] FAILED - No garden assigned to %s", player.Name))
+-- print(string.format("[PlantSeed] FAILED - No garden assigned to %s", player.Name))
 		return false, "No garden assigned"
 	end
 	
-	print(string.format("[PlantSeed] Player has garden: %s", garden.Name))
+-- print(string.format("[PlantSeed] Player has garden: %s", garden.Name))
 
 	local anchor = GardenManager.GetPlantAnchor(garden, slotIndex)
 	if not anchor then
-		print(string.format("[PlantSeed] FAILED - Missing plant anchor for slot %d in %s", slotIndex, garden.Name))
+-- print(string.format("[PlantSeed] FAILED - Missing plant anchor for slot %d in %s", slotIndex, garden.Name))
 		return false, "Missing plant anchor"
 	end
 	
-	print(string.format("[PlantSeed] Found anchor at: %s", tostring(anchor.Position)))
+-- print(string.format("[PlantSeed] Found anchor at: %s", tostring(anchor.Position)))
 
 	if getPlantInSlot(player, slotIndex) then
-		print(string.format("[PlantSeed] FAILED - Slot %d already occupied", slotIndex))
+-- print(string.format("[PlantSeed] FAILED - Slot %d already occupied", slotIndex))
 		return false, "Slot already occupied"
 	end
 
 	if not EconomyService.RemoveSeed(player, plantType) then
-		print(string.format("[PlantSeed] FAILED - %s doesn't have %s seed", player.Name, plantType))
+-- print(string.format("[PlantSeed] FAILED - %s doesn't have %s seed", player.Name, plantType))
 		return false, "Seed unavailable"
 	end
 
 	local plantModel = PlantModule.CreatePlantModel(plantType, anchor.Position)
 	if not plantModel then
 		EconomyService.AddSeed(player, plantType, 1)
-		print(string.format("[PlantSeed] FAILED - Could not create plant model for %s", plantType))
+-- print(string.format("[PlantSeed] FAILED - Could not create plant model for %s", plantType))
 		return false, "Failed to create plant model"
 	end
 
@@ -678,7 +676,7 @@ function GardenManager.PlantSeed(player: Player, slotIndex: number, plantType: s
 
 	task.spawn(PlantModule.GrowPlant, plantModel)
 
-	print(string.format("[PlantSeed] ✓ SUCCESS - %s planted %s in slot %d", player.Name, plantType, slotIndex))
+-- print(string.format("[PlantSeed] ✓ SUCCESS - %s planted %s in slot %d", player.Name, plantType, slotIndex))
 	return true, nil
 end
 
@@ -765,7 +763,7 @@ function GardenManager.Initialize()
 		end
 	end)
 
-	print("GardenManager initialized")
+-- print("GardenManager initialized")
 end
 
 return GardenManager

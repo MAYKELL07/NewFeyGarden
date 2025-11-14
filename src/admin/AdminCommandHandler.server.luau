@@ -17,6 +17,13 @@ adminCommandEvent.OnServerEvent:Connect(function(player, commandString)
 	-- Check if player is admin
 	if not AdminCommands.IsAdmin(player) then
 		warn(player.Name .. " tried to use admin command but is not admin")
+		adminCommandEvent:FireClient(player, false, "You are not authorized to use admin commands")
+		return
+	end
+	
+	-- Validate command string
+	if not commandString or commandString == "" then
+		adminCommandEvent:FireClient(player, false, "No command entered")
 		return
 	end
 	
@@ -26,47 +33,56 @@ adminCommandEvent.OnServerEvent:Connect(function(player, commandString)
 	
 	local success, message
 	
-	-- Execute commands
-	if command == "addcoins" then
-		local amount = tonumber(args[2]) or 100
-		success, message = AdminCommands.AddCoins(player, amount)
-		
-	elseif command == "removecoins" then
-		local amount = tonumber(args[2]) or 100
-		success, message = AdminCommands.RemoveCoins(player, amount)
-		
-	elseif command == "getcoins" then
-		success, message = AdminCommands.GetCoins(player)
-		
-	elseif command == "addseeds" then
-		local plantType = args[2] or "Glowbud"
-		local amount = tonumber(args[3]) or 5
-		success, message = AdminCommands.AddSeeds(player, plantType, amount)
-		
-	elseif command == "setweather" then
-		local weatherType = args[2] or "Sunny"
-		success, message = AdminCommands.SetWeather(weatherType)
-		
-	elseif command == "grow" then
-		success, message = AdminCommands.GrowAllPlants(player)
-		
-	elseif command == "clear" then
-		success, message = AdminCommands.ClearGarden(player)
-		
-	elseif command == "spawn" then
-		success, message = AdminCommands.TeleportToSpawn(player)
-		
-	elseif command == "help" then
-		local commands = AdminCommands.GetCommandsList()
-		message = "=== Admin Commands (Press P to open) ===\n"
-		for _, cmd in ipairs(commands) do
-			message = message .. string.format("%s - %s\n", cmd.usage, cmd.desc)
+	-- Execute commands with error protection
+	local executeSuccess, executeError = pcall(function()
+		if command == "addcoins" then
+			local amount = tonumber(args[2]) or 100
+			success, message = AdminCommands.AddCoins(player, amount)
+			
+		elseif command == "removecoins" then
+			local amount = tonumber(args[2]) or 100
+			success, message = AdminCommands.RemoveCoins(player, amount)
+			
+		elseif command == "getcoins" then
+			success, message = AdminCommands.GetCoins(player)
+			
+		elseif command == "addseeds" then
+			local plantType = args[2] or "Glowbud"
+			local amount = tonumber(args[3]) or 5
+			success, message = AdminCommands.AddSeeds(player, plantType, amount)
+			
+		elseif command == "setweather" then
+			local weatherType = args[2] or "Sunny"
+			success, message = AdminCommands.SetWeather(weatherType)
+			
+		elseif command == "grow" then
+			success, message = AdminCommands.GrowAllPlants(player)
+			
+		elseif command == "clear" then
+			success, message = AdminCommands.ClearGarden(player)
+			
+		elseif command == "spawn" then
+			success, message = AdminCommands.TeleportToSpawn(player)
+			
+		elseif command == "help" then
+			local commands = AdminCommands.GetCommandsList()
+			message = "=== Admin Commands (Press P to open) ===\n"
+			for _, cmd in ipairs(commands) do
+				message = message .. string.format("%s - %s\n", cmd.usage, cmd.desc)
+			end
+			success = true
+			
+		else
+			success = false
+			message = "Unknown command: " .. command .. ". Type 'help' for command list."
 		end
-		success = true
-		
-	else
+	end)
+	
+	-- Handle execution errors
+	if not executeSuccess then
 		success = false
-		message = "Unknown command: " .. command .. ". Type 'help' for command list."
+		message = "Command error: " .. tostring(executeError)
+		warn(string.format("[ADMIN] Error executing command '%s' for %s: %s", commandString, player.Name, executeError))
 	end
 	
 	-- Send response back to client

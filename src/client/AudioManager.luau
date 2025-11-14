@@ -68,7 +68,7 @@ local function playMusic(trackName)
 	fadeInTween:Play()
 	
 	currentMusic = music
-	print("[AudioManager] Playing music:", trackName)
+	-- print("[AudioManager] Playing music:", trackName)
 end
 
 -- Stop all music
@@ -225,7 +225,7 @@ end
 -- INITIALIZE
 -- =============================================================================
 function AudioManager.Initialize()
-	print("[AudioManager] Initializing...")
+	-- print("[AudioManager] Initializing...")
 	
 	-- Safety check for Config.Audio
 	if not Config.Audio then
@@ -257,7 +257,7 @@ function AudioManager.Initialize()
 		end)
 	end
 	
-	print("[AudioManager] ✅ Initialized successfully!")
+	-- print("[AudioManager] ✅ Initialized successfully!")
 end
 
 return AudioManager

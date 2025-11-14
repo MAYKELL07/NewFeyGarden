@@ -123,4 +123,4 @@ end
 -- Start monitoring
 task.delay(2, monitorPlants) -- Small delay to ensure everything is loaded
 
-print("BuffIndicators client initialized")
+-- print("BuffIndicators client initialized")

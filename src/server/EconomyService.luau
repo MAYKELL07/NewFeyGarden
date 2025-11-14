@@ -55,7 +55,7 @@ function EconomyService.InitializePlayerData(player)
 		
 		if not profile then
 			if attempts % 4 == 0 then
-				print(string.format("EconomyService: Waiting for profile to load for %s (attempt %d/%d)", player.Name, attempts, maxAttempts))
+				-- print(string.format("EconomyService: Waiting for profile to load for %s (attempt %d/%d)", player.Name, attempts, maxAttempts))
 			end
 		end
 	end
@@ -65,7 +65,7 @@ function EconomyService.InitializePlayerData(player)
 		return
 	end
 	
-	print(string.format("EconomyService: Profile loaded for %s after %d attempts", player.Name, attempts))
+	-- print(string.format("EconomyService: Profile loaded for %s after %d attempts", player.Name, attempts))
 	
 	-- Create legacy cache reference for compatibility
 	EconomyService.PlayerData[player.UserId] = {
@@ -75,7 +75,7 @@ function EconomyService.InitializePlayerData(player)
 	
 	-- Give starting items if new player (only if they have default starting coins)
 	if profile.Coins == 100 and not next(profile.Inventory.Seeds) then
-		print(string.format("EconomyService: New player detected - giving starting items to %s", player.Name))
+		-- print(string.format("EconomyService: New player detected - giving starting items to %s", player.Name))
 		DataService.AddSeed(player.UserId, Constants.PLANT_TYPES.GLOWBUD, 2)
 		DataService.AddSeed(player.UserId, Constants.PLANT_TYPES.DEWLEAF, 3)
 		
@@ -86,15 +86,7 @@ function EconomyService.InitializePlayerData(player)
 		end
 	end
 	
-	print(string.format("EconomyService: ✓ Initialized data for %s - Coins: %d, Seeds: %d types", 
-		player.Name, 
-		profile.Coins,
-		(function()
-			local count = 0
-			for _ in pairs(profile.Inventory.Seeds) do count = count + 1 end
-			return count
-		end)()
-	))
+	-- print(string.format("EconomyService: ✓ Initialized data for %s - Coins: %d, Seeds: %d types", player.Name, profile.Coins, seedCount))
 	
 	EconomyService.SyncPlayerData(player)
 end
@@ -136,7 +128,7 @@ function EconomyService.AddCoins(player, amount)
 	end
 	
 	updateCurrencyEvent:FireClient(player, amount, false)
-	print(player.Name .. " earned " .. amount .. " coins (Total:", profile.Coins, ")")
+	-- print(player.Name .. " earned " .. amount .. " coins (Total:", profile.Coins, ")")
 	return true
 end
 
@@ -152,7 +144,7 @@ function EconomyService.RemoveCoins(player, amount)
 	end
 	
 	updateCurrencyEvent:FireClient(player, -amount, false)
-	print(player.Name .. " spent " .. amount .. " coins (Remaining:", profile.Coins, ")")
+	-- print(player.Name .. " spent " .. amount .. " coins (Remaining:", profile.Coins, ")")
 	return true
 end
 
@@ -214,7 +206,7 @@ function EconomyService.BuySeed(player, plantType, amount)
 	end
 	
 	EconomyService.AddSeed(player, plantType, amount)
-	print(player.Name .. " bought " .. amount .. "x " .. plantType .. " seeds")
+	-- print(player.Name .. " bought " .. amount .. "x " .. plantType .. " seeds")
 	
 	return true
 end
@@ -248,7 +240,7 @@ function EconomyService.BuyPet(player, petType)
 	
 	EconomyService.SyncPlayerData(player)
 	
-	print(player.Name .. " bought " .. petType .. " pet")
+	-- print(player.Name .. " bought " .. petType .. " pet")
 	return true
 end
 
@@ -278,7 +270,7 @@ function EconomyService.EquipPet(player, petType)
 	
 	EconomyService.SyncPlayerData(player)
 	
-	print(player.Name .. " equipped " .. petType .. " pet")
+	-- print(player.Name .. " equipped " .. petType .. " pet")
 	return true
 end
 
@@ -318,13 +310,13 @@ function EconomyService.SellFruit(player, fruitName, amount)
 	-- Sync inventory to client
 	EconomyService.SyncPlayerData(player)
 	
-	print(string.format("%s sold %dx %s for %d coins", player.Name, amount, fruitName, totalPrice))
+	-- print(string.format("%s sold %dx %s for %d coins", player.Name, amount, fruitName, totalPrice))
 	return true
 end
 
 -- Initialize Economy Service
 function EconomyService.Initialize()
-	print("EconomyService: Initializing...")
+	-- print("EconomyService: Initializing...")
 	
 	-- Handle buy seed requests
 	buySeedEvent.OnServerEvent:Connect(function(player, plantType, amount)
@@ -380,7 +372,7 @@ function EconomyService.Initialize()
 		EconomyService.PlayerData[player.UserId] = nil
 	end)
 	
-	print("EconomyService: ✓ Initialized")
+	-- print("EconomyService: ✓ Initialized")
 end
 
 return EconomyService

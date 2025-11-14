@@ -25,6 +25,126 @@ function UISetup.CreateUI()
 	screenGui.IgnoreGuiInset = true
 	screenGui.Parent = StarterGui
 	
+	-- =============================================================================
+	-- LOADING SCREEN (Full Screen Overlay)
+	-- =============================================================================
+	local loadingScreen = Instance.new("Frame")
+	loadingScreen.Name = "LoadingScreen"
+	loadingScreen.Size = UDim2.new(1, 0, 1, 0)
+	loadingScreen.Position = UDim2.new(0, 0, 0, 0)
+	loadingScreen.BackgroundColor3 = Color3.fromRGB(15, 25, 20) -- Very dark forest
+	loadingScreen.BorderSizePixel = 0
+	loadingScreen.ZIndex = 1000 -- On top of everything
+	loadingScreen.Visible = true
+	loadingScreen.Parent = screenGui
+	
+	-- Background gradient
+	local loadingGradient = Instance.new("UIGradient")
+	loadingGradient.Color = ColorSequence.new(Color3.fromRGB(15, 25, 20), Color3.fromRGB(25, 40, 30))
+	loadingGradient.Rotation = 45
+	loadingGradient.Parent = loadingScreen
+	
+	-- Game title
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Name = "TitleLabel"
+	titleLabel.Size = UDim2.new(0.6, 0, 0.15, 0)
+	titleLabel.Position = UDim2.new(0.5, 0, 0.3, 0)
+	titleLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.Text = "🌿 FEY GARDEN 🌿"
+	titleLabel.TextColor3 = Color3.fromRGB(180, 240, 200) -- Magical glow green
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.TextScaled = true
+	titleLabel.ZIndex = 1001
+	titleLabel.Parent = loadingScreen
+	
+	local titleStroke = Instance.new("UIStroke")
+	titleStroke.Color = Color3.fromRGB(88, 160, 140)
+	titleStroke.Thickness = 3
+	titleStroke.Parent = titleLabel
+	
+	-- Loading text
+	local loadingLabel = Instance.new("TextLabel")
+	loadingLabel.Name = "LoadingLabel"
+	loadingLabel.Size = UDim2.new(0.4, 0, 0.05, 0)
+	loadingLabel.Position = UDim2.new(0.5, 0, 0.55, 0)
+	loadingLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	loadingLabel.BackgroundTransparency = 1
+	loadingLabel.Text = "Loading..."
+	loadingLabel.TextColor3 = Color3.fromRGB(245, 238, 220)
+	loadingLabel.Font = Enum.Font.Gotham
+	loadingLabel.TextSize = 20
+	loadingLabel.ZIndex = 1001
+	loadingLabel.Parent = loadingScreen
+	
+	-- Progress bar background
+	local progressBarBg = Instance.new("Frame")
+	progressBarBg.Name = "ProgressBarBg"
+	progressBarBg.Size = UDim2.new(0.5, 0, 0.03, 0)
+	progressBarBg.Position = UDim2.new(0.5, 0, 0.62, 0)
+	progressBarBg.AnchorPoint = Vector2.new(0.5, 0.5)
+	progressBarBg.BackgroundColor3 = Color3.fromRGB(35, 60, 45)
+	progressBarBg.BorderSizePixel = 0
+	progressBarBg.ZIndex = 1001
+	progressBarBg.Parent = loadingScreen
+	
+	local progressBarCorner = Instance.new("UICorner")
+	progressBarCorner.CornerRadius = UDim.new(0, 20)
+	progressBarCorner.Parent = progressBarBg
+	
+	local progressBarStroke = Instance.new("UIStroke")
+	progressBarStroke.Color = Color3.fromRGB(88, 160, 140)
+	progressBarStroke.Thickness = 2
+	progressBarStroke.Transparency = 0.3
+	progressBarStroke.Parent = progressBarBg
+	
+	-- Progress bar fill
+	local progressBarFill = Instance.new("Frame")
+	progressBarFill.Name = "ProgressBarFill"
+	progressBarFill.Size = UDim2.new(0, 0, 1, 0)
+	progressBarFill.Position = UDim2.new(0, 0, 0, 0)
+	progressBarFill.BackgroundColor3 = Color3.fromRGB(110, 190, 170)
+	progressBarFill.BorderSizePixel = 0
+	progressBarFill.ZIndex = 1002
+	progressBarFill.Parent = progressBarBg
+	
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(0, 20)
+	fillCorner.Parent = progressBarFill
+	
+	local fillGradient = Instance.new("UIGradient")
+	fillGradient.Color = ColorSequence.new(Color3.fromRGB(88, 160, 140), Color3.fromRGB(140, 255, 200))
+	fillGradient.Rotation = 0
+	fillGradient.Parent = progressBarFill
+	
+	-- Percentage text
+	local percentLabel = Instance.new("TextLabel")
+	percentLabel.Name = "PercentLabel"
+	percentLabel.Size = UDim2.new(1, 0, 1, 0)
+	percentLabel.Position = UDim2.new(0, 0, 0, 0)
+	percentLabel.BackgroundTransparency = 1
+	percentLabel.Text = "0%"
+	percentLabel.TextColor3 = Color3.fromRGB(245, 238, 220)
+	percentLabel.Font = Enum.Font.GothamBold
+	percentLabel.TextSize = 16
+	percentLabel.ZIndex = 1003
+	percentLabel.Parent = progressBarBg
+	
+	-- Tip text
+	local tipLabel = Instance.new("TextLabel")
+	tipLabel.Name = "TipLabel"
+	tipLabel.Size = UDim2.new(0.6, 0, 0.08, 0)
+	tipLabel.Position = UDim2.new(0.5, 0, 0.75, 0)
+	tipLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+	tipLabel.BackgroundTransparency = 1
+	tipLabel.Text = "💡 Tip: Water your plants during rainy weather for bonus growth!"
+	tipLabel.TextColor3 = Color3.fromRGB(180, 220, 190)
+	tipLabel.Font = Enum.Font.GothamMedium
+	tipLabel.TextSize = 16
+	tipLabel.TextWrapped = true
+	tipLabel.ZIndex = 1001
+	tipLabel.Parent = loadingScreen
+	
 	-- Helper function to create organic rounded corners (wood/vine aesthetic)
 	local function addCorner(parent, radius)
 		local corner = Instance.new("UICorner")
@@ -112,16 +232,90 @@ function UISetup.CreateUI()
 		glowStroke = Color3.fromRGB(140, 255, 200),     -- Bioluminescent glow
 	}
 	
-	print("[UISetup] Creating Enchanted Forest UI...")
+	-- =============================================================================
+	-- TOP CENTER NAVIGATION BUTTONS
+	-- =============================================================================
+	local navFrame = Instance.new("Frame")
+	navFrame.Name = "NavigationFrame"
+	navFrame.Size = UDim2.new(0, 550, 0, 70)
+	navFrame.Position = UDim2.new(0.5, 0, 0, 15)
+	navFrame.AnchorPoint = Vector2.new(0.5, 0)
+	navFrame.BackgroundTransparency = 1
+	navFrame.Parent = screenGui
+	
+	-- Seeds Button
+	local seedsButton = Instance.new("TextButton")
+	seedsButton.Name = "SeedsButton"
+	seedsButton.Size = UDim2.new(0, 170, 0, 70)
+	seedsButton.Position = UDim2.new(0, 0, 0, 0)
+	seedsButton.BackgroundColor3 = Color3.fromRGB(88, 180, 140)
+	seedsButton.BorderSizePixel = 0
+	seedsButton.Text = "SEEDS"
+	seedsButton.TextColor3 = theme.textLight
+	seedsButton.Font = Enum.Font.GothamBold
+	seedsButton.TextSize = 28
+	seedsButton.Parent = navFrame
+	
+	addCorner(seedsButton, 15)
+	addStroke(seedsButton, theme.tealGlow, 3, 0.2)
+	addShadow(seedsButton)
+	
+	local seedsGradient = Instance.new("UIGradient")
+	seedsGradient.Color = ColorSequence.new(Color3.fromRGB(88, 180, 140), Color3.fromRGB(60, 140, 100))
+	seedsGradient.Rotation = 90
+	seedsGradient.Parent = seedsButton
+	
+	-- Garden Button
+	local gardenButton = Instance.new("TextButton")
+	gardenButton.Name = "GardenButton"
+	gardenButton.Size = UDim2.new(0, 170, 0, 70)
+	gardenButton.Position = UDim2.new(0, 190, 0, 0)
+	gardenButton.BackgroundColor3 = Color3.fromRGB(120, 200, 90)
+	gardenButton.BorderSizePixel = 0
+	gardenButton.Text = "GARDEN"
+	gardenButton.TextColor3 = theme.textLight
+	gardenButton.Font = Enum.Font.GothamBold
+	gardenButton.TextSize = 28
+	gardenButton.Parent = navFrame
+	
+	addCorner(gardenButton, 15)
+	addStroke(gardenButton, Color3.fromRGB(150, 255, 120), 3, 0.2)
+	addShadow(gardenButton)
+	
+	local gardenGradient = Instance.new("UIGradient")
+	gardenGradient.Color = ColorSequence.new(Color3.fromRGB(120, 200, 90), Color3.fromRGB(80, 160, 60))
+	gardenGradient.Rotation = 90
+	gardenGradient.Parent = gardenButton
+	
+	-- Sell Button
+	local sellButton = Instance.new("TextButton")
+	sellButton.Name = "SellButton"
+	sellButton.Size = UDim2.new(0, 170, 0, 70)
+	sellButton.Position = UDim2.new(0, 380, 0, 0)
+	sellButton.BackgroundColor3 = Color3.fromRGB(235, 185, 95)
+	sellButton.BorderSizePixel = 0
+	sellButton.Text = "SELL"
+	sellButton.TextColor3 = Color3.fromRGB(40, 30, 20)
+	sellButton.Font = Enum.Font.GothamBold
+	sellButton.TextSize = 28
+	sellButton.Parent = navFrame
+	
+	addCorner(sellButton, 15)
+	addStroke(sellButton, Color3.fromRGB(255, 220, 140), 3, 0.2)
+	addShadow(sellButton)
+	
+	local sellGradient = Instance.new("UIGradient")
+	sellGradient.Color = ColorSequence.new(Color3.fromRGB(235, 185, 95), Color3.fromRGB(200, 150, 70))
+	sellGradient.Rotation = 90
+	sellGradient.Parent = sellButton
 	
 	-- =============================================================================
-	-- CURRENCY FRAME (Top Right) - Golden Coin Pouch
+	-- CURRENCY FRAME (Bottom Left) - Golden Coin Purse
 	-- =============================================================================
 	local currencyFrame = Instance.new("Frame")
 	currencyFrame.Name = "CurrencyFrame"
-	currencyFrame.Size = UDim2.new(0.16, 0, 0.09, 0)
-	currencyFrame.Position = UDim2.new(0.83, 0, 0.02, 0)
-	currencyFrame.AnchorPoint = Vector2.new(0.5, 0)
+	currencyFrame.Size = UDim2.new(0, 200, 0, 60)
+	currencyFrame.Position = UDim2.new(0, 15, 1, -75)
 	currencyFrame.BackgroundColor3 = theme.woodPanel
 	currencyFrame.BorderSizePixel = 0
 	currencyFrame.Parent = screenGui
@@ -134,8 +328,9 @@ function UISetup.CreateUI()
 	-- Currency icon with magical glow
 	local coinIcon = Instance.new("TextLabel")
 	coinIcon.Name = "CoinIcon"
-	coinIcon.Size = UDim2.new(0.32, 0, 0.7, 0)
-	coinIcon.Position = UDim2.new(0.05, 0, 0.15, 0)
+	coinIcon.Size = UDim2.new(0, 35, 0, 35)
+	coinIcon.Position = UDim2.new(0, 8, 0.5, 0)
+	coinIcon.AnchorPoint = Vector2.new(0, 0.5)
 	coinIcon.BackgroundTransparency = 1
 	coinIcon.Text = "💰"
 	coinIcon.TextScaled = true
@@ -145,8 +340,9 @@ function UISetup.CreateUI()
 	-- Currency label with golden text
 	local coinLabel = Instance.new("TextLabel")
 	coinLabel.Name = "CoinLabel"
-	coinLabel.Size = UDim2.new(0.58, 0, 0.7, 0)
-	coinLabel.Position = UDim2.new(0.4, 0, 0.15, 0)
+	coinLabel.Size = UDim2.new(0, 125, 0, 35)
+	coinLabel.Position = UDim2.new(0, 48, 0.5, 0)
+	coinLabel.AnchorPoint = Vector2.new(0, 0.5)
 	coinLabel.BackgroundTransparency = 1
 	coinLabel.Text = "0"
 	coinLabel.TextColor3 = theme.textGold
@@ -166,9 +362,8 @@ function UISetup.CreateUI()
 	-- =============================================================================
 	local weatherFrame = Instance.new("Frame")
 	weatherFrame.Name = "WeatherFrame"
-	weatherFrame.Size = UDim2.new(0.16, 0, 0.09, 0)
-	weatherFrame.Position = UDim2.new(0.17, 0, 0.02, 0)
-	weatherFrame.AnchorPoint = Vector2.new(0.5, 0)
+	weatherFrame.Size = UDim2.new(0, 180, 0, 50)
+	weatherFrame.Position = UDim2.new(0, 10, 0, 10)
 	weatherFrame.BackgroundColor3 = theme.stonePanel
 	weatherFrame.BorderSizePixel = 0
 	weatherFrame.Parent = screenGui
@@ -182,9 +377,8 @@ function UISetup.CreateUI()
 	-- Weather label with mystical glow
 	local weatherLabel = Instance.new("TextLabel")
 	weatherLabel.Name = "WeatherLabel"
-	weatherLabel.Size = UDim2.new(0.9, 0, 0.7, 0)
-	weatherLabel.Position = UDim2.new(0.5, 0, 0.15, 0)
-	weatherLabel.AnchorPoint = Vector2.new(0.5, 0)
+	weatherLabel.Size = UDim2.new(1, -20, 1, -10)
+	weatherLabel.Position = UDim2.new(0, 10, 0, 5)
 	weatherLabel.BackgroundTransparency = 1
 	weatherLabel.Text = "☀️ Sunny"
 	weatherLabel.TextColor3 = theme.textLight
@@ -198,120 +392,205 @@ function UISetup.CreateUI()
 	weatherStroke.Parent = weatherLabel
 	
 	-- =============================================================================
-	-- INVENTORY FRAME - Seeds (Bottom Left) - Seed Pouch with Vines
+	-- HOTBAR (Bottom Center) - 6 Inventory Slots
 	-- =============================================================================
-	local inventoryFrame = Instance.new("Frame")
-	inventoryFrame.Name = "InventoryFrame"
-	inventoryFrame.Size = UDim2.new(0.36, 0, 0.13, 0)
-	inventoryFrame.Position = UDim2.new(0.01, 0, 0.86, 0)
-	inventoryFrame.BackgroundColor3 = theme.leafPanel
-	inventoryFrame.BorderSizePixel = 0
-	inventoryFrame.Parent = screenGui
+	local hotbarFrame = Instance.new("Frame")
+	hotbarFrame.Name = "HotbarFrame"
+	hotbarFrame.Size = UDim2.new(0, 420, 0, 70)
+	hotbarFrame.Position = UDim2.new(0.5, 0, 1, -80)
+	hotbarFrame.AnchorPoint = Vector2.new(0.5, 0)
+	hotbarFrame.BackgroundColor3 = theme.woodPanel
+	hotbarFrame.BorderSizePixel = 0
+	hotbarFrame.Parent = screenGui
 	
-	addCorner(inventoryFrame, 22)
-	addShadow(inventoryFrame)
-	addGradient(inventoryFrame, theme.leafPanel, theme.mossGreen, 90)
-	addStroke(inventoryFrame, theme.vineStroke, 2.5, 0.2)
+	addCorner(hotbarFrame, 15)
+	addShadow(hotbarFrame)
+	addGradient(hotbarFrame, theme.woodPanel, theme.woodBark, 90)
+	addStroke(hotbarFrame, theme.goldLeaf, 2.5, 0.2)
 	
-	-- Title with nature motif
-	local seedTitle = Instance.new("TextLabel")
-	seedTitle.Name = "Title"
-	seedTitle.Size = UDim2.new(0.95, 0, 0.22, 0)
-	seedTitle.Position = UDim2.new(0.025, 0, 0.05, 0)
-	seedTitle.BackgroundTransparency = 1
-	seedTitle.Text = "🌱 Seeds"
-	seedTitle.TextColor3 = theme.textMoss
-	seedTitle.Font = Enum.Font.GothamBold
-	seedTitle.TextScaled = true
-	seedTitle.TextXAlignment = Enum.TextXAlignment.Left
-	seedTitle.Parent = inventoryFrame
-	
-	local seedTitleStroke = Instance.new("UIStroke")
-	seedTitleStroke.Color = theme.forestDark
-	seedTitleStroke.Thickness = 2
-	seedTitleStroke.Parent = seedTitle
-	
-	-- Scrolling container
-	local seedContainer = Instance.new("ScrollingFrame")
-	seedContainer.Name = "SeedContainer"
-	seedContainer.Size = UDim2.new(0.95, 0, 0.68, 0)
-	seedContainer.Position = UDim2.new(0.025, 0, 0.30, 0)
-	seedContainer.BackgroundTransparency = 1
-	seedContainer.BorderSizePixel = 0
-	seedContainer.ScrollBarThickness = 7
-	seedContainer.ScrollBarImageColor3 = theme.tealGem
-	seedContainer.AutomaticCanvasSize = Enum.AutomaticSize.X
-	seedContainer.CanvasSize = UDim2.new(0, 0, 1, 0)
-	seedContainer.Parent = inventoryFrame
-	
-	local seedLayout = Instance.new("UIListLayout")
-	seedLayout.FillDirection = Enum.FillDirection.Horizontal
-	seedLayout.Padding = UDim.new(0, 10)
-	seedLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	seedLayout.Parent = seedContainer
-	
-	local seedPadding = Instance.new("UIPadding")
-	seedPadding.PaddingLeft = UDim.new(0, 5)
-	seedPadding.PaddingRight = UDim.new(0, 5)
-	seedPadding.Parent = seedContainer
+	-- Create 6 hotbar slots
+	for i = 1, 6 do
+		local slot = Instance.new("Frame")
+		slot.Name = "Slot" .. i
+		slot.Size = UDim2.new(0, 60, 0, 60)
+		slot.Position = UDim2.new(0, 5 + (i - 1) * 68, 0, 5)
+		slot.BackgroundColor3 = theme.forestDeep
+		slot.BorderSizePixel = 0
+		slot.Parent = hotbarFrame
+		
+		addCorner(slot, 10)
+		addStroke(slot, theme.tealGem, 2, 0.3)
+		
+		-- Slot number
+		local slotNum = Instance.new("TextLabel")
+		slotNum.Name = "SlotNumber"
+		slotNum.Size = UDim2.new(0, 18, 0, 18)
+		slotNum.Position = UDim2.new(0, 2, 0, 2)
+		slotNum.BackgroundTransparency = 1
+		slotNum.Text = tostring(i)
+		slotNum.TextColor3 = theme.textLight
+		slotNum.Font = Enum.Font.GothamBold
+		slotNum.TextSize = 12
+		slotNum.Parent = slot
+		
+		local numStroke = Instance.new("UIStroke")
+		numStroke.Color = theme.forestDark
+		numStroke.Thickness = 2
+		numStroke.Parent = slotNum
+		
+		-- Item icon
+		local itemIcon = Instance.new("TextLabel")
+		itemIcon.Name = "ItemIcon"
+		itemIcon.Size = UDim2.new(0, 35, 0, 35)
+		itemIcon.Position = UDim2.new(0.5, 0, 0.45, 0)
+		itemIcon.AnchorPoint = Vector2.new(0.5, 0.5)
+		itemIcon.BackgroundTransparency = 1
+		itemIcon.Text = ""
+		itemIcon.TextScaled = true
+		itemIcon.Font = Enum.Font.GothamBold
+		itemIcon.Parent = slot
+		
+		-- Item count
+		local itemCount = Instance.new("TextLabel")
+		itemCount.Name = "ItemCount"
+		itemCount.Size = UDim2.new(0, 25, 0, 18)
+		itemCount.Position = UDim2.new(1, -27, 1, -20)
+		itemCount.BackgroundTransparency = 1
+		itemCount.Text = ""
+		itemCount.TextColor3 = theme.textLight
+		itemCount.Font = Enum.Font.GothamBold
+		itemCount.TextSize = 14
+		itemCount.TextXAlignment = Enum.TextXAlignment.Right
+		itemCount.Parent = slot
+		
+		local countStroke = Instance.new("UIStroke")
+		countStroke.Color = theme.forestDark
+		countStroke.Thickness = 2
+		countStroke.Parent = itemCount
+		
+		-- Make slot clickable
+		local slotButton = Instance.new("TextButton")
+		slotButton.Name = "SlotButton"
+		slotButton.Size = UDim2.new(1, 0, 1, 0)
+		slotButton.BackgroundTransparency = 1
+		slotButton.Text = ""
+		slotButton.ZIndex = 2
+		slotButton.Parent = slot
+	end
 	
 	-- =============================================================================
-	-- FRUITS FRAME (Below Seeds) - Berry Basket
+	-- INVENTORY WINDOW (Press B) - Full Backpack
 	-- =============================================================================
-	local fruitsFrame = Instance.new("Frame")
-	fruitsFrame.Name = "FruitsFrame"
-	fruitsFrame.Size = UDim2.new(0.36, 0, 0.13, 0)
-	fruitsFrame.Position = UDim2.new(0.01, 0, 0.72, 0)
-	fruitsFrame.BackgroundColor3 = theme.woodPanel
-	fruitsFrame.BorderSizePixel = 0
-	fruitsFrame.Parent = screenGui
+	local inventoryWindow = Instance.new("Frame")
+	inventoryWindow.Name = "InventoryWindow"
+	inventoryWindow.Size = UDim2.new(0, 600, 0, 450)
+	inventoryWindow.Position = UDim2.new(0.5, 0, 0.5, -50)
+	inventoryWindow.AnchorPoint = Vector2.new(0.5, 0.5)
+	inventoryWindow.BackgroundColor3 = theme.woodPanel
+	inventoryWindow.BorderSizePixel = 0
+	inventoryWindow.Visible = false
+	inventoryWindow.Parent = screenGui
 	
-	addCorner(fruitsFrame, 22)
-	addShadow(fruitsFrame)
-	addGradient(fruitsFrame, theme.woodPanel, theme.woodBark, 90)
-	addStroke(fruitsFrame, theme.goldLeaf, 2.5, 0.2)
+	addCorner(inventoryWindow, 25)
+	addShadow(inventoryWindow)
+	addGradient(inventoryWindow, theme.woodPanel, theme.forestDeep, 45)
+	addStroke(inventoryWindow, theme.goldLeaf, 3, 0.2)
 	
-	-- Title
-	local fruitTitle = Instance.new("TextLabel")
-	fruitTitle.Name = "Title"
-	fruitTitle.Size = UDim2.new(0.95, 0, 0.22, 0)
-	fruitTitle.Position = UDim2.new(0.025, 0, 0.05, 0)
-	fruitTitle.BackgroundTransparency = 1
-	fruitTitle.Text = "🍎 Fruits"
-	fruitTitle.TextColor3 = theme.textGold
-	fruitTitle.Font = Enum.Font.GothamBold
-	fruitTitle.TextScaled = true
-	fruitTitle.TextXAlignment = Enum.TextXAlignment.Left
-	fruitTitle.Parent = fruitsFrame
+	-- Title bar
+	local invTitleBar = Instance.new("Frame")
+	invTitleBar.Name = "TitleBar"
+	invTitleBar.Size = UDim2.new(1, 0, 0, 60)
+	invTitleBar.BackgroundColor3 = theme.forestDeep
+	invTitleBar.BorderSizePixel = 0
+	invTitleBar.Parent = inventoryWindow
 	
-	local fruitTitleStroke = Instance.new("UIStroke")
-	fruitTitleStroke.Color = theme.forestDark
-	fruitTitleStroke.Thickness = 2
-	fruitTitleStroke.Parent = fruitTitle
+	addCorner(invTitleBar, 25)
 	
-	-- Scrolling container
-	local fruitsContainer = Instance.new("ScrollingFrame")
-	fruitsContainer.Name = "FruitsContainer"
-	fruitsContainer.Size = UDim2.new(0.95, 0, 0.68, 0)
-	fruitsContainer.Position = UDim2.new(0.025, 0, 0.30, 0)
-	fruitsContainer.BackgroundTransparency = 1
-	fruitsContainer.BorderSizePixel = 0
-	fruitsContainer.ScrollBarThickness = 7
-	fruitsContainer.ScrollBarImageColor3 = theme.goldLeaf
-	fruitsContainer.AutomaticCanvasSize = Enum.AutomaticSize.X
-	fruitsContainer.CanvasSize = UDim2.new(0, 0, 1, 0)
-	fruitsContainer.Parent = fruitsFrame
+	local invTitle = Instance.new("TextLabel")
+	invTitle.Name = "Title"
+	invTitle.Size = UDim2.new(0, 300, 0, 40)
+	invTitle.Position = UDim2.new(0, 20, 0, 10)
+	invTitle.BackgroundTransparency = 1
+	invTitle.Text = "� Inventory"
+	invTitle.TextColor3 = theme.textGold
+	invTitle.Font = Enum.Font.GothamBold
+	invTitle.TextSize = 28
+	invTitle.TextXAlignment = Enum.TextXAlignment.Left
+	invTitle.Parent = invTitleBar
 	
-	local fruitLayout = Instance.new("UIListLayout")
-	fruitLayout.FillDirection = Enum.FillDirection.Horizontal
-	fruitLayout.Padding = UDim.new(0, 10)
-	fruitLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	fruitLayout.Parent = fruitsContainer
+	local invTitleStroke = Instance.new("UIStroke")
+	invTitleStroke.Color = theme.forestDark
+	invTitleStroke.Thickness = 2
+	invTitleStroke.Parent = invTitle
 	
-	local fruitPadding = Instance.new("UIPadding")
-	fruitPadding.PaddingLeft = UDim.new(0, 5)
-	fruitPadding.PaddingRight = UDim.new(0, 5)
-	fruitPadding.Parent = fruitsContainer
+	-- Close button
+	local invCloseButton = Instance.new("TextButton")
+	invCloseButton.Name = "CloseButton"
+	invCloseButton.Size = UDim2.new(0, 130, 0, 35)
+	invCloseButton.Position = UDim2.new(1, -145, 0, 13)
+	invCloseButton.BackgroundColor3 = theme.woodBark
+	invCloseButton.Text = "✕ Close"
+	invCloseButton.TextColor3 = theme.textLight
+	invCloseButton.Font = Enum.Font.GothamBold
+	invCloseButton.TextSize = 16
+	invCloseButton.Parent = invTitleBar
+	
+	addCorner(invCloseButton, 12)
+	addStroke(invCloseButton, theme.goldLeaf, 2, 0.3)
+	
+	-- Tab buttons
+	local tabContainer = Instance.new("Frame")
+	tabContainer.Name = "TabContainer"
+	tabContainer.Size = UDim2.new(1, -40, 0, 50)
+	tabContainer.Position = UDim2.new(0, 20, 0, 70)
+	tabContainer.BackgroundTransparency = 1
+	tabContainer.Parent = inventoryWindow
+	
+	local tabLayout = Instance.new("UIListLayout")
+	tabLayout.FillDirection = Enum.FillDirection.Horizontal
+	tabLayout.Padding = UDim.new(0, 10)
+	tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+	tabLayout.Parent = tabContainer
+	
+	local tabs = {"Seeds", "Fruits", "All"}
+	for i, tabName in ipairs(tabs) do
+		local tabButton = Instance.new("TextButton")
+		tabButton.Name = tabName .. "Tab"
+		tabButton.Size = UDim2.new(0, 150, 0, 40)
+		tabButton.BackgroundColor3 = theme.leafPanel
+		tabButton.Text = tabName
+		tabButton.TextColor3 = theme.textMoss
+		tabButton.Font = Enum.Font.GothamBold
+		tabButton.TextSize = 18
+		tabButton.Parent = tabContainer
+		
+		addCorner(tabButton, 12)
+		addStroke(tabButton, theme.tealGem, 2, 0.3)
+	end
+	
+	-- Inventory grid container
+	local invGridScroll = Instance.new("ScrollingFrame")
+	invGridScroll.Name = "GridContainer"
+	invGridScroll.Size = UDim2.new(1, -40, 1, -150)
+	invGridScroll.Position = UDim2.new(0, 20, 0, 130)
+	invGridScroll.BackgroundTransparency = 1
+	invGridScroll.BorderSizePixel = 0
+	invGridScroll.ScrollBarThickness = 10
+	invGridScroll.ScrollBarImageColor3 = theme.goldLeaf
+	invGridScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	invGridScroll.Parent = inventoryWindow
+	
+	local invGridLayout = Instance.new("UIGridLayout")
+	invGridLayout.CellSize = UDim2.new(0, 90, 0, 90)
+	invGridLayout.CellPadding = UDim2.new(0, 10, 0, 10)
+	invGridLayout.SortOrder = Enum.SortOrder.Name
+	invGridLayout.Parent = invGridScroll
+	
+	local invPadding = Instance.new("UIPadding")
+	invPadding.PaddingLeft = UDim.new(0, 10)
+	invPadding.PaddingRight = UDim.new(0, 10)
+	invPadding.PaddingTop = UDim.new(0, 10)
+	invPadding.Parent = invGridScroll
 	
 	-- =============================================================================
 	-- SHOP WINDOW (Modal) - 3 Column Fullscreen: Store | NPC | Inventory
@@ -437,7 +716,7 @@ function UISetup.CreateUI()
 	
 	local shopRightTitle = Instance.new("TextLabel")
 	shopRightTitle.Name = "PanelTitle"
-	shopRightTitle.Size = UDim2.new(0.9, 0, 0.06, 0)
+	shopRightTitle.Size = UDim2.new(0.9, 0, 0.08, 0)
 	shopRightTitle.Position = UDim2.new(0.05, 0, 0.02, 0)
 	shopRightTitle.BackgroundTransparency = 1
 	shopRightTitle.Text = "🎒 My Seeds"
@@ -453,30 +732,33 @@ function UISetup.CreateUI()
 	shopRightTitleStroke.Thickness = 2
 	shopRightTitleStroke.Parent = shopRightTitle
 	
-	-- Inventory container for seeds
+	-- Grid container for seeds inventory (like hotbar style)
 	local shopInventoryScroll = Instance.new("ScrollingFrame")
 	shopInventoryScroll.Name = "InventoryScroll"
-	shopInventoryScroll.Size = UDim2.new(0.94, 0, 0.9, 0)
-	shopInventoryScroll.Position = UDim2.new(0.03, 0, 0.09, 0)
+	shopInventoryScroll.Size = UDim2.new(0.94, 0, 0.88, 0)
+	shopInventoryScroll.Position = UDim2.new(0.03, 0, 0.11, 0)
 	shopInventoryScroll.BackgroundTransparency = 1
 	shopInventoryScroll.BorderSizePixel = 0
-	shopInventoryScroll.ScrollBarThickness = 10
+	shopInventoryScroll.ScrollBarThickness = 8
 	shopInventoryScroll.ScrollBarImageColor3 = theme.tealGem
 	shopInventoryScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	shopInventoryScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 	shopInventoryScroll.ZIndex = 12
 	shopInventoryScroll.Parent = shopRightPanel
 	
-	local inventoryLayout = Instance.new("UIListLayout")
-	inventoryLayout.Padding = UDim.new(0, 10)
-	inventoryLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	inventoryLayout.Parent = shopInventoryScroll
+	-- Use Grid Layout instead of List Layout
+	local inventoryGrid = Instance.new("UIGridLayout")
+	inventoryGrid.Name = "GridLayout"
+	inventoryGrid.CellSize = UDim2.new(0, 130, 0, 130)
+	inventoryGrid.CellPadding = UDim2.new(0, 10, 0, 10)
+	inventoryGrid.SortOrder = Enum.SortOrder.Name
+	inventoryGrid.Parent = shopInventoryScroll
 	
 	local inventoryPadding = Instance.new("UIPadding")
-	inventoryPadding.PaddingTop = UDim.new(0, 8)
-	inventoryPadding.PaddingBottom = UDim.new(0, 8)
-	inventoryPadding.PaddingLeft = UDim.new(0, 8)
-	inventoryPadding.PaddingRight = UDim.new(0, 8)
+	inventoryPadding.PaddingTop = UDim.new(0, 10)
+	inventoryPadding.PaddingBottom = UDim.new(0, 10)
+	inventoryPadding.PaddingLeft = UDim.new(0, 10)
+	inventoryPadding.PaddingRight = UDim.new(0, 10)
 	inventoryPadding.Parent = shopInventoryScroll
 	
 	-- =============================================================================
@@ -603,7 +885,7 @@ function UISetup.CreateUI()
 	
 	local sellRightTitle = Instance.new("TextLabel")
 	sellRightTitle.Name = "PanelTitle"
-	sellRightTitle.Size = UDim2.new(0.9, 0, 0.06, 0)
+	sellRightTitle.Size = UDim2.new(0.9, 0, 0.08, 0)
 	sellRightTitle.Position = UDim2.new(0.05, 0, 0.02, 0)
 	sellRightTitle.BackgroundTransparency = 1
 	sellRightTitle.Text = "🍎 My Fruits"
@@ -619,30 +901,33 @@ function UISetup.CreateUI()
 	sellRightTitleStroke.Thickness = 2
 	sellRightTitleStroke.Parent = sellRightTitle
 	
-	-- Fruit inventory display
+	-- Fruit inventory display with grid layout
 	local sellInventoryScroll = Instance.new("ScrollingFrame")
 	sellInventoryScroll.Name = "InventoryScroll"
-	sellInventoryScroll.Size = UDim2.new(0.94, 0, 0.9, 0)
-	sellInventoryScroll.Position = UDim2.new(0.03, 0, 0.09, 0)
+	sellInventoryScroll.Size = UDim2.new(0.94, 0, 0.88, 0)
+	sellInventoryScroll.Position = UDim2.new(0.03, 0, 0.11, 0)
 	sellInventoryScroll.BackgroundTransparency = 1
 	sellInventoryScroll.BorderSizePixel = 0
-	sellInventoryScroll.ScrollBarThickness = 10
+	sellInventoryScroll.ScrollBarThickness = 8
 	sellInventoryScroll.ScrollBarImageColor3 = theme.goldLeaf
 	sellInventoryScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	sellInventoryScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 	sellInventoryScroll.ZIndex = 12
 	sellInventoryScroll.Parent = sellRightPanel
 	
-	local sellInventoryLayout = Instance.new("UIListLayout")
-	sellInventoryLayout.Padding = UDim.new(0, 10)
-	sellInventoryLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	sellInventoryLayout.Parent = sellInventoryScroll
+	-- Use Grid Layout for fruits
+	local sellInventoryGrid = Instance.new("UIGridLayout")
+	sellInventoryGrid.Name = "GridLayout"
+	sellInventoryGrid.CellSize = UDim2.new(0, 130, 0, 130)
+	sellInventoryGrid.CellPadding = UDim2.new(0, 10, 0, 10)
+	sellInventoryGrid.SortOrder = Enum.SortOrder.Name
+	sellInventoryGrid.Parent = sellInventoryScroll
 	
 	local sellInventoryPadding = Instance.new("UIPadding")
-	sellInventoryPadding.PaddingTop = UDim.new(0, 8)
-	sellInventoryPadding.PaddingBottom = UDim.new(0, 8)
-	sellInventoryPadding.PaddingLeft = UDim.new(0, 8)
-	sellInventoryPadding.PaddingRight = UDim.new(0, 8)
+	sellInventoryPadding.PaddingTop = UDim.new(0, 10)
+	sellInventoryPadding.PaddingBottom = UDim.new(0, 10)
+	sellInventoryPadding.PaddingLeft = UDim.new(0, 10)
+	sellInventoryPadding.PaddingRight = UDim.new(0, 10)
 	sellInventoryPadding.Parent = sellInventoryScroll
 	
 	-- =============================================================================
@@ -852,21 +1137,6 @@ function UISetup.CreateUI()
 	notifLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	notifLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	notifLayout.Parent = notificationContainer
-	
-	print("[UISetup] ✅ Enchanted Forest UI created successfully!")
-	print("[UISetup] Theme: Deep forest tones with magical glows")
-	print("[UISetup] UI Structure:")
-	print("  - CurrencyFrame (golden coin pouch)")
-	print("  - WeatherFrame (sky crystal)")
-	print("  - InventoryFrame (seed pouch with vines)")
-	print("  - FruitsFrame (berry basket)")
-	print("  - ShopWindow (enchanted merchant's stand)")
-	print("  - SellWindow (fruit market stand)")
-	print("  - PetsWindow (companion sanctuary)")
-	print("  - PetsButton (magical paw crystal)")
-	print("  - NotificationContainer (floating messages)")
-	print("[UISetup] Use ProximityPrompts on ShopPart, SellPart, and PetShopPart to open windows!")
-	print("[UISetup] Ready for client scripts to use!")
 end
 
 return UISetup

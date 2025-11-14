@@ -64,7 +64,7 @@ local function setupAnchorClick(anchor)
 		-- Fire plant seed event to server
 		local plantSeedEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.PLANT_SEED)
 		if plantSeedEvent then
-			print(string.format("[PlantingHandler] Planting %s at slot %d", selectedPlantType, slotIndex))
+			-- print(string.format("[PlantingHandler] Planting %s at slot %d", selectedPlantType, slotIndex))
 			plantSeedEvent:FireServer(slotIndex, selectedPlantType)
 		else
 			warn("[PlantingHandler] PLANT_SEED event not found!")
@@ -73,7 +73,7 @@ local function setupAnchorClick(anchor)
 end
 
 function PlantingHandler.Initialize()
-	print("[PlantingHandler] Initializing...")
+	-- print("[PlantingHandler] Initializing...")
 	
 	-- Wait for player's garden
 	task.wait(2) -- Give time for garden assignment
@@ -99,7 +99,7 @@ function PlantingHandler.Initialize()
 		return
 	end
 	
-	print("[PlantingHandler] Found player garden:", playerGarden.Name)
+	-- print("[PlantingHandler] Found player garden:", playerGarden.Name)
 	
 	-- Setup click detectors for all plant anchors
 	local plotsFolder = playerGarden:FindFirstChild(Config.World.PlotsFolder)
@@ -116,7 +116,7 @@ function PlantingHandler.Initialize()
 		end
 	end
 	
-	print(string.format("[PlantingHandler] ✅ Setup complete - %d anchors ready", anchorCount))
+	-- print(string.format("[PlantingHandler] ✅ Setup complete - %d anchors ready", anchorCount))
 end
 
 return PlantingHandler

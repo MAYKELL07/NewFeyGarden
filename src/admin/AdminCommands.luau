@@ -31,14 +31,34 @@ end
 function AdminCommands.AddCoins(player, amount)
 	local ServerScriptService = game:GetService("ServerScriptService")
 	local EconomyService = require(ServerScriptService.Server.EconomyService)
-	EconomyService.AddCoins(player, amount)
-	return true, "Added " .. amount .. " coins"
+	
+	-- Check if player data is loaded
+	local DataService = require(ServerScriptService.Server.Persistence.DataService)
+	local profile = DataService.GetProfile(player.UserId)
+	if not profile then
+		return false, "Player data not loaded yet. Please wait a moment."
+	end
+	
+	local success = EconomyService.AddCoins(player, amount)
+	if success then
+		return true, "Added " .. amount .. " coins"
+	else
+		return false, "Failed to add coins"
+	end
 end
 
 -- Remove coins from player
 function AdminCommands.RemoveCoins(player, amount)
 	local ServerScriptService = game:GetService("ServerScriptService")
 	local EconomyService = require(ServerScriptService.Server.EconomyService)
+	
+	-- Check if player data is loaded
+	local DataService = require(ServerScriptService.Server.Persistence.DataService)
+	local profile = DataService.GetProfile(player.UserId)
+	if not profile then
+		return false, "Player data not loaded yet. Please wait a moment."
+	end
+	
 	local success = EconomyService.RemoveCoins(player, amount)
 	if success then
 		return true, "Removed " .. amount .. " coins"
@@ -51,6 +71,14 @@ end
 function AdminCommands.GetCoins(player)
 	local ServerScriptService = game:GetService("ServerScriptService")
 	local EconomyService = require(ServerScriptService.Server.EconomyService)
+	
+	-- Check if player data is loaded
+	local DataService = require(ServerScriptService.Server.Persistence.DataService)
+	local profile = DataService.GetProfile(player.UserId)
+	if not profile then
+		return false, "Player data not loaded yet. Please wait a moment."
+	end
+	
 	local coins = EconomyService.GetCoins(player)
 	return true, player.Name .. " has " .. coins .. " coins"
 end
@@ -60,6 +88,13 @@ function AdminCommands.AddSeeds(player, plantType, amount)
 	local Constants = require(ReplicatedStorage.Shared.Constants)
 	local ServerScriptService = game:GetService("ServerScriptService")
 	local EconomyService = require(ServerScriptService.Server.EconomyService)
+	
+	-- Check if player data is loaded
+	local DataService = require(ServerScriptService.Server.Persistence.DataService)
+	local profile = DataService.GetProfile(player.UserId)
+	if not profile then
+		return false, "Player data not loaded yet. Please wait a moment."
+	end
 
 	amount = amount or 1
 
@@ -67,8 +102,12 @@ function AdminCommands.AddSeeds(player, plantType, amount)
 		return false, "Invalid plant type: " .. plantType
 	end
 
-	EconomyService.AddSeed(player, plantType, amount)
-	return true, "Added " .. amount .. "x " .. plantType .. " seeds"
+	local success = EconomyService.AddSeed(player, plantType, amount)
+	if success then
+		return true, "Added " .. amount .. "x " .. plantType .. " seeds"
+	else
+		return false, "Failed to add seeds"
+	end
 end
 
 -- Change weather
@@ -101,10 +140,11 @@ function AdminCommands.GrowAllPlants(player)
 	local Config = require(ReplicatedStorage.Shared.Config)
 	local Constants = require(ReplicatedStorage.Shared.Constants)
 	local PlantModule = require(ReplicatedStorage.Shared.PlantModule)
+	
 	local garden = GardenManager.PlayerGardens[player.UserId]
 
 	if not garden then
-		return false, "No garden found"
+		return false, "No garden assigned. Please wait for garden assignment."
 	end
 
 	local count = 0
@@ -134,6 +174,10 @@ function AdminCommands.GrowAllPlants(player)
 		end
 	end
 
+	if count == 0 then
+		return false, "No plants found in garden. Plant some seeds first!"
+	end
+
 	return true, "Instantly grew " .. count .. " plants to Bloom stage with harvest ability"
 end
 
@@ -142,10 +186,11 @@ function AdminCommands.ClearGarden(player)
 	local ServerScriptService = game:GetService("ServerScriptService")
 	local GardenManager = require(ServerScriptService.Server.GardenManager)
 	local Config = require(ReplicatedStorage.Shared.Config)
+	
 	local garden = GardenManager.PlayerGardens[player.UserId]
 
 	if not garden then
-		return false, "No garden found"
+		return false, "No garden assigned. Please wait for garden assignment."
 	end
 
 	local count = 0
@@ -161,6 +206,10 @@ function AdminCommands.ClearGarden(player)
 				end
 			end
 		end
+	end
+
+	if count == 0 then
+		return false, "Garden is already empty"
 	end
 
 	return true, "Cleared " .. count .. " plants from garden"
