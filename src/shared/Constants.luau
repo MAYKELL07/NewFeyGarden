@@ -253,90 +253,105 @@ Constants.PET_TYPES = {
 -- Pet Configuration
 Constants.PET_CONFIG = {
 	[Constants.PET_TYPES.CRYSTALOWL] = {
+		DisplayName = "CrystalOwl",
 		Price = 500,
 		FollowDistance = 3,
 		WaterBoost = 0.85, -- Makes plants grow 15% faster
 		Color = Color3.fromRGB(150, 200, 255)
 	},
 	[Constants.PET_TYPES.EMBERCAT] = {
+		DisplayName = "EmberCat",
 		Price = 400,
 		FollowDistance = 2.5,
 		WaterBoost = 0.90, -- Makes plants grow 10% faster
 		Color = Color3.fromRGB(255, 100, 50)
 	},
 	[Constants.PET_TYPES.EVERFLAMEGRIFFIN] = {
+		DisplayName = "EverflameGriffin",
 		Price = 800,
 		FollowDistance = 4,
 		WaterBoost = 0.75, -- Makes plants grow 25% faster
 		Color = Color3.fromRGB(255, 150, 0)
 	},
 	[Constants.PET_TYPES.GLOWBUG] = {
+		DisplayName = "GlowBug",
 		Price = 250,
 		FollowDistance = 2,
 		WaterBoost = 0.95, -- Makes plants grow 5% faster
 		Color = Color3.fromRGB(255, 255, 100)
 	},
 	[Constants.PET_TYPES.LEAFLING] = {
+		DisplayName = "Leafling",
 		Price = 350,
 		FollowDistance = 3,
 		WaterBoost = 0.88, -- Makes plants grow 12% faster
 		Color = Color3.fromRGB(100, 255, 100)
 	},
 	[Constants.PET_TYPES.MOONDRAGON] = {
+		DisplayName = "MoonDragon",
 		Price = 900,
 		FollowDistance = 4.5,
 		WaterBoost = 0.70, -- Makes plants grow 30% faster
 		Color = Color3.fromRGB(200, 200, 255)
 	},
 	[Constants.PET_TYPES.MOSSYSLIME] = {
+		DisplayName = "MossySlime",
 		Price = 300,
 		FollowDistance = 2,
 		WaterBoost = 0.92, -- Makes plants grow 8% faster
 		Color = Color3.fromRGB(100, 200, 100)
 	},
 	[Constants.PET_TYPES.PEBBLEPUB] = {
+		DisplayName = "PebblePup",
 		Price = 350,
 		FollowDistance = 2.5,
 		WaterBoost = 0.90, -- Makes plants grow 10% faster
 		Color = Color3.fromRGB(150, 150, 150)
 	},
 	[Constants.PET_TYPES.PHANTOMELK] = {
+		DisplayName = "PhantomElk",
 		Price = 600,
 		FollowDistance = 3.5,
 		WaterBoost = 0.82, -- Makes plants grow 18% faster
 		Color = Color3.fromRGB(180, 180, 255)
 	},
 	[Constants.PET_TYPES.PUFFSPIRIT] = {
+		DisplayName = "PuffSpirit",
 		Price = 450,
 		FollowDistance = 3,
 		WaterBoost = 0.87, -- Makes plants grow 13% faster
 		Color = Color3.fromRGB(255, 255, 255)
 	},
 	[Constants.PET_TYPES.SPARKFOX] = {
+		DisplayName = "SparkFox",
 		Price = 550,
 		FollowDistance = 3.5,
 		WaterBoost = 0.83, -- Makes plants grow 17% faster
 		Color = Color3.fromRGB(255, 200, 100)
 	},
 	[Constants.PET_TYPES.SPROUTTAIL] = {
+		DisplayName = "SproutTail",
 		Price = 400,
 		FollowDistance = 3,
 		WaterBoost = 0.89, -- Makes plants grow 11% faster
 		Color = Color3.fromRGB(150, 255, 100)
 	},
 	[Constants.PET_TYPES.STARLIGHTPHOENIX] = {
+		DisplayName = "StarlightPheonix",
 		Price = 1000,
 		FollowDistance = 5,
 		WaterBoost = 0.65, -- Makes plants grow 35% faster
 		Color = Color3.fromRGB(255, 255, 200)
 	},
 	[Constants.PET_TYPES.THORNBEAK] = {
+		DisplayName = "Thornbeak",
 		Price = 500,
 		FollowDistance = 3,
 		WaterBoost = 0.85, -- Makes plants grow 15% faster
 		Color = Color3.fromRGB(150, 100, 50)
 	},
 	[Constants.PET_TYPES.WHISPRABBIT] = {
+		DisplayName = "WispRabbit",
 		Price = 350,
 		FollowDistance = 2.5,
 		WaterBoost = 0.90, -- Makes plants grow 10% faster

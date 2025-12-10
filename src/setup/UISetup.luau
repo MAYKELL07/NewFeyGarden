@@ -38,12 +38,6 @@ function UISetup.CreateUI()
 	loadingScreen.Visible = true
 	loadingScreen.Parent = screenGui
 	
-	-- Background gradient
-	local loadingGradient = Instance.new("UIGradient")
-	loadingGradient.Color = ColorSequence.new(Color3.fromRGB(15, 25, 20), Color3.fromRGB(25, 40, 30))
-	loadingGradient.Rotation = 45
-	loadingGradient.Parent = loadingScreen
-	
 	-- Game title
 	local titleLabel = Instance.new("TextLabel")
 	titleLabel.Name = "TitleLabel"
@@ -112,11 +106,6 @@ function UISetup.CreateUI()
 	fillCorner.CornerRadius = UDim.new(0, 20)
 	fillCorner.Parent = progressBarFill
 	
-	local fillGradient = Instance.new("UIGradient")
-	fillGradient.Color = ColorSequence.new(Color3.fromRGB(88, 160, 140), Color3.fromRGB(140, 255, 200))
-	fillGradient.Rotation = 0
-	fillGradient.Parent = progressBarFill
-	
 	-- Percentage text
 	local percentLabel = Instance.new("TextLabel")
 	percentLabel.Name = "PercentLabel"
@@ -146,48 +135,23 @@ function UISetup.CreateUI()
 	tipLabel.Parent = loadingScreen
 	
 	-- Helper function to create organic rounded corners (wood/vine aesthetic)
-	local function addCorner(parent, radius)
-		local corner = Instance.new("UICorner")
-		corner.CornerRadius = UDim.new(0, radius or 18)
-		corner.Parent = parent
-		return corner
+	local function addCorner(_parent, _radius)
+		return nil -- Corners removed per simplified art direction
 	end
-	
+
 	-- Helper function to create soft shadow (lifted from background)
-	local function addShadow(parent)
-		local shadow = Instance.new("ImageLabel")
-		shadow.Name = "Shadow"
-		shadow.BackgroundTransparency = 1
-		shadow.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
-		shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
-		shadow.ImageTransparency = 0.5
-		shadow.Size = UDim2.new(1, 12, 1, 12)
-		shadow.Position = UDim2.new(0, 0, 0, 6)
-		shadow.AnchorPoint = Vector2.new(0, 0)
-		shadow.ZIndex = -10
-		shadow.Parent = parent
-		addCorner(shadow, 18)
-		return shadow
+	local function addShadow(_parent)
+		return nil -- Shadows removed per simplified art direction
 	end
-	
+
 	-- Helper function to create natural gradients (wood/moss)
-	local function addGradient(parent, color1, color2, rotation)
-		local gradient = Instance.new("UIGradient")
-		gradient.Color = ColorSequence.new(color1, color2)
-		gradient.Rotation = rotation or 90
-		gradient.Parent = parent
-		return gradient
+	local function addGradient(_parent, _color1, _color2, _rotation)
+		return nil -- Gradients removed from frame art
 	end
 
 	-- Helper function to add vine/leaf stroke outline
-	local function addStroke(parent, color, thickness, transparency)
-		local stroke = Instance.new("UIStroke")
-		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-		stroke.Thickness = thickness or 2
-		stroke.Color = color or Color3.fromRGB(88, 160, 108)
-		stroke.Transparency = transparency or 0.25
-		stroke.Parent = parent
-		return stroke
+	local function addStroke(_parent, _color, _thickness, _transparency)
+		return nil -- Strokes removed from frame art
 	end
 	
 	-- Helper to add magical glow effect (bioluminescence)
@@ -214,20 +178,19 @@ function UISetup.CreateUI()
 	local FRAME_SLICE_RECT = Rect.new(90, 120, 630, 960)
 	local FRAME_SLICE_SQUARE = Rect.new(90, 120, 630, 960)
 
-	local function applyFrameImage(parent, assetId, sliceRect, zOffset)
-		local bg = Instance.new("ImageLabel")
-		bg.Name = "FrameArt"
-		bg.BackgroundTransparency = 1
-		bg.Image = assetId or FRAME_IMAGE_WINDOW_TALL
-		local isWindow = bg.Image == FRAME_IMAGE_WINDOW_TALL or bg.Image == FRAME_IMAGE_WINDOW_WIDE
-		bg.ScaleType = isWindow and Enum.ScaleType.Stretch or Enum.ScaleType.Crop
-		bg.Size = UDim2.new(1.4, 0, 1.4, 0)
-		bg.Position = UDim2.new(0.5, 0, 0.5, 0)
-		bg.AnchorPoint = Vector2.new(0.5, 0.5)
-		bg.ZIndex = (parent.ZIndex or 1) - 1 + (zOffset or 0)
-		bg.Parent = parent
-		parent.BackgroundTransparency = 1
-		return bg
+	local function applyFrameImage(parent, assetId, sliceRect, _zOffset)
+		if parent:IsA("ImageButton") or parent:IsA("ImageLabel") then
+			parent.Image = assetId or FRAME_IMAGE_WINDOW_TALL
+			parent.ScaleType = Enum.ScaleType.Crop
+			parent.Size = parent.Size * 1.4
+			if sliceRect then
+				parent.SliceCenter = sliceRect
+			end
+			parent.BackgroundTransparency = 1
+			return parent
+		end
+		-- Frames keep their background; no separate frame-art child
+		return parent
 	end
 
 	-- FANTASY FRAME THEME (Purple/Blue palette from provided frame art)
@@ -289,11 +252,6 @@ function UISetup.CreateUI()
 	addStroke(seedsButton, theme.tealGlow, 3, 0.2)
 	addShadow(seedsButton)
 
-	local seedsGradient = Instance.new("UIGradient")
-	seedsGradient.Color = ColorSequence.new(Color3.fromRGB(86, 108, 186), Color3.fromRGB(130, 150, 220))
-	seedsGradient.Rotation = 90
-	seedsGradient.Parent = seedsBg
-
 	local seedsLabel = Instance.new("TextLabel")
 	seedsLabel.Name = "Label"
 	seedsLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -317,11 +275,6 @@ function UISetup.CreateUI()
 	addCorner(gardenButton, 15)
 	addStroke(gardenButton, Color3.fromRGB(150, 255, 120), 3, 0.2)
 	addShadow(gardenButton)
-
-	local gardenGradient = Instance.new("UIGradient")
-	gardenGradient.Color = ColorSequence.new(Color3.fromRGB(120, 80, 140), Color3.fromRGB(96, 48, 103))
-	gardenGradient.Rotation = 90
-	gardenGradient.Parent = gardenBg
 
 	local gardenLabel = Instance.new("TextLabel")
 	gardenLabel.Name = "Label"
@@ -347,11 +300,6 @@ function UISetup.CreateUI()
 	addStroke(sellButton, Color3.fromRGB(255, 220, 140), 3, 0.2)
 	addShadow(sellButton)
 
-	local sellGradient = Instance.new("UIGradient")
-	sellGradient.Color = ColorSequence.new(Color3.fromRGB(210, 168, 120), Color3.fromRGB(160, 120, 90))
-	sellGradient.Rotation = 90
-	sellGradient.Parent = sellBg
-
 	local sellLabel = Instance.new("TextLabel")
 	sellLabel.Name = "Label"
 	sellLabel.Size = UDim2.new(1, 0, 1, 0)
@@ -365,12 +313,13 @@ function UISetup.CreateUI()
 	-- =============================================================================
 	-- CURRENCY FRAME (Bottom Left) - Golden Coin Purse
 	-- =============================================================================
-	local currencyFrame = Instance.new("Frame")
+	local currencyFrame = Instance.new("ImageLabel")
 	currencyFrame.Name = "CurrencyFrame"
 	currencyFrame.Size = UDim2.new(0, 200, 0, 60)
 	currencyFrame.Position = UDim2.new(0, 15, 1, -75)
 	currencyFrame.BackgroundColor3 = theme.woodPanel
 	currencyFrame.BorderSizePixel = 0
+	currencyFrame.Image = ""
 	currencyFrame.Parent = screenGui
 	
 	local currencyBg = applyFrameImage(currencyFrame, FRAME_IMAGE_PANEL_RECT, FRAME_SLICE_RECT)
@@ -413,12 +362,13 @@ function UISetup.CreateUI()
 	-- =============================================================================
 	-- WEATHER FRAME (Top Left) - Sky Crystal
 	-- =============================================================================
-	local weatherFrame = Instance.new("Frame")
+	local weatherFrame = Instance.new("ImageLabel")
 	weatherFrame.Name = "WeatherFrame"
 	weatherFrame.Size = UDim2.new(0, 180, 0, 50)
 	weatherFrame.Position = UDim2.new(0, 10, 0, 10)
 	weatherFrame.BackgroundColor3 = theme.stonePanel
 	weatherFrame.BorderSizePixel = 0
+	weatherFrame.Image = ""
 	weatherFrame.Parent = screenGui
 	
 	local weatherBg = applyFrameImage(weatherFrame, FRAME_IMAGE_PANEL_RECT, FRAME_SLICE_RECT)
@@ -448,13 +398,14 @@ function UISetup.CreateUI()
 	-- =============================================================================
 	-- HOTBAR (Bottom Center) - 6 Inventory Slots
 	-- =============================================================================
-	local hotbarFrame = Instance.new("Frame")
+	local hotbarFrame = Instance.new("ImageLabel")
 	hotbarFrame.Name = "HotbarFrame"
 	hotbarFrame.Size = UDim2.new(0, 420, 0, 70)
 	hotbarFrame.Position = UDim2.new(0.5, 0, 1, -80)
 	hotbarFrame.AnchorPoint = Vector2.new(0.5, 0)
 	hotbarFrame.BackgroundColor3 = theme.woodPanel
 	hotbarFrame.BorderSizePixel = 0
+	hotbarFrame.Image = ""
 	hotbarFrame.Parent = screenGui
 	
 	local hotbarBg = applyFrameImage(hotbarFrame, FRAME_IMAGE_PANEL_RECT, FRAME_SLICE_RECT)
@@ -542,7 +493,7 @@ function UISetup.CreateUI()
 	-- =============================================================================
 	-- INVENTORY WINDOW (Press B) - Full Backpack
 	-- =============================================================================
-	local inventoryWindow = Instance.new("Frame")
+	local inventoryWindow = Instance.new("ImageLabel")
 	inventoryWindow.Name = "InventoryWindow"
 	inventoryWindow.Size = UDim2.new(0, 600, 0, 450)
 	inventoryWindow.Position = UDim2.new(0.5, 0, 0.5, -50)
@@ -550,6 +501,7 @@ function UISetup.CreateUI()
 	inventoryWindow.BackgroundColor3 = theme.woodPanel
 	inventoryWindow.BackgroundTransparency = 1
 	inventoryWindow.BorderSizePixel = 0
+	inventoryWindow.Image = ""
 	inventoryWindow.Visible = false
 	inventoryWindow.Parent = screenGui
 
@@ -557,11 +509,12 @@ function UISetup.CreateUI()
 	addShadow(inventoryWindow)
 	
 	-- Title bar
-	local invTitleBar = Instance.new("Frame")
+	local invTitleBar = Instance.new("ImageLabel")
 	invTitleBar.Name = "TitleBar"
 	invTitleBar.Size = UDim2.new(1, 0, 0, 60)
 	invTitleBar.BackgroundColor3 = theme.forestDeep
 	invTitleBar.BorderSizePixel = 0
+	invTitleBar.Image = ""
 	invTitleBar.Parent = inventoryWindow
 	
 	addCorner(invTitleBar, 25)
@@ -660,25 +613,27 @@ function UISetup.CreateUI()
 	-- =============================================================================
 	-- SHOP WINDOW (Modal) - 3 Column Fullscreen: Store | NPC | Inventory
 	-- =============================================================================
-	local shopWindow = Instance.new("Frame")
+	local shopWindow = Instance.new("ImageLabel")
 	shopWindow.Name = "ShopWindow"
 	shopWindow.Size = UDim2.new(1, 0, 1, 0)
 	shopWindow.Position = UDim2.new(0, 0, 0, 0)
 	shopWindow.BackgroundColor3 = theme.forestDeep
 	shopWindow.BackgroundTransparency = 1
 	shopWindow.BorderSizePixel = 0
+	shopWindow.Image = ""
 	shopWindow.Visible = false
 	shopWindow.ZIndex = 10
 	shopWindow.Parent = screenGui
 	
 	-- LEFT PANEL - Store Items (35%)
-	local shopLeftPanel = Instance.new("Frame")
+	local shopLeftPanel = Instance.new("ImageLabel")
 	shopLeftPanel.Name = "LeftPanel"
 	shopLeftPanel.Size = UDim2.new(0.35, -10, 1, -120)
 	shopLeftPanel.Position = UDim2.new(0, 10, 0, 60)
 	shopLeftPanel.BackgroundColor3 = theme.woodBark
 	shopLeftPanel.BackgroundTransparency = 1
 	shopLeftPanel.BorderSizePixel = 0
+	shopLeftPanel.Image = ""
 	shopLeftPanel.ZIndex = 11
 	shopLeftPanel.Parent = shopWindow
 	
@@ -729,12 +684,13 @@ function UISetup.CreateUI()
 	shopPadding.Parent = shopScroll
 	
 	-- MIDDLE PANEL - NPC Display (30%) - INVISIBLE SPACER
-	local shopMiddlePanel = Instance.new("Frame")
+	local shopMiddlePanel = Instance.new("ImageLabel")
 	shopMiddlePanel.Name = "MiddlePanel"
 	shopMiddlePanel.Size = UDim2.new(0.3, 0, 1, 0)
 	shopMiddlePanel.Position = UDim2.new(0.35, 0, 0, 0)
 	shopMiddlePanel.BackgroundTransparency = 1
 	shopMiddlePanel.BorderSizePixel = 0
+	shopMiddlePanel.Image = ""
 	shopMiddlePanel.ZIndex = 11
 	shopMiddlePanel.Parent = shopWindow
 	
@@ -758,13 +714,14 @@ function UISetup.CreateUI()
 	shopCloseButton.TextSize = 18
 	
 	-- RIGHT PANEL - Player Inventory (35%)
-	local shopRightPanel = Instance.new("Frame")
+	local shopRightPanel = Instance.new("ImageLabel")
 	shopRightPanel.Name = "RightPanel"
 	shopRightPanel.Size = UDim2.new(0.35, -10, 1, -120)
 	shopRightPanel.Position = UDim2.new(0.65, 0, 0, 60)
 	shopRightPanel.BackgroundColor3 = theme.leafPanel
 	shopRightPanel.BackgroundTransparency = 1
 	shopRightPanel.BorderSizePixel = 0
+	shopRightPanel.Image = ""
 	shopRightPanel.ZIndex = 11
 	shopRightPanel.Parent = shopWindow
 	
@@ -821,25 +778,27 @@ function UISetup.CreateUI()
 	-- =============================================================================
 	-- SELL WINDOW (Modal) - 3 Column Fullscreen: Sellable | NPC | Fruits Owned
 	-- =============================================================================
-	local sellWindow = Instance.new("Frame")
+	local sellWindow = Instance.new("ImageLabel")
 	sellWindow.Name = "SellWindow"
 	sellWindow.Size = UDim2.new(1, 0, 1, 0)
 	sellWindow.Position = UDim2.new(0, 0, 0, 0)
 	sellWindow.BackgroundColor3 = theme.forestDeep
 	sellWindow.BackgroundTransparency = 1
 	sellWindow.BorderSizePixel = 0
+	sellWindow.Image = ""
 	sellWindow.Visible = false
 	sellWindow.ZIndex = 10
 	sellWindow.Parent = screenGui
 	
 	-- LEFT PANEL - Sellable Fruits (35%)
-	local sellLeftPanel = Instance.new("Frame")
+	local sellLeftPanel = Instance.new("ImageLabel")
 	sellLeftPanel.Name = "LeftPanel"
 	sellLeftPanel.Size = UDim2.new(0.35, -10, 1, -120)
 	sellLeftPanel.Position = UDim2.new(0, 10, 0, 60)
 	sellLeftPanel.BackgroundColor3 = theme.woodBark
 	sellLeftPanel.BackgroundTransparency = 1
 	sellLeftPanel.BorderSizePixel = 0
+	sellLeftPanel.Image = ""
 	sellLeftPanel.ZIndex = 11
 	sellLeftPanel.Parent = sellWindow
 	
@@ -890,12 +849,13 @@ function UISetup.CreateUI()
 	sellPadding.Parent = sellScroll
 	
 	-- MIDDLE PANEL - NPC Merchant (30%) - INVISIBLE SPACER
-	local sellMiddlePanel = Instance.new("Frame")
+	local sellMiddlePanel = Instance.new("ImageLabel")
 	sellMiddlePanel.Name = "MiddlePanel"
 	sellMiddlePanel.Size = UDim2.new(0.3, 0, 1, 0)
 	sellMiddlePanel.Position = UDim2.new(0.35, 0, 0, 0)
 	sellMiddlePanel.BackgroundTransparency = 1
 	sellMiddlePanel.BorderSizePixel = 0
+	sellMiddlePanel.Image = ""
 	sellMiddlePanel.ZIndex = 11
 	sellMiddlePanel.Parent = sellWindow
 	
@@ -919,13 +879,14 @@ function UISetup.CreateUI()
 	sellCloseButton.TextSize = 18
 	
 	-- RIGHT PANEL - Player's Fruits (35%)
-	local sellRightPanel = Instance.new("Frame")
+	local sellRightPanel = Instance.new("ImageLabel")
 	sellRightPanel.Name = "RightPanel"
 	sellRightPanel.Size = UDim2.new(0.35, -10, 1, -120)
 	sellRightPanel.Position = UDim2.new(0.65, 0, 0, 60)
 	sellRightPanel.BackgroundColor3 = theme.leafPanel
 	sellRightPanel.BackgroundTransparency = 1
 	sellRightPanel.BorderSizePixel = 0
+	sellRightPanel.Image = ""
 	sellRightPanel.ZIndex = 11
 	sellRightPanel.Parent = sellWindow
 	
@@ -982,13 +943,14 @@ function UISetup.CreateUI()
 	-- =============================================================================
 	-- PETS WINDOW (Modal) - 2 Column Layout: Available Pets | Equipped Pet
 	-- =============================================================================
-	local petsWindow = Instance.new("Frame")
+	local petsWindow = Instance.new("ImageLabel")
 	petsWindow.Name = "PetsWindow"
 	petsWindow.Size = UDim2.new(0.7, 0, 0.75, 0)
 	petsWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
 	petsWindow.AnchorPoint = Vector2.new(0.5, 0.5)
 	petsWindow.BackgroundColor3 = theme.forestDeep
 	petsWindow.BorderSizePixel = 0
+	petsWindow.Image = ""
 	petsWindow.Visible = false
 	petsWindow.ZIndex = 10
 	petsWindow.Parent = screenGui
@@ -997,12 +959,13 @@ function UISetup.CreateUI()
 	addShadow(petsWindow)
 	
 	-- Pets title bar
-	local petsTitleBar = Instance.new("Frame")
+	local petsTitleBar = Instance.new("ImageLabel")
 	petsTitleBar.Name = "TitleBar"
 	petsTitleBar.Size = UDim2.new(1, 0, 0.08, 0)
 	petsTitleBar.Position = UDim2.new(0, 0, 0, 0)
 	petsTitleBar.BackgroundColor3 = theme.woodPanel
 	petsTitleBar.BorderSizePixel = 0
+	petsTitleBar.Image = ""
 	petsTitleBar.ZIndex = 11
 	petsTitleBar.Parent = petsWindow
 
@@ -1047,12 +1010,13 @@ function UISetup.CreateUI()
 	petsCloseButton.TextScaled = true
 	
 	-- LEFT PANEL - Available Pets
-	local petsLeftPanel = Instance.new("Frame")
+	local petsLeftPanel = Instance.new("ImageLabel")
 	petsLeftPanel.Name = "LeftPanel"
 	petsLeftPanel.Size = UDim2.new(0.48, 0, 0.88, 0)
 	petsLeftPanel.Position = UDim2.new(0.01, 0, 0.1, 0)
 	petsLeftPanel.BackgroundColor3 = theme.woodBark
 	petsLeftPanel.BorderSizePixel = 0
+	petsLeftPanel.Image = ""
 	petsLeftPanel.ZIndex = 11
 	petsLeftPanel.Parent = petsWindow
 	
@@ -1098,12 +1062,13 @@ function UISetup.CreateUI()
 	petsPadding.Parent = petsScroll
 	
 	-- RIGHT PANEL - Equipped Pet Display
-	local petsRightPanel = Instance.new("Frame")
+	local petsRightPanel = Instance.new("ImageLabel")
 	petsRightPanel.Name = "RightPanel"
 	petsRightPanel.Size = UDim2.new(0.48, 0, 0.88, 0)
 	petsRightPanel.Position = UDim2.new(0.51, 0, 0.1, 0)
 	petsRightPanel.BackgroundColor3 = theme.leafPanel
 	petsRightPanel.BorderSizePixel = 0
+	petsRightPanel.Image = ""
 	petsRightPanel.ZIndex = 11
 	petsRightPanel.Parent = petsWindow
 	

@@ -62,6 +62,11 @@ local THEME = {
 	PanelStroke = Color3.fromRGB(110, 70, 140),
 }
 
+local function getPetDisplayName(petType)
+	local config = Constants.PET_CONFIG[petType]
+	return (config and config.DisplayName) or petType
+end
+
 -- Forward declarations
 local updateSellShop
 local updatePetsWindow
@@ -726,6 +731,7 @@ end
 local function createPetItem(petType, container)
 	local config = Constants.PET_CONFIG[petType]
 	if not config then return end
+	local displayName = getPetDisplayName(petType)
 	
 	local isEquipped = (playerInventory.EquippedPet == petType)
 	
@@ -774,7 +780,7 @@ local function createPetItem(petType, container)
 	nameLabel.Size = UDim2.new(0.4, 0, 0.5, 0)
 	nameLabel.Position = UDim2.new(0.15, 0, 0.1, 0)
 	nameLabel.BackgroundTransparency = 1
-	nameLabel.Text = petType
+	nameLabel.Text = displayName
 	nameLabel.TextColor3 = THEME.TextLight
 	nameLabel.Font = Enum.Font.GothamBold
 	nameLabel.TextScaled = true
@@ -867,7 +873,7 @@ local function createPetItem(petType, container)
 			if equipEvent then
 				equipEvent:FireServer(petType)
 				playSound("PetEquip")
-				showNotification("Equipped " .. petType, THEME.TealGem, "🐾")
+				showNotification("Equipped " .. displayName, THEME.TealGem, "🐾")
 			end
 		end)
 		
