@@ -6,7 +6,19 @@ local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local Config = require(ReplicatedStorage.Shared.Config)
+local sharedFolder = ReplicatedStorage:FindFirstChild("Shared") or ReplicatedStorage:WaitForChild("Shared", 5)
+if not sharedFolder then
+	warn("[BuffIndicators] Shared folder missing; aborting buff indicators")
+	return
+end
+
+local ok, Config = pcall(function()
+	return require(sharedFolder:WaitForChild("Config", 5))
+end)
+if not ok or not Config then
+	warn("[BuffIndicators] Config module missing; aborting buff indicators")
+	return
+end
 
 local player = Players.LocalPlayer
 

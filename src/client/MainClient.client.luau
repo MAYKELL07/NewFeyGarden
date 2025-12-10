@@ -3,8 +3,19 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Wait for shared modules
-local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
+local sharedFolder = ReplicatedStorage:FindFirstChild("Shared") or ReplicatedStorage:WaitForChild("Shared", 5)
+if not sharedFolder then
+	warn("[MainClient] Shared folder missing; aborting client init")
+	return
+end
+
+local okConstants, Constants = pcall(function()
+	return require(sharedFolder:WaitForChild("Constants", 5))
+end)
+if not okConstants or not Constants then
+	warn("[MainClient] Failed to load Constants; aborting client init")
+	return
+end
 
 -- Load client modules
 local PetController = require(script.Parent.PetController)

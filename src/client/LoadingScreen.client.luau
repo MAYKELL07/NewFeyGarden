@@ -12,8 +12,18 @@ local playerGui = player:WaitForChild("PlayerGui")
 -- Wait for UI
 local screenGui = playerGui:WaitForChild("FeyGardenUI", 10)
 if not screenGui then
-	warn("[LoadingScreen] FeyGardenUI not found!")
-	return
+	-- Attempt to build UI on the fly if it wasn't created
+	local setupModule = game:GetService("ReplicatedStorage"):FindFirstChild("Setup")
+	if setupModule and setupModule:FindFirstChild("UISetup") then
+		pcall(function()
+			require(setupModule.UISetup).CreateUI()
+		end)
+		screenGui = playerGui:WaitForChild("FeyGardenUI", 5)
+	end
+	if not screenGui then
+		warn("[LoadingScreen] FeyGardenUI not found!")
+		return
+	end
 end
 
 local loadingScreen = screenGui:WaitForChild("LoadingScreen", 5)

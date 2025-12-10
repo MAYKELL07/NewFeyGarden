@@ -4,9 +4,23 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 
--- Wait for shared modules to load
-local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
-local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+local sharedFolder = ReplicatedStorage:FindFirstChild("Shared") or ReplicatedStorage:WaitForChild("Shared", 5)
+if not sharedFolder then
+	warn("[MainServer] Shared folder missing; aborting server init")
+	return
+end
+
+local okConstants, Constants = pcall(function()
+	return require(sharedFolder:WaitForChild("Constants", 5))
+end)
+local okConfig, Config = pcall(function()
+	return require(sharedFolder:WaitForChild("Config", 5))
+end)
+
+if not okConstants or not Constants or not okConfig or not Config then
+	warn("[MainServer] Failed to load shared modules; aborting server init")
+	return
+end
 
 -- Load persistence first
 local DataService = require(script.Parent.Persistence.DataService)

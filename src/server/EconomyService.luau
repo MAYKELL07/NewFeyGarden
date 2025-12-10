@@ -5,8 +5,29 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
 
-local Constants = require(ReplicatedStorage.Shared.Constants)
-local Config = require(ReplicatedStorage.Shared.Config)
+local sharedFolder = ReplicatedStorage:FindFirstChild("Shared") or ReplicatedStorage:WaitForChild("Shared", 5)
+if not sharedFolder then
+	warn("[EconomyService] Shared folder missing; economy disabled")
+	return {}
+end
+
+local function safeRequire(name)
+	local ok, mod = pcall(function()
+		return require(sharedFolder:WaitForChild(name, 5))
+	end)
+	if not ok then
+		warn(string.format("[EconomyService] Failed to load %s: %s", name, tostring(mod)))
+		return nil
+	end
+	return mod
+end
+
+local Constants = safeRequire("Constants")
+local Config = safeRequire("Config")
+if not (Constants and Config) then
+	return {}
+end
+
 local DataService = require(ServerScriptService.Server.Persistence.DataService)
 
 local EconomyService = {}
@@ -24,6 +45,18 @@ buyPetEvent.Parent = ReplicatedStorage
 local equipPetEvent = Instance.new("RemoteEvent")
 equipPetEvent.Name = Constants.EVENTS.EQUIP_PET
 equipPetEvent.Parent = ReplicatedStorage
+
+local unequipPetEvent = Instance.new("RemoteEvent")
+unequipPetEvent.Name = Constants.EVENTS.UNEQUIP_PET
+unequipPetEvent.Parent = ReplicatedStorage
+
+local addGardenPetEvent = Instance.new("RemoteEvent")
+addGardenPetEvent.Name = Constants.EVENTS.ADD_GARDEN_PET
+addGardenPetEvent.Parent = ReplicatedStorage
+
+local removeGardenPetEvent = Instance.new("RemoteEvent")
+removeGardenPetEvent.Name = Constants.EVENTS.REMOVE_GARDEN_PET
+removeGardenPetEvent.Parent = ReplicatedStorage
 
 local sellFruitEvent = Instance.new("RemoteEvent")
 sellFruitEvent.Name = Constants.EVENTS.SELL_FRUIT
@@ -100,18 +133,20 @@ function EconomyService.SyncPlayerData(player)
 	EconomyService.PlayerData[player.UserId] = {
 		Coins = profile.Coins,
 		Inventory = profile.Inventory,
-		EquippedPet = profile.EquippedPet
+		EquippedPets = profile.EquippedPets or {},
+		GardenPets = profile.GardenPets or {}
 	}
 	
 	-- Update currency
 	updateCurrencyEvent:FireClient(player, profile.Coins, true)
 	
-	-- Update inventory (now includes EquippedPet and Fruits)
+	-- Update inventory (now includes EquippedPets, GardenPets and Fruits)
 	local inventoryData = {
 		Seeds = profile.Inventory.Seeds,
 		Pets = profile.Inventory.Pets,
 		Fruits = profile.Inventory.Fruits,
-		EquippedPet = profile.EquippedPet
+		EquippedPets = profile.EquippedPets or {},
+		GardenPets = profile.GardenPets or {}
 	}
 	updateInventoryEvent:FireClient(player, inventoryData)
 end
@@ -244,7 +279,7 @@ function EconomyService.BuyPet(player, petType)
 	return true
 end
 
--- Equip pet
+-- Equip pet (add to equipped pets)
 function EconomyService.EquipPet(player, petType)
 	local config = Constants.PET_CONFIG[petType]
 	if not config then
@@ -259,18 +294,83 @@ function EconomyService.EquipPet(player, petType)
 	end
 	
 	-- Equip the pet
-	DataService.EquipPet(player.UserId, petType)
+	local success = DataService.EquipPet(player.UserId, petType)
+	if not success then
+		return false
+	end
 	
-	-- Update cache
+	-- Update cache and sync
 	local profile = DataService.GetProfile(player.UserId)
 	if profile then
 		EconomyService.PlayerData[player.UserId].Inventory = profile.Inventory
-		EconomyService.PlayerData[player.UserId].EquippedPet = profile.EquippedPet
+		EconomyService.PlayerData[player.UserId].EquippedPets = profile.EquippedPets
 	end
 	
 	EconomyService.SyncPlayerData(player)
+	return true
+end
+
+-- Unequip pet (remove from equipped pets)
+function EconomyService.UnequipPet(player, petType)
+	local success = DataService.UnequipPet(player.UserId, petType)
+	if not success then
+		return false
+	end
 	
-	-- print(player.Name .. " equipped " .. petType .. " pet")
+	-- Update cache and sync
+	local profile = DataService.GetProfile(player.UserId)
+	if profile then
+		EconomyService.PlayerData[player.UserId].EquippedPets = profile.EquippedPets
+	end
+	
+	EconomyService.SyncPlayerData(player)
+	return true
+end
+
+-- Add pet to garden
+function EconomyService.AddGardenPet(player, petType)
+	local config = Constants.PET_CONFIG[petType]
+	if not config then
+		warn("Invalid pet type:", petType)
+		return false
+	end
+	
+	-- Check if player owns this pet
+	if not DataService.HasPet(player.UserId, petType) then
+		warn(player.Name .. " doesn't own this pet")
+		return false
+	end
+	
+	-- Add to garden
+	local success = DataService.AddGardenPet(player.UserId, petType)
+	if not success then
+		return false
+	end
+	
+	-- Update cache and sync
+	local profile = DataService.GetProfile(player.UserId)
+	if profile then
+		EconomyService.PlayerData[player.UserId].GardenPets = profile.GardenPets
+	end
+	
+	EconomyService.SyncPlayerData(player)
+	return true
+end
+
+-- Remove pet from garden
+function EconomyService.RemoveGardenPet(player, petType)
+	local success = DataService.RemoveGardenPet(player.UserId, petType)
+	if not success then
+		return false
+	end
+	
+	-- Update cache and sync
+	local profile = DataService.GetProfile(player.UserId)
+	if profile then
+		EconomyService.PlayerData[player.UserId].GardenPets = profile.GardenPets
+	end
+	
+	EconomyService.SyncPlayerData(player)
 	return true
 end
 
@@ -331,6 +431,21 @@ function EconomyService.Initialize()
 	-- Handle equip pet requests
 	equipPetEvent.OnServerEvent:Connect(function(player, petType)
 		EconomyService.EquipPet(player, petType)
+	end)
+	
+	-- Handle unequip pet requests
+	unequipPetEvent.OnServerEvent:Connect(function(player, petType)
+		EconomyService.UnequipPet(player, petType)
+	end)
+	
+	-- Handle add garden pet requests
+	addGardenPetEvent.OnServerEvent:Connect(function(player, petType)
+		EconomyService.AddGardenPet(player, petType)
+	end)
+	
+	-- Handle remove garden pet requests
+	removeGardenPetEvent.OnServerEvent:Connect(function(player, petType)
+		EconomyService.RemoveGardenPet(player, petType)
 	end)
 	
 	-- Handle sell fruit requests

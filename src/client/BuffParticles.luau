@@ -5,9 +5,29 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
-local Config = require(ReplicatedStorage.Shared.Config)
-local Constants = require(ReplicatedStorage.Shared.Constants)
-local BuffsModule = require(ReplicatedStorage.Shared.BuffsModule)
+local sharedFolder = ReplicatedStorage:FindFirstChild("Shared") or ReplicatedStorage:WaitForChild("Shared", 5)
+if not sharedFolder then
+	warn("[BuffParticles] Shared folder missing; particle effects disabled")
+	return {}
+end
+
+local function safeRequire(name)
+	local ok, mod = pcall(function()
+		return require(sharedFolder:WaitForChild(name, 5))
+	end)
+	if not ok then
+		warn(string.format("[BuffParticles] Failed to load %s: %s", name, tostring(mod)))
+		return nil
+	end
+	return mod
+end
+
+local Config = safeRequire("Config")
+local Constants = safeRequire("Constants")
+local BuffsModule = safeRequire("BuffsModule")
+if not (Config and Constants and BuffsModule) then
+	return {}
+end
 
 local BuffParticles = {}
 local trackedPlants = {} -- [plantModel] = {weather = emitter, watered = emitter, pet = emitter}

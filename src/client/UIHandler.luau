@@ -28,38 +28,38 @@ local playerCoins = 0
 local currentWeather = Constants.WEATHER_TYPES.SUNNY
 local screenGui = nil
 
--- ENCHANTED FOREST THEME - Matching UISetup.luau
+-- FANTASY FRAME THEME - Purple/Blue palette (matches UISetup)
 local THEME = {
-	-- Backgrounds: Deep forest night
-	ForestDark = Color3.fromRGB(25, 50, 35),
-	ForestDeep = Color3.fromRGB(35, 60, 45),
-	WoodBark = Color3.fromRGB(50, 60, 45),
-	MossGreen = Color3.fromRGB(45, 70, 55),
+	-- Backgrounds: Deep plum nights
+	ForestDark = Color3.fromRGB(18, 10, 28),
+	ForestDeep = Color3.fromRGB(28, 16, 40),
+	WoodBark = Color3.fromRGB(72, 44, 33),
+	MossGreen = Color3.fromRGB(54, 24, 66),
 	
-	-- Panels: Organic wood and stone
-	WoodPanel = Color3.fromRGB(60, 70, 55),
-	StonePanel = Color3.fromRGB(60, 75, 65),
-	LeafPanel = Color3.fromRGB(50, 75, 60),
+	-- Panels: Leaf + wood violet tones
+	WoodPanel = Color3.fromRGB(54, 24, 66),
+	StonePanel = Color3.fromRGB(70, 33, 76),
+	LeafPanel = Color3.fromRGB(96, 48, 103),
 	
-	-- Accents: Magical glows and natural gems
-	TealGem = Color3.fromRGB(88, 160, 140),
-	TealGlow = Color3.fromRGB(110, 190, 170),
-	GoldLeaf = Color3.fromRGB(235, 185, 95),
-	AmberGlow = Color3.fromRGB(255, 200, 120),
+	-- Accents: Mushroom blues + soft golds
+	TealGem = Color3.fromRGB(86, 108, 186),
+	TealGlow = Color3.fromRGB(130, 150, 220),
+	GoldLeaf = Color3.fromRGB(210, 168, 120),
+	AmberGlow = Color3.fromRGB(180, 120, 150),
 	
-	-- Text: Off-white and pale colors
-	TextLight = Color3.fromRGB(245, 238, 220),
-	TextGold = Color3.fromRGB(240, 200, 130),
-	TextMoss = Color3.fromRGB(180, 220, 190),
+	-- Text: Lilac/off-white
+	TextLight = Color3.fromRGB(228, 218, 240),
+	TextGold = Color3.fromRGB(210, 190, 230),
+	TextMoss = Color3.fromRGB(182, 154, 210),
 	
-	-- Borders: Natural vine and leaf strokes
-	VineStroke = Color3.fromRGB(88, 160, 108),
-	GlowStroke = Color3.fromRGB(140, 255, 200),
+	-- Borders: Vine strokes tinted
+	VineStroke = Color3.fromRGB(120, 80, 140),
+	GlowStroke = Color3.fromRGB(160, 140, 210),
 	
 	-- UI Elements
-	Notification = Color3.fromRGB(88, 160, 140), -- Teal notification background
-	NotificationAlt = Color3.fromRGB(110, 190, 170), -- Lighter teal for gradient
-	PanelStroke = Color3.fromRGB(70, 140, 120), -- Panel border
+	Notification = Color3.fromRGB(86, 108, 186),
+	NotificationAlt = Color3.fromRGB(130, 150, 220),
+	PanelStroke = Color3.fromRGB(110, 70, 140),
 }
 
 -- Forward declarations

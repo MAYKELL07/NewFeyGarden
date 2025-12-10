@@ -15,7 +15,8 @@ function Schema.Default()
 			Pets = {}, -- {PetType = owned}
 			Fruits = {} -- {FruitName = count}
 		},
-		EquippedPet = nil, -- Currently equipped pet type
+		EquippedPets = {}, -- Array of up to 2 pets equipped to player (follow player)
+		GardenPets = {}, -- Array of up to 5 pets in garden (roam in garden)
 		PlantSlots = {}, -- {[slotIndex] = {Type, Stage, WateredUntil, PetBoost}}
 		SessionLock = nil, -- Session lock for preventing conflicts
 		SessionLockTime = 0,
@@ -41,7 +42,15 @@ function Schema.Migrate(data)
 	data.Inventory.Seeds = data.Inventory.Seeds or {}
 	data.Inventory.Pets = data.Inventory.Pets or {}
 	data.Inventory.Fruits = data.Inventory.Fruits or {}
-	data.EquippedPet = data.EquippedPet or nil
+	
+	-- Migrate old EquippedPet to new EquippedPets array
+	if data.EquippedPet and type(data.EquippedPet) == "string" then
+		data.EquippedPets = {data.EquippedPet}
+		data.EquippedPet = nil
+	end
+	
+	data.EquippedPets = data.EquippedPets or {}
+	data.GardenPets = data.GardenPets or {}
 	data.PlantSlots = data.PlantSlots or {}
 	data.SessionLock = data.SessionLock or nil
 	data.SessionLockTime = data.SessionLockTime or 0

@@ -164,7 +164,7 @@ function UISetup.CreateUI()
 		shadow.Size = UDim2.new(1, 12, 1, 12)
 		shadow.Position = UDim2.new(0, 0, 0, 6)
 		shadow.AnchorPoint = Vector2.new(0, 0)
-		shadow.ZIndex = parent.ZIndex - 1
+		shadow.ZIndex = -10
 		shadow.Parent = parent
 		addCorner(shadow, 18)
 		return shadow
@@ -202,34 +202,66 @@ function UISetup.CreateUI()
 		return glow
 	end
 
-	-- FANTASY ENCHANTED FOREST THEME
-	-- Deep forest tones (dark blues, greens, browns) with gold/teal accents
+	-- Frame art asset ids (provided)
+	local FRAME_IMAGE_WINDOW_TALL = "rbxassetid://72140204040476"   -- File 1 (tall window)
+	local FRAME_IMAGE_WINDOW_WIDE = "rbxassetid://110769453800411"  -- File 2 (wide window)
+	local FRAME_IMAGE_PANEL_RECT = "rbxassetid://77328240678206"    -- File 3 (rect panel)
+	local FRAME_IMAGE_PANEL_SQUARE = "rbxassetid://125833347683847" -- File 4 (square/rect panel)
+
+	-- 9-slice defaults (tune if edges warp after upload)
+	local FRAME_SLICE_TALL = Rect.new(90, 120, 630, 960)
+	local FRAME_SLICE_WIDE = Rect.new(90, 120, 630, 960)
+	local FRAME_SLICE_RECT = Rect.new(90, 120, 630, 960)
+	local FRAME_SLICE_SQUARE = Rect.new(90, 120, 630, 960)
+
+	local function applyFrameImage(parent, assetId, sliceRect, zOffset)
+		local bg = Instance.new("ImageLabel")
+		bg.Name = "FrameArt"
+		bg.BackgroundTransparency = 1
+		bg.Image = assetId or FRAME_IMAGE_WINDOW_TALL
+		local isWindow = bg.Image == FRAME_IMAGE_WINDOW_TALL or bg.Image == FRAME_IMAGE_WINDOW_WIDE
+		bg.ScaleType = isWindow and Enum.ScaleType.Stretch or Enum.ScaleType.Crop
+		bg.Size = UDim2.new(1.4, 0, 1.4, 0)
+		bg.Position = UDim2.new(0.5, 0, 0.5, 0)
+		bg.AnchorPoint = Vector2.new(0.5, 0.5)
+		bg.ZIndex = (parent.ZIndex or 1) - 1 + (zOffset or 0)
+		bg.Parent = parent
+		parent.BackgroundTransparency = 1
+		return bg
+	end
+
+	-- FANTASY FRAME THEME (Purple/Blue palette from provided frame art)
 	local theme = {
-		-- Backgrounds: Deep forest night
-		forestDark = Color3.fromRGB(25, 50, 35),       -- Dark forest background
-		forestDeep = Color3.fromRGB(35, 60, 45),        -- Deep wood
-		woodBark = Color3.fromRGB(50, 60, 45),          -- Matte wood brown
-		mossGreen = Color3.fromRGB(45, 70, 55),         -- Moss overlay
+		-- Backgrounds: Deep midnight plum
+		forestDark = Color3.fromRGB(18, 10, 28),       -- Inner background
+		forestDeep = Color3.fromRGB(28, 16, 40),       -- Deeper shadowed plum
+		woodBark = Color3.fromRGB(72, 44, 33),         -- Dark bark behind leaves
+		mossGreen = Color3.fromRGB(54, 24, 66),        -- Repurposed as plum fill
 		
-		-- Panels: Organic wood and stone
-		woodPanel = Color3.fromRGB(60, 70, 55),         -- Weathered wood panel
-		stonePanel = Color3.fromRGB(60, 75, 65),        -- Ancient stone
-		leafPanel = Color3.fromRGB(50, 75, 60),         -- Leaf-covered surface
+		-- Panels: Leaf + wood tones (purple dominant)
+		woodPanel = Color3.fromRGB(54, 24, 66),        -- Main panel plum
+		stonePanel = Color3.fromRGB(70, 33, 76),       -- Muted violet stone
+		leafPanel = Color3.fromRGB(96, 48, 103),       -- Highlighted leaf purple
 		
-		-- Accents: Magical glows and natural gems
-		tealGem = Color3.fromRGB(88, 160, 140),         -- Teal gem accent
-		tealGlow = Color3.fromRGB(110, 190, 170),       -- Teal glow hover
-		goldLeaf = Color3.fromRGB(235, 185, 95),        -- Gold leaf accent
-		amberGlow = Color3.fromRGB(255, 200, 120),      -- Amber magical glow
+		-- Accents: Mushroom blues and soft golds
+		tealGem = Color3.fromRGB(86, 108, 186),        -- Blue-mushroom cap
+		tealGlow = Color3.fromRGB(130, 150, 220),      -- Soft blue glow
+		goldLeaf = Color3.fromRGB(210, 168, 120),      -- Warm subdued gold
+		amberGlow = Color3.fromRGB(180, 120, 150),     -- Rose/amber accent
 		
-		-- Text: Off-white and pale colors for contrast
-		textLight = Color3.fromRGB(245, 238, 220),      -- Pale yellow-white
-		textGold = Color3.fromRGB(240, 200, 130),       -- Golden text
-		textMoss = Color3.fromRGB(180, 220, 190),       -- Moss green text
+		-- Text: Cool lilac + off-white
+		textLight = Color3.fromRGB(228, 218, 240),     -- Light lilac
+		textGold = Color3.fromRGB(210, 190, 230),      -- Pale lavender/gold mix
+		textMoss = Color3.fromRGB(182, 154, 210),      -- Muted lilac
 		
-		-- Borders: Natural vine and leaf strokes
-		vineStroke = Color3.fromRGB(88, 160, 108),      -- Vine green
-		glowStroke = Color3.fromRGB(140, 255, 200),     -- Bioluminescent glow
+		-- Borders: Vine strokes re-tinted
+		vineStroke = Color3.fromRGB(120, 80, 140),
+		glowStroke = Color3.fromRGB(160, 140, 210),
+		
+		-- UI Elements
+		notification = Color3.fromRGB(86, 108, 186),
+		notificationAlt = Color3.fromRGB(130, 150, 220),
+		panelStroke = Color3.fromRGB(110, 70, 140),
 	}
 	
 	-- =============================================================================
@@ -244,70 +276,91 @@ function UISetup.CreateUI()
 	navFrame.Parent = screenGui
 	
 	-- Seeds Button
-	local seedsButton = Instance.new("TextButton")
+	local seedsButton = Instance.new("ImageButton")
 	seedsButton.Name = "SeedsButton"
 	seedsButton.Size = UDim2.new(0, 170, 0, 70)
 	seedsButton.Position = UDim2.new(0, 0, 0, 0)
-	seedsButton.BackgroundColor3 = Color3.fromRGB(88, 180, 140)
+	seedsButton.BackgroundColor3 = Color3.fromRGB(86, 108, 186)
 	seedsButton.BorderSizePixel = 0
-	seedsButton.Text = "SEEDS"
-	seedsButton.TextColor3 = theme.textLight
-	seedsButton.Font = Enum.Font.GothamBold
-	seedsButton.TextSize = 28
 	seedsButton.Parent = navFrame
-	
+
+	local seedsBg = applyFrameImage(seedsButton, FRAME_IMAGE_PANEL_SQUARE, FRAME_SLICE_SQUARE)
 	addCorner(seedsButton, 15)
 	addStroke(seedsButton, theme.tealGlow, 3, 0.2)
 	addShadow(seedsButton)
-	
+
 	local seedsGradient = Instance.new("UIGradient")
-	seedsGradient.Color = ColorSequence.new(Color3.fromRGB(88, 180, 140), Color3.fromRGB(60, 140, 100))
+	seedsGradient.Color = ColorSequence.new(Color3.fromRGB(86, 108, 186), Color3.fromRGB(130, 150, 220))
 	seedsGradient.Rotation = 90
-	seedsGradient.Parent = seedsButton
+	seedsGradient.Parent = seedsBg
+
+	local seedsLabel = Instance.new("TextLabel")
+	seedsLabel.Name = "Label"
+	seedsLabel.Size = UDim2.new(1, 0, 1, 0)
+	seedsLabel.BackgroundTransparency = 1
+	seedsLabel.Text = "SEEDS"
+	seedsLabel.TextColor3 = theme.textLight
+	seedsLabel.Font = Enum.Font.GothamBold
+	seedsLabel.TextSize = 28
+	seedsLabel.Parent = seedsButton
 	
 	-- Garden Button
-	local gardenButton = Instance.new("TextButton")
+	local gardenButton = Instance.new("ImageButton")
 	gardenButton.Name = "GardenButton"
 	gardenButton.Size = UDim2.new(0, 170, 0, 70)
 	gardenButton.Position = UDim2.new(0, 190, 0, 0)
-	gardenButton.BackgroundColor3 = Color3.fromRGB(120, 200, 90)
+	gardenButton.BackgroundColor3 = Color3.fromRGB(120, 80, 140)
 	gardenButton.BorderSizePixel = 0
-	gardenButton.Text = "GARDEN"
-	gardenButton.TextColor3 = theme.textLight
-	gardenButton.Font = Enum.Font.GothamBold
-	gardenButton.TextSize = 28
 	gardenButton.Parent = navFrame
-	
+
+	local gardenBg = applyFrameImage(gardenButton, FRAME_IMAGE_PANEL_SQUARE, FRAME_SLICE_SQUARE)
 	addCorner(gardenButton, 15)
 	addStroke(gardenButton, Color3.fromRGB(150, 255, 120), 3, 0.2)
 	addShadow(gardenButton)
-	
+
 	local gardenGradient = Instance.new("UIGradient")
-	gardenGradient.Color = ColorSequence.new(Color3.fromRGB(120, 200, 90), Color3.fromRGB(80, 160, 60))
+	gardenGradient.Color = ColorSequence.new(Color3.fromRGB(120, 80, 140), Color3.fromRGB(96, 48, 103))
 	gardenGradient.Rotation = 90
-	gardenGradient.Parent = gardenButton
+	gardenGradient.Parent = gardenBg
+
+	local gardenLabel = Instance.new("TextLabel")
+	gardenLabel.Name = "Label"
+	gardenLabel.Size = UDim2.new(1, 0, 1, 0)
+	gardenLabel.BackgroundTransparency = 1
+	gardenLabel.Text = "GARDEN"
+	gardenLabel.TextColor3 = theme.textLight
+	gardenLabel.Font = Enum.Font.GothamBold
+	gardenLabel.TextSize = 28
+	gardenLabel.Parent = gardenButton
 	
 	-- Sell Button
-	local sellButton = Instance.new("TextButton")
+	local sellButton = Instance.new("ImageButton")
 	sellButton.Name = "SellButton"
 	sellButton.Size = UDim2.new(0, 170, 0, 70)
 	sellButton.Position = UDim2.new(0, 380, 0, 0)
-	sellButton.BackgroundColor3 = Color3.fromRGB(235, 185, 95)
+	sellButton.BackgroundColor3 = Color3.fromRGB(210, 168, 120)
 	sellButton.BorderSizePixel = 0
-	sellButton.Text = "SELL"
-	sellButton.TextColor3 = Color3.fromRGB(40, 30, 20)
-	sellButton.Font = Enum.Font.GothamBold
-	sellButton.TextSize = 28
 	sellButton.Parent = navFrame
-	
+
+	local sellBg = applyFrameImage(sellButton, FRAME_IMAGE_PANEL_SQUARE, FRAME_SLICE_SQUARE)
 	addCorner(sellButton, 15)
 	addStroke(sellButton, Color3.fromRGB(255, 220, 140), 3, 0.2)
 	addShadow(sellButton)
-	
+
 	local sellGradient = Instance.new("UIGradient")
-	sellGradient.Color = ColorSequence.new(Color3.fromRGB(235, 185, 95), Color3.fromRGB(200, 150, 70))
+	sellGradient.Color = ColorSequence.new(Color3.fromRGB(210, 168, 120), Color3.fromRGB(160, 120, 90))
 	sellGradient.Rotation = 90
-	sellGradient.Parent = sellButton
+	sellGradient.Parent = sellBg
+
+	local sellLabel = Instance.new("TextLabel")
+	sellLabel.Name = "Label"
+	sellLabel.Size = UDim2.new(1, 0, 1, 0)
+	sellLabel.BackgroundTransparency = 1
+	sellLabel.Text = "SELL"
+	sellLabel.TextColor3 = Color3.fromRGB(40, 30, 20)
+	sellLabel.Font = Enum.Font.GothamBold
+	sellLabel.TextSize = 28
+	sellLabel.Parent = sellButton
 	
 	-- =============================================================================
 	-- CURRENCY FRAME (Bottom Left) - Golden Coin Purse
@@ -320,21 +373,21 @@ function UISetup.CreateUI()
 	currencyFrame.BorderSizePixel = 0
 	currencyFrame.Parent = screenGui
 	
+	local currencyBg = applyFrameImage(currencyFrame, FRAME_IMAGE_PANEL_RECT, FRAME_SLICE_RECT)
 	addCorner(currencyFrame, 20)
 	addShadow(currencyFrame)
-	addGradient(currencyFrame, theme.woodPanel, theme.woodBark, 45)
+	addGradient(currencyBg, theme.woodPanel, theme.woodBark, 45)
 	addStroke(currencyFrame, theme.goldLeaf, 2.5, 0.15)
 	
-	-- Currency icon with magical glow
-	local coinIcon = Instance.new("TextLabel")
+	-- Currency icon with provided coin image
+	local coinIcon = Instance.new("ImageLabel")
 	coinIcon.Name = "CoinIcon"
 	coinIcon.Size = UDim2.new(0, 35, 0, 35)
 	coinIcon.Position = UDim2.new(0, 8, 0.5, 0)
 	coinIcon.AnchorPoint = Vector2.new(0, 0.5)
 	coinIcon.BackgroundTransparency = 1
-	coinIcon.Text = "💰"
-	coinIcon.TextScaled = true
-	coinIcon.Font = Enum.Font.GothamBold
+	coinIcon.Image = "rbxassetid://85348816613986"
+	coinIcon.ScaleType = Enum.ScaleType.Fit
 	coinIcon.Parent = currencyFrame
 	
 	-- Currency label with golden text
@@ -368,9 +421,10 @@ function UISetup.CreateUI()
 	weatherFrame.BorderSizePixel = 0
 	weatherFrame.Parent = screenGui
 	
+	local weatherBg = applyFrameImage(weatherFrame, FRAME_IMAGE_PANEL_RECT, FRAME_SLICE_RECT)
 	addCorner(weatherFrame, 20)
 	addShadow(weatherFrame)
-	addGradient(weatherFrame, theme.stonePanel, theme.forestDeep, 45)
+	addGradient(weatherBg, theme.stonePanel, theme.forestDeep, 45)
 	addStroke(weatherFrame, theme.tealGem, 2.5, 0.15)
 	addGlow(weatherFrame, theme.glowStroke)
 	
@@ -403,9 +457,10 @@ function UISetup.CreateUI()
 	hotbarFrame.BorderSizePixel = 0
 	hotbarFrame.Parent = screenGui
 	
+	local hotbarBg = applyFrameImage(hotbarFrame, FRAME_IMAGE_PANEL_RECT, FRAME_SLICE_RECT)
 	addCorner(hotbarFrame, 15)
 	addShadow(hotbarFrame)
-	addGradient(hotbarFrame, theme.woodPanel, theme.woodBark, 90)
+	addGradient(hotbarBg, theme.woodPanel, theme.woodBark, 90)
 	addStroke(hotbarFrame, theme.goldLeaf, 2.5, 0.2)
 	
 	-- Create 6 hotbar slots
@@ -469,13 +524,19 @@ function UISetup.CreateUI()
 		countStroke.Parent = itemCount
 		
 		-- Make slot clickable
-		local slotButton = Instance.new("TextButton")
+		local slotButton = Instance.new("ImageButton")
 		slotButton.Name = "SlotButton"
 		slotButton.Size = UDim2.new(1, 0, 1, 0)
 		slotButton.BackgroundTransparency = 1
-		slotButton.Text = ""
 		slotButton.ZIndex = 2
 		slotButton.Parent = slot
+
+		local slotButtonLabel = Instance.new("TextLabel")
+		slotButtonLabel.Name = "Label"
+		slotButtonLabel.Size = UDim2.new(1, 0, 1, 0)
+		slotButtonLabel.BackgroundTransparency = 1
+		slotButtonLabel.Text = ""
+		slotButtonLabel.Parent = slotButton
 	end
 	
 	-- =============================================================================
@@ -487,14 +548,13 @@ function UISetup.CreateUI()
 	inventoryWindow.Position = UDim2.new(0.5, 0, 0.5, -50)
 	inventoryWindow.AnchorPoint = Vector2.new(0.5, 0.5)
 	inventoryWindow.BackgroundColor3 = theme.woodPanel
+	inventoryWindow.BackgroundTransparency = 1
 	inventoryWindow.BorderSizePixel = 0
 	inventoryWindow.Visible = false
 	inventoryWindow.Parent = screenGui
-	
-	addCorner(inventoryWindow, 25)
+
+	applyFrameImage(inventoryWindow, FRAME_IMAGE_WINDOW_TALL, FRAME_SLICE_TALL)
 	addShadow(inventoryWindow)
-	addGradient(inventoryWindow, theme.woodPanel, theme.forestDeep, 45)
-	addStroke(inventoryWindow, theme.goldLeaf, 3, 0.2)
 	
 	-- Title bar
 	local invTitleBar = Instance.new("Frame")
@@ -529,14 +589,16 @@ function UISetup.CreateUI()
 	invCloseButton.Size = UDim2.new(0, 130, 0, 35)
 	invCloseButton.Position = UDim2.new(1, -145, 0, 13)
 	invCloseButton.BackgroundColor3 = theme.woodBark
+	invCloseButton.Parent = invTitleBar
+
+	local invCloseBg = applyFrameImage(invCloseButton, FRAME_IMAGE_PANEL_SQUARE, FRAME_SLICE_SQUARE)
+	addCorner(invCloseButton, 12)
+	addStroke(invCloseButton, theme.goldLeaf, 2, 0.3)
+
 	invCloseButton.Text = "✕ Close"
 	invCloseButton.TextColor3 = theme.textLight
 	invCloseButton.Font = Enum.Font.GothamBold
 	invCloseButton.TextSize = 16
-	invCloseButton.Parent = invTitleBar
-	
-	addCorner(invCloseButton, 12)
-	addStroke(invCloseButton, theme.goldLeaf, 2, 0.3)
 	
 	-- Tab buttons
 	local tabContainer = Instance.new("Frame")
@@ -558,14 +620,17 @@ function UISetup.CreateUI()
 		tabButton.Name = tabName .. "Tab"
 		tabButton.Size = UDim2.new(0, 150, 0, 40)
 		tabButton.BackgroundColor3 = theme.leafPanel
+		tabButton.Parent = tabContainer
+		
+		local tabBg = applyFrameImage(tabButton, FRAME_IMAGE_PANEL_SQUARE, FRAME_SLICE_SQUARE)
+		addCorner(tabButton, 12)
+		addStroke(tabButton, theme.tealGem, 2, 0.3)
+		addGradient(tabBg, theme.leafPanel, theme.mossGreen, 90)
+
 		tabButton.Text = tabName
 		tabButton.TextColor3 = theme.textMoss
 		tabButton.Font = Enum.Font.GothamBold
 		tabButton.TextSize = 18
-		tabButton.Parent = tabContainer
-		
-		addCorner(tabButton, 12)
-		addStroke(tabButton, theme.tealGem, 2, 0.3)
 	end
 	
 	-- Inventory grid container
@@ -612,17 +677,12 @@ function UISetup.CreateUI()
 	shopLeftPanel.Size = UDim2.new(0.35, -10, 1, -120)
 	shopLeftPanel.Position = UDim2.new(0, 10, 0, 60)
 	shopLeftPanel.BackgroundColor3 = theme.woodBark
+	shopLeftPanel.BackgroundTransparency = 1
 	shopLeftPanel.BorderSizePixel = 0
 	shopLeftPanel.ZIndex = 11
 	shopLeftPanel.Parent = shopWindow
 	
-	-- Rounded corners only on top-right and bottom-right
-	local leftCorner = Instance.new("UICorner")
-	leftCorner.CornerRadius = UDim.new(0, 25)
-	leftCorner.Parent = shopLeftPanel
-	
-	addStroke(shopLeftPanel, theme.vineStroke, 3, 0.35)
-	addGradient(shopLeftPanel, theme.woodBark, theme.forestDark, 90)
+	applyFrameImage(shopLeftPanel, FRAME_IMAGE_WINDOW_WIDE, FRAME_SLICE_WIDE, 0)
 	addShadow(shopLeftPanel)
 	
 	local shopLeftTitle = Instance.new("TextLabel")
@@ -684,16 +744,18 @@ function UISetup.CreateUI()
 	shopCloseButton.Size = UDim2.new(0, 130, 0, 35)
 	shopCloseButton.Position = UDim2.new(1, -145, 0, 15)
 	shopCloseButton.BackgroundColor3 = theme.woodBark
+	shopCloseButton.ZIndex = 13
+	shopCloseButton.Parent = shopWindow
+
+	local shopCloseBg = applyFrameImage(shopCloseButton, FRAME_IMAGE_PANEL_SQUARE, FRAME_SLICE_SQUARE)
+	addCorner(shopCloseButton, 12)
+	addStroke(shopCloseButton, theme.goldLeaf, 3, 0.3)
+	addShadow(shopCloseButton)
+
 	shopCloseButton.Text = "✖ CLOSE"
 	shopCloseButton.TextColor3 = theme.textLight
 	shopCloseButton.Font = Enum.Font.GothamBold
 	shopCloseButton.TextSize = 18
-	shopCloseButton.ZIndex = 13
-	shopCloseButton.Parent = shopWindow
-	
-	addCorner(shopCloseButton, 12)
-	addStroke(shopCloseButton, theme.goldLeaf, 3, 0.3)
-	addShadow(shopCloseButton)
 	
 	-- RIGHT PANEL - Player Inventory (35%)
 	local shopRightPanel = Instance.new("Frame")
@@ -701,17 +763,12 @@ function UISetup.CreateUI()
 	shopRightPanel.Size = UDim2.new(0.35, -10, 1, -120)
 	shopRightPanel.Position = UDim2.new(0.65, 0, 0, 60)
 	shopRightPanel.BackgroundColor3 = theme.leafPanel
+	shopRightPanel.BackgroundTransparency = 1
 	shopRightPanel.BorderSizePixel = 0
 	shopRightPanel.ZIndex = 11
 	shopRightPanel.Parent = shopWindow
 	
-	-- Rounded corners only on top-left and bottom-left
-	local rightCorner = Instance.new("UICorner")
-	rightCorner.CornerRadius = UDim.new(0, 25)
-	rightCorner.Parent = shopRightPanel
-	
-	addStroke(shopRightPanel, theme.vineStroke, 3, 0.35)
-	addGradient(shopRightPanel, theme.leafPanel, theme.mossGreen, 90)
+	applyFrameImage(shopRightPanel, FRAME_IMAGE_WINDOW_WIDE, FRAME_SLICE_WIDE, 0)
 	addShadow(shopRightPanel)
 	
 	local shopRightTitle = Instance.new("TextLabel")
@@ -781,16 +838,12 @@ function UISetup.CreateUI()
 	sellLeftPanel.Size = UDim2.new(0.35, -10, 1, -120)
 	sellLeftPanel.Position = UDim2.new(0, 10, 0, 60)
 	sellLeftPanel.BackgroundColor3 = theme.woodBark
+	sellLeftPanel.BackgroundTransparency = 1
 	sellLeftPanel.BorderSizePixel = 0
 	sellLeftPanel.ZIndex = 11
 	sellLeftPanel.Parent = sellWindow
 	
-	local sellLeftCorner = Instance.new("UICorner")
-	sellLeftCorner.CornerRadius = UDim.new(0, 25)
-	sellLeftCorner.Parent = sellLeftPanel
-	
-	addStroke(sellLeftPanel, theme.goldLeaf, 3, 0.3)
-	addGradient(sellLeftPanel, theme.woodBark, theme.forestDark, 90)
+	applyFrameImage(sellLeftPanel, FRAME_IMAGE_WINDOW_WIDE, FRAME_SLICE_WIDE, 0)
 	addShadow(sellLeftPanel)
 	
 	local sellLeftTitle = Instance.new("TextLabel")
@@ -852,18 +905,18 @@ function UISetup.CreateUI()
 	sellCloseButton.Size = UDim2.new(0, 130, 0, 35)
 	sellCloseButton.Position = UDim2.new(1, -145, 0, 15)
 	sellCloseButton.BackgroundColor3 = theme.woodBark
+	sellCloseButton.ZIndex = 13
+	sellCloseButton.Parent = sellWindow
+
+	local sellCloseBg = applyFrameImage(sellCloseButton, FRAME_IMAGE_PANEL_SQUARE, FRAME_SLICE_SQUARE)
+	addCorner(sellCloseButton, 12)
+	addStroke(sellCloseButton, theme.goldLeaf, 3, 0.3)
+	addShadow(sellCloseButton)
+
 	sellCloseButton.Text = "✖ CLOSE"
 	sellCloseButton.TextColor3 = theme.textLight
 	sellCloseButton.Font = Enum.Font.GothamBold
 	sellCloseButton.TextSize = 18
-	sellCloseButton.ZIndex = 13
-	sellCloseButton.Parent = sellWindow
-	
-	addCorner(sellCloseButton, 12)
-	addStroke(sellCloseButton, theme.goldLeaf, 3, 0.3)
-	addShadow(sellCloseButton)
-	addStroke(sellCloseButton, theme.goldLeaf, 3, 0.3)
-	addShadow(sellCloseButton)
 	
 	-- RIGHT PANEL - Player's Fruits (35%)
 	local sellRightPanel = Instance.new("Frame")
@@ -871,16 +924,12 @@ function UISetup.CreateUI()
 	sellRightPanel.Size = UDim2.new(0.35, -10, 1, -120)
 	sellRightPanel.Position = UDim2.new(0.65, 0, 0, 60)
 	sellRightPanel.BackgroundColor3 = theme.leafPanel
+	sellRightPanel.BackgroundTransparency = 1
 	sellRightPanel.BorderSizePixel = 0
 	sellRightPanel.ZIndex = 11
 	sellRightPanel.Parent = sellWindow
 	
-	local sellRightCorner = Instance.new("UICorner")
-	sellRightCorner.CornerRadius = UDim.new(0, 25)
-	sellRightCorner.Parent = sellRightPanel
-	
-	addStroke(sellRightPanel, theme.goldLeaf, 3, 0.3)
-	addGradient(sellRightPanel, theme.leafPanel, theme.mossGreen, 90)
+	applyFrameImage(sellRightPanel, FRAME_IMAGE_WINDOW_WIDE, FRAME_SLICE_WIDE, 0)
 	addShadow(sellRightPanel)
 	
 	local sellRightTitle = Instance.new("TextLabel")
@@ -943,12 +992,9 @@ function UISetup.CreateUI()
 	petsWindow.Visible = false
 	petsWindow.ZIndex = 10
 	petsWindow.Parent = screenGui
-	
-	addCorner(petsWindow, 28)
+
+	applyFrameImage(petsWindow, FRAME_IMAGE_WINDOW_TALL, FRAME_SLICE_TALL)
 	addShadow(petsWindow)
-	addGradient(petsWindow, theme.forestDeep, theme.forestDark, 135)
-	addStroke(petsWindow, theme.tealGem, 3, 0.15)
-	addGlow(petsWindow, theme.glowStroke)
 	
 	-- Pets title bar
 	local petsTitleBar = Instance.new("Frame")
@@ -959,9 +1005,10 @@ function UISetup.CreateUI()
 	petsTitleBar.BorderSizePixel = 0
 	petsTitleBar.ZIndex = 11
 	petsTitleBar.Parent = petsWindow
-	
-	addCorner(petsTitleBar, 28)
-	addGradient(petsTitleBar, theme.woodPanel, theme.woodBark, 0)
+
+	local petsTitleBg = applyFrameImage(petsTitleBar, FRAME_IMAGE_PANEL_RECT, FRAME_SLICE_RECT)
+	addCorner(petsTitleBar, 20)
+	addGradient(petsTitleBg, theme.woodPanel, theme.woodBark, 0)
 	
 	-- Pets title
 	local petsTitle = Instance.new("TextLabel")
@@ -987,15 +1034,17 @@ function UISetup.CreateUI()
 	petsCloseButton.Size = UDim2.new(0.06, 0, 0.7, 0)
 	petsCloseButton.Position = UDim2.new(0.93, 0, 0.15, 0)
 	petsCloseButton.BackgroundColor3 = theme.woodBark
+	petsCloseButton.ZIndex = 12
+	petsCloseButton.Parent = petsTitleBar
+
+	local petsCloseBg = applyFrameImage(petsCloseButton, FRAME_IMAGE_PANEL_SQUARE, FRAME_SLICE_SQUARE)
+	addCorner(petsCloseButton, 12)
+	addStroke(petsCloseButton, theme.goldLeaf, 2, 0.2)
+
 	petsCloseButton.Text = "✖"
 	petsCloseButton.TextColor3 = theme.textLight
 	petsCloseButton.Font = Enum.Font.GothamBold
 	petsCloseButton.TextScaled = true
-	petsCloseButton.ZIndex = 12
-	petsCloseButton.Parent = petsTitleBar
-	
-	addCorner(petsCloseButton, 12)
-	addStroke(petsCloseButton, theme.goldLeaf, 2, 0.2)
 	
 	-- LEFT PANEL - Available Pets
 	local petsLeftPanel = Instance.new("Frame")
@@ -1007,9 +1056,8 @@ function UISetup.CreateUI()
 	petsLeftPanel.ZIndex = 11
 	petsLeftPanel.Parent = petsWindow
 	
-	addCorner(petsLeftPanel, 20)
-	addStroke(petsLeftPanel, theme.tealGem, 2, 0.3)
-	addGradient(petsLeftPanel, theme.woodBark, theme.forestDark, 90)
+	applyFrameImage(petsLeftPanel, FRAME_IMAGE_WINDOW_WIDE, FRAME_SLICE_WIDE)
+	addShadow(petsLeftPanel)
 	
 	local petsLeftTitle = Instance.new("TextLabel")
 	petsLeftTitle.Name = "PanelTitle"
@@ -1059,9 +1107,8 @@ function UISetup.CreateUI()
 	petsRightPanel.ZIndex = 11
 	petsRightPanel.Parent = petsWindow
 	
-	addCorner(petsRightPanel, 20)
-	addStroke(petsRightPanel, theme.tealGem, 2, 0.3)
-	addGradient(petsRightPanel, theme.leafPanel, theme.mossGreen, 90)
+	applyFrameImage(petsRightPanel, FRAME_IMAGE_WINDOW_WIDE, FRAME_SLICE_WIDE)
+	addShadow(petsRightPanel)
 	
 	local petsRightTitle = Instance.new("TextLabel")
 	petsRightTitle.Name = "PanelTitle"
@@ -1101,24 +1148,31 @@ function UISetup.CreateUI()
 	equippedPetLabel.Parent = equippedPetDisplay
 	
 	-- Pets toggle button (Bottom Right) - Magical Paw Crystal
-	local petsButton = Instance.new("TextButton")
+	local petsButton = Instance.new("ImageButton")
 	petsButton.Name = "PetsButton"
 	petsButton.Size = UDim2.new(0.09, 0, 0.09, 0)
 	petsButton.Position = UDim2.new(0.905, 0, 0.86, 0)
 	petsButton.AnchorPoint = Vector2.new(0.5, 0)
 	petsButton.BackgroundColor3 = theme.leafPanel
-	petsButton.Text = "🐾"
-	petsButton.TextColor3 = theme.textLight
-	petsButton.Font = Enum.Font.GothamBold
-	petsButton.TextScaled = true
 	petsButton.ZIndex = 5
 	petsButton.Parent = screenGui
-	
+
+	local petsBtnBg = applyFrameImage(petsButton, FRAME_IMAGE_PANEL_SQUARE, FRAME_SLICE_SQUARE)
 	addCorner(petsButton, 16)
 	addShadow(petsButton)
-	addGradient(petsButton, theme.leafPanel, theme.mossGreen, 45)
+	addGradient(petsBtnBg, theme.leafPanel, theme.mossGreen, 45)
 	addStroke(petsButton, theme.tealGem, 2.5, 0.2)
 	addGlow(petsButton, theme.glowStroke)
+
+	local petsBtnLabel = Instance.new("TextLabel")
+	petsBtnLabel.Name = "Label"
+	petsBtnLabel.Size = UDim2.new(1, 0, 1, 0)
+	petsBtnLabel.BackgroundTransparency = 1
+	petsBtnLabel.Text = "🐾"
+	petsBtnLabel.TextColor3 = theme.textLight
+	petsBtnLabel.Font = Enum.Font.GothamBold
+	petsBtnLabel.TextScaled = true
+	petsBtnLabel.Parent = petsButton
 	
 	-- =============================================================================
 	-- NOTIFICATION CONTAINER - Floating Messages

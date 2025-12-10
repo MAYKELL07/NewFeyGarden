@@ -3,7 +3,21 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local AdminCommands = require(script.Parent.AdminCommands)
+
+local AdminCommands = nil
+do
+	local adminModule = script.Parent:FindFirstChild("AdminCommands") or script.Parent:WaitForChild("AdminCommands", 5)
+	if not adminModule then
+		warn("[Admin] AdminCommands module missing; admin system disabled")
+		return
+	end
+	local ok, mod = pcall(require, adminModule)
+	if not ok then
+		warn("[Admin] Failed to require AdminCommands: " .. tostring(mod))
+		return
+	end
+	AdminCommands = mod
+end
 
 print("🔧 Admin Commands System Loaded")
 

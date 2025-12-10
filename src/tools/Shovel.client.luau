@@ -9,9 +9,9 @@ local mouse = player:GetMouse()
 local tool = script.Parent
 
 -- Wait for ToolAction RemoteEvent
-local toolActionEvent = ReplicatedStorage:WaitForChild("ToolAction", 10)
+local toolActionEvent = ReplicatedStorage:WaitForChild("ToolAction", 20)
 if not toolActionEvent then
-	warn("[Shovel] ToolAction RemoteEvent not found!")
+	warn("[Shovel] ToolAction RemoteEvent not found; tool disabled")
 	return
 end
 

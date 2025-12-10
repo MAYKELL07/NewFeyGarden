@@ -4,10 +4,32 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
-local Constants = require(ReplicatedStorage.Shared.Constants)
-local Config = require(ReplicatedStorage.Shared.Config)
-local PlantModule = require(ReplicatedStorage.Shared.PlantModule)
-local BuffsModule = require(ReplicatedStorage.Shared.BuffsModule)
+
+local sharedFolder = ReplicatedStorage:FindFirstChild("Shared") or ReplicatedStorage:WaitForChild("Shared", 5)
+if not sharedFolder then
+	warn("[GardenManager] Shared folder missing; garden system disabled")
+	return {}
+end
+
+local function safeRequire(name)
+	local ok, mod = pcall(function()
+		return require(sharedFolder:WaitForChild(name, 5))
+	end)
+	if not ok then
+		warn(string.format("[GardenManager] Failed to load %s: %s", name, tostring(mod)))
+		return nil
+	end
+	return mod
+end
+
+local Constants = safeRequire("Constants")
+local Config = safeRequire("Config")
+local PlantModule = safeRequire("PlantModule")
+local BuffsModule = safeRequire("BuffsModule")
+if not (Constants and Config and PlantModule and BuffsModule) then
+	return {}
+end
+
 local EconomyService = require(ServerScriptService.Server.EconomyService)
 local DataService = require(ServerScriptService.Server.Persistence.DataService)
 

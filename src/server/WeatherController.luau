@@ -5,8 +5,28 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
 
-local Constants = require(ReplicatedStorage.Shared.Constants)
-local BuffsModule = require(ReplicatedStorage.Shared.BuffsModule)
+local sharedFolder = ReplicatedStorage:FindFirstChild("Shared") or ReplicatedStorage:WaitForChild("Shared", 5)
+if not sharedFolder then
+	warn("[WeatherController] Shared folder missing; weather system disabled")
+	return {}
+end
+
+local function safeRequire(name)
+	local ok, mod = pcall(function()
+		return require(sharedFolder:WaitForChild(name, 5))
+	end)
+	if not ok then
+		warn(string.format("[WeatherController] Failed to load %s: %s", name, tostring(mod)))
+		return nil
+	end
+	return mod
+end
+
+local Constants = safeRequire("Constants")
+local BuffsModule = safeRequire("BuffsModule")
+if not (Constants and BuffsModule) then
+	return {}
+end
 
 local WeatherController = {}
 WeatherController.CurrentWeather = Constants.WEATHER_TYPES.SUNNY

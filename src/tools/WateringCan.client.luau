@@ -9,9 +9,9 @@ local mouse = player:GetMouse()
 local tool = script.Parent
 
 -- Wait for ToolAction RemoteEvent
-local toolActionEvent = ReplicatedStorage:WaitForChild("ToolAction", 10)
+local toolActionEvent = ReplicatedStorage:WaitForChild("ToolAction", 20)
 if not toolActionEvent then
-	warn("[WateringCan] ToolAction RemoteEvent not found!")
+	warn("[WateringCan] ToolAction RemoteEvent not found; tool disabled")
 	return
 end
 
@@ -23,4 +23,4 @@ tool.Activated:Connect(function()
 		-- Send to server
 		toolActionEvent:FireServer("WateringCan", target, mouse.Hit.Position)
 	end
-end)
+	end)

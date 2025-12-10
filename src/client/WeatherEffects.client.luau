@@ -6,9 +6,31 @@ local Workspace = game:GetService("Workspace")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
-local Constants = require(ReplicatedStorage.Shared.Constants)
-local Config = require(ReplicatedStorage.Shared.Config)
-local VFXModule = require(ReplicatedStorage.Shared.VFXModule)
+local sharedFolder = ReplicatedStorage:FindFirstChild("Shared") or ReplicatedStorage:WaitForChild("Shared", 5)
+if not sharedFolder then
+	warn("[WeatherEffects] Shared folder missing; aborting weather VFX")
+	return
+end
+
+local function safeRequire(name)
+	local ok, mod = pcall(function()
+		return require(sharedFolder:WaitForChild(name, 5))
+	end)
+	if not ok then
+		warn(string.format("[WeatherEffects] Failed to load %s: %s", name, tostring(mod)))
+		return nil
+	end
+	return mod
+end
+
+local Constants = safeRequire("Constants")
+local Config = safeRequire("Config")
+local VFXModule = safeRequire("VFXModule")
+
+if not Constants or not Config or not VFXModule then
+	warn("[WeatherEffects] Missing shared modules; aborting weather VFX")
+	return
+end
 
 local player = Players.LocalPlayer
 

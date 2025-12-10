@@ -9,6 +9,10 @@
       },
       "Setup": {
         "$path": "src/setup"
+      },
+      "ToolScripts": {
+        "$path": "src/tools",
+        "$ignoreUnknownInstances": true
       }
     },
 
@@ -27,10 +31,6 @@
           "$path": "src/client"
         }
       }
-    },
-    "StarterPack": {
-      "$path": "src/tools",
-      "$ignoreUnknownInstances": true
     },
     "SoundService": {
       "$properties": {
