@@ -169,8 +169,17 @@ function GardenManager.SetupPlantHarvestDetector(plantModel: Model, userId: numb
 		-- Generate fruit name
 		local fruitName = plantType .. "Fruit"
 		
-		-- Add fruit to inventory
-		local success = DataService.AddFruit(userId, fruitName, 1)
+		-- Calculate fruit weight based on plant size (bigger plant = heavier fruit)
+		-- Base weight is 1.0 lbs, scaled by plant's SizeMultiplier
+		local plantSize = plantModel:GetAttribute("SizeMultiplier") or 1.0
+		local baseWeight = 1.0 -- Base weight in pounds
+		local fruitWeight = baseWeight * plantSize
+		-- Add small random variance (+/- 10%)
+		fruitWeight = fruitWeight * (0.9 + math.random() * 0.2)
+		fruitWeight = math.floor(fruitWeight * 100 + 0.5) / 100 -- Round to 2 decimals
+		
+		-- Add fruit instance to inventory with calculated weight
+		local success, fruitInstance = DataService.AddFruitInstance(userId, fruitName, fruitWeight)
 		if success then
 			-- Sync inventory to client
 			EconomyService.SyncPlayerData(clickingPlayer)
@@ -240,10 +249,13 @@ local function serializePlant(model: Model)
 	end
 
 	return {
+		Id = model:GetAttribute("PlantId") or game:GetService("HttpService"):GenerateGUID(false),
 		Type = plantType,
 		Stage = model:GetAttribute("Stage") or Constants.GROWTH_STAGES.SEED,
 		WateredUntil = model:GetAttribute("WateredUntil") or 0,
 		PetBoost = model:GetAttribute("PetBoost") or false,
+		Size = model:GetAttribute("Size") or 1,
+		Weight = model:GetAttribute("Weight") or 1,
 	}
 end
 
@@ -374,13 +386,18 @@ local function restorePlantSlots(userId: number, gardenFolder: Folder)
 				if anchor then
 -- print(string.format("[RestorePlants] Creating plant: %s at slot %d", state.Type, numericIndex))
 					
-					local plantModel = PlantModule.CreatePlantModel(state.Type, anchor.Position)
+					-- Pass saved size to CreatePlantModel
+					local savedSize = state.Size or 1
+					local plantModel = PlantModule.CreatePlantModel(state.Type, anchor.Position, savedSize)
 					if plantModel then
+						plantModel:SetAttribute("PlantId", state.Id or game:GetService("HttpService"):GenerateGUID(false))
 						plantModel:SetAttribute("OwnerUserId", userId)
 						plantModel:SetAttribute("Owner", userId)
 						plantModel:SetAttribute("SlotIndex", numericIndex)
 						plantModel:SetAttribute("WateredUntil", state.WateredUntil or 0)
 						plantModel:SetAttribute("PetBoost", state.PetBoost or false)
+						plantModel:SetAttribute("Size", state.Size or 1)
+						plantModel:SetAttribute("Weight", state.Weight or 1)
 					plantModel.Parent = anchor
 
 					continueGrowthFromStage(plantModel, state.Stage)
@@ -665,18 +682,26 @@ function GardenManager.PlantSeed(player: Player, slotIndex: number, plantType: s
 		return false, "Seed unavailable"
 	end
 
-	local plantModel = PlantModule.CreatePlantModel(plantType, anchor.Position)
+	-- Generate unique ID and random size/weight for the plant
+	local HttpService = game:GetService("HttpService")
+	local plantId = HttpService:GenerateGUID(false)
+	local sizeWeight = Constants.GenerateRandomSizeWeight("Plant")
+
+	local plantModel = PlantModule.CreatePlantModel(plantType, anchor.Position, sizeWeight.Size)
 	if not plantModel then
 		EconomyService.AddSeed(player, plantType, 1)
 -- print(string.format("[PlantSeed] FAILED - Could not create plant model for %s", plantType))
 		return false, "Failed to create plant model"
 	end
 
+	plantModel:SetAttribute("PlantId", plantId)
 	plantModel:SetAttribute("OwnerUserId", player.UserId)
 	plantModel:SetAttribute("Owner", player.UserId)
 	plantModel:SetAttribute("SlotIndex", slotIndex)
 	plantModel:SetAttribute("WateredUntil", 0)
 	plantModel:SetAttribute("PetBoost", false)
+	plantModel:SetAttribute("Size", sizeWeight.Size)
+	plantModel:SetAttribute("Weight", sizeWeight.Weight)
 	plantModel.Parent = anchor
 
 	local cache = ensurePlayerCache(player.UserId)
@@ -685,10 +710,13 @@ function GardenManager.PlantSeed(player: Player, slotIndex: number, plantType: s
 	-- Only save to DataStore if persistence is enabled
 	if Config.Economy.EnablePersistence then
 		DataService.SetPlantSlot(player.UserId, slotIndex, {
+			Id = plantId,
 			Type = plantType,
 			Stage = plantModel:GetAttribute("Stage"),
 			WateredUntil = 0,
 			PetBoost = false,
+			Size = sizeWeight.Size,
+			Weight = sizeWeight.Weight,
 		})
 		-- Force save to prevent data loss
 		task.spawn(function()

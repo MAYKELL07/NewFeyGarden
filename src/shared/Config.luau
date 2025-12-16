@@ -146,6 +146,62 @@ Config.Economy = {
 }
 
 -- ============================================================================
+-- EGG OPENING ANIMATION CONFIGURATION
+-- ============================================================================
+-- Settings for the egg opening sequence
+Config.EggOpening = {
+	-- Animation timings (in seconds)
+	ShakeDuration = 2.0,                 -- How long the egg shakes before cracking
+	ShakeIntensity = 10,                 -- Pixels of shake offset
+	CrackDuration = 0.5,                 -- Time for crack animation
+	RevealDuration = 1.5,                -- Time for pet reveal
+	
+	-- Visual effects
+	DarkenBackground = true,             -- Whether to darken background during opening
+	BackgroundDarknessAlpha = 0.85,      -- How dark (0-1)
+	
+	-- Special effects for Epic/Legendary
+	EpicEffects = {
+		EnableGlow = true,
+		GlowColor = Color3.fromRGB(180, 100, 255),  -- Purple glow
+		EnableParticles = true,
+		ParticleCount = 20
+	},
+	LegendaryEffects = {
+		EnableGlow = true,
+		GlowColor = Color3.fromRGB(255, 200, 50),   -- Gold glow
+		EnableParticles = true,
+		ParticleCount = 40,
+		EnableScreenFlash = true,
+		EnableRays = true                           -- Light rays effect
+	}
+}
+
+-- ============================================================================
+-- GARDEN PET ROAMING CONFIGURATION
+-- ============================================================================
+-- Settings for how pets roam within the player's garden
+Config.GardenPetRoaming = {
+	-- Roaming bounds (box centered on garden floor)
+	BoundsHalfWidth = 18,                -- Half-width of roaming box (X axis)
+	BoundsHalfLength = 18,               -- Half-length of roaming box (Z axis)
+	MinHeight = 1,                       -- Minimum hover height above floor
+	MaxHeight = 4,                       -- Maximum hover height above floor
+	
+	-- Movement behavior
+	IdleChance = 0.6,                    -- Chance to stay idle vs moving (0-1)
+	MinIdleTime = 3,                     -- Minimum seconds to stay idle
+	MaxIdleTime = 8,                     -- Maximum seconds to stay idle
+	MinMoveTime = 2,                     -- Minimum seconds between movement updates
+	MaxMoveTime = 5,                     -- Maximum seconds between movement updates
+	MoveSpeed = 0.3,                     -- How fast pets move (lower = slower/calmer)
+	
+	-- Vertical bobbing
+	BobAmplitude = 0.3,                  -- Vertical bob height
+	BobSpeed = 1.5                       -- Vertical bob frequency
+}
+
+-- ============================================================================
 -- VFX PARTICLE CONFIGURATION
 -- ============================================================================
 -- Settings for visual effects system (currently uses fallback sparkles if particles don't exist)
@@ -204,10 +260,10 @@ Config.Audio = {
 		-- UI Interactions
 		ButtonClick = "rbxassetid://6895079853",      -- UI button clicks
 		WindowOpen = "rbxassetid://15675059323",       -- Opening shop/sell windows
-		WindowClose = "rbxassetid://18755588842c",      -- Closing windows
+		WindowClose = "rbxassetid://18755588842",       -- Closing windows
 		Purchase = "rbxassetid://87437544236708",         -- Successful purchase sound
-		Sell = "rbxassetid://18755588842c",             -- Selling items sound
-		Error = "rbxassetid://18755588842c",            -- Error/cannot do action
+		Sell = "rbxassetid://18755588842",              -- Selling items sound
+		Error = "rbxassetid://18755588842",             -- Error/cannot do action
 		
 		-- Plant Growth
 		PlantGrow = "rbxassetid://92413337196515",        -- Plant advancing growth stage

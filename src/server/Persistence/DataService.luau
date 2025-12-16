@@ -300,7 +300,7 @@ end
 -- Get inventory
 function DataService.GetInventory(userId)
 	local profile = Profiles[userId]
-	return profile and profile.Inventory or {Seeds = {}, Pets = {}}
+	return profile and profile.Inventory or {Seeds = {}, Pets = {}, Eggs = {}, Fruits = {}}
 end
 
 -- Add seed to inventory
@@ -334,59 +334,179 @@ function DataService.GetSeedCount(userId, plantType)
 	return profile.Inventory.Seeds[plantType] or 0
 end
 
--- Add pet to inventory
-function DataService.AddPet(userId, petType)
+-- ============================================================================
+-- EGG MANAGEMENT
+-- ============================================================================
+
+-- Add egg to inventory
+function DataService.AddEgg(userId, eggType, amount)
 	local profile = Profiles[userId]
 	if not profile then return false end
 	
-	profile.Inventory.Pets[petType] = true
+	amount = amount or 1
+	profile.Inventory.Eggs = profile.Inventory.Eggs or {}
+	profile.Inventory.Eggs[eggType] = (profile.Inventory.Eggs[eggType] or 0) + amount
 	return true
 end
 
--- Check if player owns a pet
-function DataService.HasPet(userId, petType)
+-- Remove egg from inventory
+function DataService.RemoveEgg(userId, eggType)
 	local profile = Profiles[userId]
 	if not profile then return false end
 	
-	return profile.Inventory.Pets[petType] == true
-end
-
--- Equip a pet (add to equipped pets, max 2)
-function DataService.EquipPet(userId, petType)
-	local profile = Profiles[userId]
-	if not profile then return false end
-	
-	-- Check if player owns this pet
-	if not profile.Inventory.Pets[petType] then
-		warn("Player doesn't own pet:", petType)
+	profile.Inventory.Eggs = profile.Inventory.Eggs or {}
+	if not profile.Inventory.Eggs[eggType] or profile.Inventory.Eggs[eggType] <= 0 then
 		return false
 	end
 	
-	-- Initialize EquippedPets if old format
+	profile.Inventory.Eggs[eggType] = profile.Inventory.Eggs[eggType] - 1
+	return true
+end
+
+-- Get egg count
+function DataService.GetEggCount(userId, eggType)
+	local profile = Profiles[userId]
+	if not profile then return 0 end
+	
+	profile.Inventory.Eggs = profile.Inventory.Eggs or {}
+	return profile.Inventory.Eggs[eggType] or 0
+end
+
+-- Get all eggs
+function DataService.GetAllEggs(userId)
+	local profile = Profiles[userId]
+	if not profile then return {} end
+	
+	return profile.Inventory.Eggs or {}
+end
+
+-- ============================================================================
+-- PET MANAGEMENT (Instance-based with unique IDs)
+-- ============================================================================
+
+-- Add a new pet instance to inventory
+-- Returns the new pet instance data or nil on failure
+function DataService.AddPetInstance(userId, petType, size, weight)
+	local profile = Profiles[userId]
+	if not profile then return nil end
+	
+	-- Ensure Pets is an array
+	if not profile.Inventory.Pets or type(profile.Inventory.Pets) ~= "table" then
+		profile.Inventory.Pets = {}
+	end
+	
+	-- Generate unique ID and random size/weight if not provided
+	local HttpService = game:GetService("HttpService")
+	local petId = HttpService:GenerateGUID(false)
+	
+	size = size or (0.8 + math.random() * 0.4)
+	weight = weight or (0.7 + math.random() * 0.6)
+	size = math.floor(size * 100 + 0.5) / 100
+	weight = math.floor(weight * 100 + 0.5) / 100
+	
+	local petInstance = {
+		Id = petId,
+		PetType = petType,
+		Size = size,
+		Weight = weight
+	}
+	
+	table.insert(profile.Inventory.Pets, petInstance)
+	return petInstance
+end
+
+-- Get a pet instance by ID
+function DataService.GetPetInstance(userId, petId)
+	local profile = Profiles[userId]
+	if not profile or not profile.Inventory.Pets then return nil end
+	
+	for _, pet in ipairs(profile.Inventory.Pets) do
+		if pet.Id == petId then
+			return pet
+		end
+	end
+	return nil
+end
+
+-- Get all pet instances
+function DataService.GetAllPets(userId)
+	local profile = Profiles[userId]
+	if not profile then return {} end
+	
+	return profile.Inventory.Pets or {}
+end
+
+-- Check if player owns a pet by ID
+function DataService.HasPetById(userId, petId)
+	return DataService.GetPetInstance(userId, petId) ~= nil
+end
+
+-- Check if player owns any pet of a given type (legacy compatibility)
+function DataService.HasPet(userId, petType)
+	local profile = Profiles[userId]
+	if not profile or not profile.Inventory.Pets then return false end
+	
+	for _, pet in ipairs(profile.Inventory.Pets) do
+		if pet.PetType == petType then
+			return true
+		end
+	end
+	return false
+end
+
+-- Add pet to inventory (legacy compatibility - creates a new instance)
+function DataService.AddPet(userId, petType)
+	local instance = DataService.AddPetInstance(userId, petType)
+	return instance ~= nil
+end
+
+-- Equip a pet by instance ID (max 3)
+function DataService.EquipPet(userId, petId)
+	local profile = Profiles[userId]
+	if not profile then return false end
+	
+	-- Check if player owns this pet instance
+	local petInstance = DataService.GetPetInstance(userId, petId)
+	if not petInstance then
+		warn("Player doesn't own pet instance:", petId)
+		return false
+	end
+	
+	-- Initialize EquippedPets if needed
 	if not profile.EquippedPets then
 		profile.EquippedPets = {}
 	end
 	
 	-- Check if already equipped
-	for _, equipped in ipairs(profile.EquippedPets) do
-		if equipped == petType then
-			warn("Pet already equipped:", petType)
+	for _, equippedId in ipairs(profile.EquippedPets) do
+		if equippedId == petId then
+			warn("Pet already equipped:", petId)
 			return false
 		end
 	end
 	
-	-- Check max equipped pets
-	if #profile.EquippedPets >= 2 then
-		warn("Maximum equipped pets reached (2)")
+	-- Check if pet is in garden (can't be both)
+	if profile.GardenPets then
+		for _, gardenId in ipairs(profile.GardenPets) do
+			if gardenId == petId then
+				warn("Pet is in garden, unassign first:", petId)
+				return false
+			end
+		end
+	end
+	
+	-- Check max equipped pets (now 3)
+	if #profile.EquippedPets >= 3 then
+		warn("Maximum equipped pets reached (3)")
 		return false
 	end
 	
-	table.insert(profile.EquippedPets, petType)
+	table.insert(profile.EquippedPets, petId)
 	return true
 end
 
--- Unequip a pet
-function DataService.UnequipPet(userId, petType)
+-- Unequip a pet by instance ID
+function DataService.UnequipPet(userId, petId)
 	local profile = Profiles[userId]
 	if not profile then return false end
 	
@@ -395,8 +515,8 @@ function DataService.UnequipPet(userId, petType)
 		return false
 	end
 	
-	for i, equipped in ipairs(profile.EquippedPets) do
-		if equipped == petType then
+	for i, equippedId in ipairs(profile.EquippedPets) do
+		if equippedId == petId then
 			table.remove(profile.EquippedPets, i)
 			return true
 		end
@@ -405,14 +525,15 @@ function DataService.UnequipPet(userId, petType)
 	return false
 end
 
--- Add pet to garden (max 5)
-function DataService.AddGardenPet(userId, petType)
+-- Add pet to garden by instance ID (max 7)
+function DataService.AddGardenPet(userId, petId)
 	local profile = Profiles[userId]
 	if not profile then return false end
 	
-	-- Check if player owns this pet
-	if not profile.Inventory.Pets[petType] then
-		warn("Player doesn't own pet:", petType)
+	-- Check if player owns this pet instance
+	local petInstance = DataService.GetPetInstance(userId, petId)
+	if not petInstance then
+		warn("Player doesn't own pet instance:", petId)
 		return false
 	end
 	
@@ -422,25 +543,35 @@ function DataService.AddGardenPet(userId, petType)
 	end
 	
 	-- Check if already in garden
-	for _, gardenPet in ipairs(profile.GardenPets) do
-		if gardenPet == petType then
-			warn("Pet already in garden:", petType)
+	for _, gardenId in ipairs(profile.GardenPets) do
+		if gardenId == petId then
+			warn("Pet already in garden:", petId)
 			return false
 		end
 	end
 	
-	-- Check max garden pets
-	if #profile.GardenPets >= 5 then
-		warn("Maximum garden pets reached (5)")
+	-- Check if pet is equipped (can't be both)
+	if profile.EquippedPets then
+		for _, equippedId in ipairs(profile.EquippedPets) do
+			if equippedId == petId then
+				warn("Pet is equipped, unequip first:", petId)
+				return false
+			end
+		end
+	end
+	
+	-- Check max garden pets (now 7)
+	if #profile.GardenPets >= 7 then
+		warn("Maximum garden pets reached (7)")
 		return false
 	end
 	
-	table.insert(profile.GardenPets, petType)
+	table.insert(profile.GardenPets, petId)
 	return true
 end
 
--- Remove pet from garden
-function DataService.RemoveGardenPet(userId, petType)
+-- Remove pet from garden by instance ID
+function DataService.RemoveGardenPet(userId, petId)
 	local profile = Profiles[userId]
 	if not profile then return false end
 	
@@ -449,8 +580,8 @@ function DataService.RemoveGardenPet(userId, petType)
 		return false
 	end
 	
-	for i, gardenPet in ipairs(profile.GardenPets) do
-		if gardenPet == petType then
+	for i, gardenId in ipairs(profile.GardenPets) do
+		if gardenId == petId then
 			table.remove(profile.GardenPets, i)
 			return true
 		end
@@ -459,7 +590,7 @@ function DataService.RemoveGardenPet(userId, petType)
 	return false
 end
 
--- Get equipped pets
+-- Get equipped pet IDs
 function DataService.GetEquippedPets(userId)
 	local profile = Profiles[userId]
 	if not profile then return {} end
@@ -467,7 +598,22 @@ function DataService.GetEquippedPets(userId)
 	return profile.EquippedPets or {}
 end
 
--- Get garden pets
+-- Get equipped pet instances (full data)
+function DataService.GetEquippedPetInstances(userId)
+	local profile = Profiles[userId]
+	if not profile then return {} end
+	
+	local instances = {}
+	for _, petId in ipairs(profile.EquippedPets or {}) do
+		local pet = DataService.GetPetInstance(userId, petId)
+		if pet then
+			table.insert(instances, pet)
+		end
+	end
+	return instances
+end
+
+-- Get garden pet IDs
 function DataService.GetGardenPets(userId)
 	local profile = Profiles[userId]
 	if not profile then return {} end
@@ -475,23 +621,105 @@ function DataService.GetGardenPets(userId)
 	return profile.GardenPets or {}
 end
 
--- Add fruit to inventory
+-- Get garden pet instances (full data)
+function DataService.GetGardenPetInstances(userId)
+	local profile = Profiles[userId]
+	if not profile then return {} end
+	
+	local instances = {}
+	for _, petId in ipairs(profile.GardenPets or {}) do
+		local pet = DataService.GetPetInstance(userId, petId)
+		if pet then
+			table.insert(instances, pet)
+		end
+	end
+	return instances
+end
+
+-- Add fruit instance to inventory (with weight based on plant size)
+function DataService.AddFruitInstance(userId, fruitType, weight)
+	local profile = Profiles[userId]
+	if not profile then return false end
+	
+	weight = weight or 1.0 -- Default weight 1.0 lbs
+	
+	local fruitInstance = {
+		Id = game:GetService("HttpService"):GenerateGUID(false),
+		Type = fruitType,
+		Weight = math.floor(weight * 100 + 0.5) / 100 -- Round to 2 decimals
+	}
+	
+	table.insert(profile.Inventory.Fruits, fruitInstance)
+	return true, fruitInstance
+end
+
+-- Remove fruit instance by ID
+function DataService.RemoveFruitById(userId, fruitId)
+	local profile = Profiles[userId]
+	if not profile then return false end
+	
+	for i, fruit in ipairs(profile.Inventory.Fruits) do
+		if fruit.Id == fruitId then
+			table.remove(profile.Inventory.Fruits, i)
+			return true, fruit
+		end
+	end
+	return false
+end
+
+-- Get all fruit instances of a type
+function DataService.GetFruitsByType(userId, fruitType)
+	local profile = Profiles[userId]
+	if not profile then return {} end
+	
+	local fruits = {}
+	for _, fruit in ipairs(profile.Inventory.Fruits) do
+		if fruit.Type == fruitType then
+			table.insert(fruits, fruit)
+		end
+	end
+	return fruits
+end
+
+-- Get total fruit count of a type
+function DataService.GetFruitCount(userId, fruitType)
+	local profile = Profiles[userId]
+	if not profile then return 0 end
+	
+	local count = 0
+	for _, fruit in ipairs(profile.Inventory.Fruits) do
+		if fruit.Type == fruitType then
+			count = count + 1
+		end
+	end
+	return count
+end
+
+-- Legacy function for backward compatibility (deprecated)
 function DataService.AddFruit(userId, fruitName, amount)
 	local profile = Profiles[userId]
 	if not profile then return false end
 	
-	amount = amount or 1
-	profile.Inventory.Fruits[fruitName] = (profile.Inventory.Fruits[fruitName] or 0) + amount
-	-- print(string.format("[DataService] Player %d received %dx %s (Total: %d)", userId, amount, fruitName, profile.Inventory.Fruits[fruitName]))
-	return true
-end
-
--- Get fruit count
-function DataService.GetFruitCount(userId, fruitName)
-	local profile = Profiles[userId]
-	if not profile then return 0 end
+	-- For negative amounts (selling), remove fruits
+	if amount and amount < 0 then
+		local toRemove = math.abs(amount)
+		local removed = 0
+		for i = #profile.Inventory.Fruits, 1, -1 do
+			if profile.Inventory.Fruits[i].Type == fruitName then
+				table.remove(profile.Inventory.Fruits, i)
+				removed = removed + 1
+				if removed >= toRemove then break end
+			end
+		end
+		return removed >= toRemove
+	end
 	
-	return profile.Inventory.Fruits[fruitName] or 0
+	-- For positive amounts, add with default weight (legacy behavior)
+	amount = amount or 1
+	for i = 1, amount do
+		DataService.AddFruitInstance(userId, fruitName, 1.0)
+	end
+	return true
 end
 
 -- Force save a player's profile (useful for important actions)

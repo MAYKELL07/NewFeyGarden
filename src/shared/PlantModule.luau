@@ -9,8 +9,14 @@ local VFXModule = require(ReplicatedStorage.Shared.VFXModule)
 local PlantModule = {}
 
 -- Create a plant model
-function PlantModule.CreatePlantModel(plantType, position)
+-- @param plantType: string - The type of plant to create
+-- @param position: Vector3 - The position to spawn the plant
+-- @param sizeMultiplier: number? - Optional size multiplier (default 1.0, range 0.85-1.15)
+function PlantModule.CreatePlantModel(plantType, position, sizeMultiplier)
 	local config = Constants.PLANT_CONFIG[plantType]
+	
+	-- Default size multiplier to 1.0 if not provided
+	sizeMultiplier = sizeMultiplier or 1.0
 	
 	if not config then
 		warn("Invalid plant type:", plantType)
@@ -55,7 +61,9 @@ function PlantModule.CreatePlantModel(plantType, position)
 	-- Clone seed mesh as the plant part (will swap models based on stage)
 	local plantPart = seedMesh:Clone()
 	plantPart.Name = "Plant"
-	plantPart.Position = position + Vector3.new(0, 1, 0)
+	-- Dynamically position plant so bottom sits on anchor (use half of mesh height)
+	local meshHeight = plantPart.Size.Y
+	plantPart.Position = position + Vector3.new(0, meshHeight / 2, 0)
 	plantPart.Anchored = true
 	plantPart.Parent = plantModel
 	
@@ -63,11 +71,14 @@ function PlantModule.CreatePlantModel(plantType, position)
 	plantModel:SetAttribute("SeedMeshName", "seed")
 	plantModel:SetAttribute("PlantMeshName", "plant")
 	
+	-- Store size multiplier for later use in visuals
+	plantModel:SetAttribute("SizeMultiplier", sizeMultiplier)
+	
 	-- Add light if needed
 	if config.EmitsLight then
 		local light = Instance.new("PointLight")
 		light.Brightness = 0
-		light.Range = 10
+		light.Range = 10 * sizeMultiplier -- Scale light range with size
 		light.Color = config.Color
 		light.Parent = plantPart
 	end
@@ -87,6 +98,7 @@ end
 function PlantModule.UpdatePlantVisual(plantModel)
 	local stage = plantModel:GetAttribute("Stage")
 	local plantType = plantModel:GetAttribute("PlantType")
+	local sizeMultiplier = plantModel:GetAttribute("SizeMultiplier") or 1.0
 	local config = Constants.PLANT_CONFIG[plantType]
 	
 	if not config then return end
@@ -118,19 +130,19 @@ function PlantModule.UpdatePlantVisual(plantModel)
 	
 	if stage == Constants.GROWTH_STAGES.SEED then
 		newMesh = seedMesh
-		scale = 1.5  -- 3x larger than original 0.5
+		scale = 1.5 * sizeMultiplier  -- Apply size multiplier
 		transparency = 0.3
 		lightBrightness = 0
 		
 	elseif stage == Constants.GROWTH_STAGES.SPROUT then
 		newMesh = plantMesh
-		scale = 2.1  -- 3x larger than original 0.7
+		scale = 2.1 * sizeMultiplier  -- Apply size multiplier
 		transparency = 0
 		lightBrightness = 0.5
 		
 	elseif stage == Constants.GROWTH_STAGES.BLOOM then
 		newMesh = plantMesh
-		scale = 3.0  -- 3x larger than original 1.0
+		scale = 3.0 * sizeMultiplier  -- Apply size multiplier
 		transparency = 0
 		lightBrightness = 2
 	end
@@ -139,13 +151,18 @@ function PlantModule.UpdatePlantVisual(plantModel)
 	if newMesh then
 		local replacementPart = newMesh:Clone()
 		replacementPart.Name = "Plant"
-		replacementPart.Position = currentPosition
 		replacementPart.Anchored = true
 		
 		-- Apply scale
 		if replacementPart:IsA("MeshPart") then
 			replacementPart.Size = newMesh.Size * scale
 		end
+		
+		-- Dynamically position plant so bottom sits on anchor (use half of scaled mesh height)
+		local basePart = plantModel:FindFirstChild("Base")
+		local anchorPos = basePart and basePart.Position or currentPosition
+		local meshHeight = replacementPart.Size.Y
+		replacementPart.Position = anchorPos + Vector3.new(0, meshHeight / 2, 0)
 		
 		replacementPart.Transparency = transparency
 		
@@ -155,7 +172,7 @@ function PlantModule.UpdatePlantVisual(plantModel)
 				light.Parent = replacementPart
 			else
 				light = Instance.new("PointLight")
-				light.Range = 10
+				light.Range = 10 * sizeMultiplier
 				light.Color = config.Color
 				light.Parent = replacementPart
 			end
@@ -213,13 +230,19 @@ function PlantModule.CanHarvest(plantModel)
 end
 
 -- Get harvest value (returns FruitSellPrice - what player gets for 1 fruit)
+-- Weight affects sell price: heavier plants are worth more
 function PlantModule.GetHarvestValue(plantModel)
 	local plantType = plantModel:GetAttribute("PlantType")
 	local config = Constants.PLANT_CONFIG[plantType]
 	
 	if not config then return 0 end
 	
-	return config.FruitSellPrice
+	-- Apply weight multiplier to sell price
+	local weight = plantModel:GetAttribute("Weight") or 1
+	local basePrice = config.FruitSellPrice
+	local adjustedPrice = math.floor(basePrice * weight + 0.5)
+	
+	return adjustedPrice
 end
 
 return PlantModule

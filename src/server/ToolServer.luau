@@ -1,8 +1,8 @@
 -- ToolServer.luau
 -- Server-side tool action processing
+-- Tools are now inventory items that weld to player hands client-side
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerScriptService = game:GetService("ServerScriptService")
 local Players = game:GetService("Players")
 
 local sharedFolder = ReplicatedStorage:FindFirstChild("Shared") or ReplicatedStorage:WaitForChild("Shared", 5)
@@ -34,88 +34,6 @@ toolActionEvent.Parent = ReplicatedStorage
 
 if not Config or not BuffsModule or not VFXModule then
 	warn("[ToolServer] Missing shared modules; tool actions will be ignored")
-end
-
--- Template lookup for tool models stored in ReplicatedStorage
-local toolTemplates = {
-	Shovel = ReplicatedStorage:FindFirstChild("Shovel") or ReplicatedStorage:FindFirstChild("shovel"),
-	WateringCan = ReplicatedStorage:FindFirstChild("WateringCan") or ReplicatedStorage:FindFirstChild("wateringcan"),
-}
-
--- LocalScripts for tools are stored in ReplicatedStorage.ToolScripts (from src/tools)
-local toolScriptsFolder = ReplicatedStorage:FindFirstChild("ToolScripts")
-
-local function attachClientScript(toolInstance, scriptName)
-	if not toolScriptsFolder then
-		warn("[ToolServer] ToolScripts folder missing; " .. scriptName .. " will have no client script")
-		return
-	end
-
-	local templateScript = toolScriptsFolder:FindFirstChild(scriptName)
-	if not templateScript then
-		warn(string.format("[ToolServer] No client script template for %s", scriptName))
-		return
-	end
-
-	if toolInstance:FindFirstChild(templateScript.Name) then
-		return
-	end
-
-	local clonedScript = templateScript:Clone()
-	clonedScript.Parent = toolInstance
-end
-
-local function giveToolToPlayer(player, template, toolName)
-	if not template then
-		warn(string.format("[ToolServer] Missing tool template for %s", toolName))
-		return
-	end
-
-	local backpack = player:FindFirstChild("Backpack") or player:WaitForChild("Backpack")
-	local starterGear = player:FindFirstChild("StarterGear") or player:WaitForChild("StarterGear")
-
-	-- Avoid duplicates
-	if backpack:FindFirstChild(toolName) and starterGear:FindFirstChild(toolName) then
-		return
-	end
-
-	local function cloneTool()
-		local toolClone = template:Clone()
-		toolClone.Name = toolName
-		attachClientScript(toolClone, toolName)
-		return toolClone
-	end
-
-	if not backpack:FindFirstChild(toolName) then
-		local toolClone = cloneTool()
-		if toolClone then
-			toolClone.Parent = backpack
-		end
-	end
-
-	if not starterGear:FindFirstChild(toolName) then
-		local toolClone = cloneTool()
-		if toolClone then
-			toolClone.Parent = starterGear
-		end
-	end
-end
-
-local function grantTools(player)
-	giveToolToPlayer(player, toolTemplates.Shovel, Config and Config.Tools.Shovel.Name or "Shovel")
-	giveToolToPlayer(player, toolTemplates.WateringCan, Config and Config.Tools.WateringCan.Name or "WateringCan")
-end
-
-Players.PlayerAdded:Connect(function(player)
-	player.CharacterAdded:Connect(function()
-		grantTools(player)
-	end)
-	grantTools(player)
-end)
-
--- Backfill for players already in game (Studio hot reload)
-for _, plr in ipairs(Players:GetPlayers()) do
-	grantTools(plr)
 end
 
 -- Cooldown tracking

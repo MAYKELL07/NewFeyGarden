@@ -1,16 +1,16 @@
 Pets:
-crystalowl
-embercat (x2)
-everflamegriffin
-glowbug
-leafling
-moondragon
-mossyslime
-pebblepub
-phantomelk
-puffspirit
-sparkfox
-sprouttail
-starlightphoenix
-thornbeak
-whisprabbit
+- EmberCat
+- EverflameGriffin
+- GlowBug
+- Leafling
+- MoonDragon
+- MossySlime
+- PebblePup
+- PhantomElk
+- SparkFox
+- CrystalOwl
+- WispRabbit
+- Thornbeak
+- StarlightPheonix
+- SproutTail
+- PuffSpirit

@@ -1,26 +1,6 @@
 -- Shovel.client.luau
--- LocalScript for Shovel tool
+-- DEPRECATED: Tools are now handled by ToolController.luau
+-- This file is kept for compatibility but is no longer used
+-- Tool equipping and activation is handled via the hotbar and ToolController
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-
-local player = Players.LocalPlayer
-local mouse = player:GetMouse()
-local tool = script.Parent
-
--- Wait for ToolAction RemoteEvent
-local toolActionEvent = ReplicatedStorage:WaitForChild("ToolAction", 20)
-if not toolActionEvent then
-	warn("[Shovel] ToolAction RemoteEvent not found; tool disabled")
-	return
-end
-
--- Handle tool activation
-tool.Activated:Connect(function()
-	local target = mouse.Target
-	
-	if target then
-		-- Send to server
-		toolActionEvent:FireServer("Shovel", target, mouse.Hit.Position)
-	end
-end)
+print("[Shovel] This script is deprecated - tools now use ToolController")

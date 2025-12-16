@@ -29,6 +29,7 @@ if not (Constants and Config) then
 end
 
 local DataService = require(ServerScriptService.Server.Persistence.DataService)
+local ShopService = require(ServerScriptService.Server.ShopService)
 
 local EconomyService = {}
 EconomyService.PlayerData = {} -- Legacy cache, now backed by DataService
@@ -58,9 +59,30 @@ local removeGardenPetEvent = Instance.new("RemoteEvent")
 removeGardenPetEvent.Name = Constants.EVENTS.REMOVE_GARDEN_PET
 removeGardenPetEvent.Parent = ReplicatedStorage
 
+local buyEggEvent = Instance.new("RemoteEvent")
+buyEggEvent.Name = Constants.EVENTS.BUY_EGG
+buyEggEvent.Parent = ReplicatedStorage
+
+local openEggEvent = Instance.new("RemoteEvent")
+openEggEvent.Name = Constants.EVENTS.OPEN_EGG
+openEggEvent.Parent = ReplicatedStorage
+
+local eggOpenedEvent = Instance.new("RemoteEvent")
+eggOpenedEvent.Name = Constants.EVENTS.EGG_OPENED
+eggOpenedEvent.Parent = ReplicatedStorage
+
 local sellFruitEvent = Instance.new("RemoteEvent")
 sellFruitEvent.Name = Constants.EVENTS.SELL_FRUIT
 sellFruitEvent.Parent = ReplicatedStorage
+
+-- New instance-based fruit selling events
+local sellFruitByIdEvent = Instance.new("RemoteEvent")
+sellFruitByIdEvent.Name = "SellFruitById"
+sellFruitByIdEvent.Parent = ReplicatedStorage
+
+local sellAllFruitsOfTypeEvent = Instance.new("RemoteEvent")
+sellAllFruitsOfTypeEvent.Name = "SellAllFruitsOfType"
+sellAllFruitsOfTypeEvent.Parent = ReplicatedStorage
 
 local requestDataEvent = Instance.new("RemoteEvent")
 requestDataEvent.Name = "RequestPlayerData"
@@ -129,6 +151,10 @@ function EconomyService.SyncPlayerData(player)
 	local profile = DataService.GetProfile(player.UserId)
 	if not profile then return end
 	
+	-- Get equipped and garden pet instances (full data)
+	local equippedPetInstances = DataService.GetEquippedPetInstances(player.UserId)
+	local gardenPetInstances = DataService.GetGardenPetInstances(player.UserId)
+	
 	-- Update cache
 	EconomyService.PlayerData[player.UserId] = {
 		Coins = profile.Coins,
@@ -140,13 +166,16 @@ function EconomyService.SyncPlayerData(player)
 	-- Update currency
 	updateCurrencyEvent:FireClient(player, profile.Coins, true)
 	
-	-- Update inventory (now includes EquippedPets, GardenPets and Fruits)
+	-- Update inventory (now includes full pet instances, eggs, and equipped/garden pet data)
 	local inventoryData = {
 		Seeds = profile.Inventory.Seeds,
-		Pets = profile.Inventory.Pets,
+		Pets = profile.Inventory.Pets, -- Full pet instances array [{Id, PetType, Size, Weight}]
+		Eggs = profile.Inventory.Eggs or {},
 		Fruits = profile.Inventory.Fruits,
-		EquippedPets = profile.EquippedPets or {},
-		GardenPets = profile.GardenPets or {}
+		EquippedPets = equippedPetInstances, -- Full instances for rendering
+		EquippedPetIds = profile.EquippedPets or {}, -- Just IDs for quick lookup
+		GardenPets = gardenPetInstances, -- Full instances for rendering
+		GardenPetIds = profile.GardenPets or {} -- Just IDs for quick lookup
 	}
 	updateInventoryEvent:FireClient(player, inventoryData)
 end
@@ -234,12 +263,28 @@ function EconomyService.BuySeed(player, plantType, amount)
 	
 	amount = amount or 1
 	local totalCost = config.SeedPrice * amount
+
+	-- Check rotating shop stock first
+	local available, reason = ShopService.IsSeedAvailable(plantType, amount)
+	if not available then
+		warn(string.format("%s attempted to buy %s but shop unavailable: %s", player.Name, plantType, reason or "unknown"))
+		return false
+	end
 	
 	if not EconomyService.RemoveCoins(player, totalCost) then
 		warn(player.Name .. " doesn't have enough coins")
 		return false
 	end
 	
+	-- Reduce shop stock (will broadcast update)
+	local stockSuccess, stockMessage = ShopService.PurchaseSeed(player, plantType, amount)
+	if not stockSuccess then
+		-- Refund coins on failure
+		EconomyService.AddCoins(player, totalCost)
+		warn(string.format("Shop purchase failed for %s: %s", player.Name, stockMessage or "unknown"))
+		return false
+	end
+
 	EconomyService.AddSeed(player, plantType, amount)
 	-- print(player.Name .. " bought " .. amount .. "x " .. plantType .. " seeds")
 	
@@ -279,22 +324,16 @@ function EconomyService.BuyPet(player, petType)
 	return true
 end
 
--- Equip pet (add to equipped pets)
-function EconomyService.EquipPet(player, petType)
-	local config = Constants.PET_CONFIG[petType]
-	if not config then
-		warn("Invalid pet type:", petType)
+-- Equip pet (add to equipped pets by instance ID)
+function EconomyService.EquipPet(player, petId)
+	-- Validate pet ID
+	if not petId or type(petId) ~= "string" then
+		warn("Invalid pet ID:", petId)
 		return false
 	end
 	
-	-- Check if player owns this pet
-	if not DataService.HasPet(player.UserId, petType) then
-		warn(player.Name .. " doesn't own this pet")
-		return false
-	end
-	
-	-- Equip the pet
-	local success = DataService.EquipPet(player.UserId, petType)
+	-- Equip the pet by instance ID
+	local success = DataService.EquipPet(player.UserId, petId)
 	if not success then
 		return false
 	end
@@ -310,9 +349,9 @@ function EconomyService.EquipPet(player, petType)
 	return true
 end
 
--- Unequip pet (remove from equipped pets)
-function EconomyService.UnequipPet(player, petType)
-	local success = DataService.UnequipPet(player.UserId, petType)
+-- Unequip pet (remove from equipped pets by instance ID)
+function EconomyService.UnequipPet(player, petId)
+	local success = DataService.UnequipPet(player.UserId, petId)
 	if not success then
 		return false
 	end
@@ -327,22 +366,16 @@ function EconomyService.UnequipPet(player, petType)
 	return true
 end
 
--- Add pet to garden
-function EconomyService.AddGardenPet(player, petType)
-	local config = Constants.PET_CONFIG[petType]
-	if not config then
-		warn("Invalid pet type:", petType)
+-- Add pet to garden by instance ID
+function EconomyService.AddGardenPet(player, petId)
+	-- Validate pet ID
+	if not petId or type(petId) ~= "string" then
+		warn("Invalid pet ID:", petId)
 		return false
 	end
 	
-	-- Check if player owns this pet
-	if not DataService.HasPet(player.UserId, petType) then
-		warn(player.Name .. " doesn't own this pet")
-		return false
-	end
-	
-	-- Add to garden
-	local success = DataService.AddGardenPet(player.UserId, petType)
+	-- Add to garden by instance ID
+	local success = DataService.AddGardenPet(player.UserId, petId)
 	if not success then
 		return false
 	end
@@ -358,8 +391,8 @@ function EconomyService.AddGardenPet(player, petType)
 end
 
 -- Remove pet from garden
-function EconomyService.RemoveGardenPet(player, petType)
-	local success = DataService.RemoveGardenPet(player.UserId, petType)
+function EconomyService.RemoveGardenPet(player, petId)
+	local success = DataService.RemoveGardenPet(player.UserId, petId)
 	if not success then
 		return false
 	end
@@ -374,7 +407,272 @@ function EconomyService.RemoveGardenPet(player, petType)
 	return true
 end
 
+-- ============================================================================
+-- EGG GACHA SYSTEM
+-- ============================================================================
+
+-- Roll a rarity based on egg's drop chances
+local function rollRarity(eggConfig)
+	local dropChances = eggConfig.DropChances
+	local totalWeight = 0
+	
+	for _, weight in pairs(dropChances) do
+		totalWeight = totalWeight + weight
+	end
+	
+	local roll = math.random() * totalWeight
+	local cumulative = 0
+	
+	for rarity, weight in pairs(dropChances) do
+		cumulative = cumulative + weight
+		if roll <= cumulative then
+			return rarity
+		end
+	end
+	
+	-- Fallback to first rarity
+	for rarity, _ in pairs(dropChances) do
+		return rarity
+	end
+end
+
+-- Get all pets of a specific rarity
+local function getPetsByRarity(rarity)
+	local pets = {}
+	for petType, petRarity in pairs(Constants.PET_RARITIES) do
+		if petRarity == rarity then
+			table.insert(pets, petType)
+		end
+	end
+	return pets
+end
+
+-- Roll a random pet from a rarity pool
+local function rollPet(rarity)
+	local pets = getPetsByRarity(rarity)
+	if #pets == 0 then
+		warn("No pets found for rarity:", rarity)
+		return nil
+	end
+	return pets[math.random(1, #pets)]
+end
+
+-- Buy an egg
+function EconomyService.BuyEgg(player, eggType, amount)
+	local eggConfig = Constants.EGG_CONFIG[eggType]
+	if not eggConfig then
+		warn("Invalid egg type:", eggType)
+		return false
+	end
+	
+	amount = amount or 1
+	local totalCost = eggConfig.Price * amount
+	
+	if not EconomyService.RemoveCoins(player, totalCost) then
+		warn(player.Name .. " doesn't have enough coins for eggs")
+		return false
+	end
+	
+	DataService.AddEgg(player.UserId, eggType, amount)
+	
+	-- Update cache
+	local profile = DataService.GetProfile(player.UserId)
+	if profile then
+		EconomyService.PlayerData[player.UserId].Inventory = profile.Inventory
+	end
+	
+	EconomyService.SyncPlayerData(player)
+	
+	-- print(string.format("%s bought %dx %s", player.Name, amount, eggConfig.DisplayName))
+	return true
+end
+
+-- Open an egg (gacha roll)
+function EconomyService.OpenEgg(player, eggType)
+	local eggConfig = Constants.EGG_CONFIG[eggType]
+	if not eggConfig then
+		warn("Invalid egg type:", eggType)
+		eggOpenedEvent:FireClient(player, false, nil, "Invalid egg type")
+		return false
+	end
+	
+	-- Check if player has the egg
+	local eggCount = DataService.GetEggCount(player.UserId, eggType)
+	if eggCount <= 0 then
+		warn(player.Name .. " doesn't have any " .. eggType)
+		eggOpenedEvent:FireClient(player, false, nil, "You don't have this egg")
+		return false
+	end
+	
+	-- Remove the egg
+	local removed = DataService.RemoveEgg(player.UserId, eggType)
+	if not removed then
+		warn("Failed to remove egg from inventory")
+		eggOpenedEvent:FireClient(player, false, nil, "Failed to open egg")
+		return false
+	end
+	
+	-- Roll for rarity
+	local rolledRarity = rollRarity(eggConfig)
+	
+	-- Roll for pet type within that rarity
+	local rolledPetType = rollPet(rolledRarity)
+	if not rolledPetType then
+		-- Fallback: give back the egg and report error
+		DataService.AddEgg(player.UserId, eggType, 1)
+		eggOpenedEvent:FireClient(player, false, nil, "No pets available")
+		return false
+	end
+	
+	-- Generate random size and weight for the new pet
+	local sizeWeight = Constants.GenerateRandomSizeWeight("Pet")
+	
+	-- Add the pet instance to inventory
+	local petInstance = DataService.AddPetInstance(player.UserId, rolledPetType, sizeWeight.Size, sizeWeight.Weight)
+	if not petInstance then
+		-- Fallback: give back the egg
+		DataService.AddEgg(player.UserId, eggType, 1)
+		eggOpenedEvent:FireClient(player, false, nil, "Failed to create pet")
+		return false
+	end
+	
+	-- Update cache
+	local profile = DataService.GetProfile(player.UserId)
+	if profile then
+		EconomyService.PlayerData[player.UserId].Inventory = profile.Inventory
+	end
+	
+	-- Get pet config for display info
+	local petConfig = Constants.PET_CONFIG[rolledPetType]
+	
+	-- Build result data to send to client
+	local resultData = {
+		Success = true,
+		PetInstance = petInstance,
+		PetType = rolledPetType,
+		Rarity = rolledRarity,
+		DisplayName = petConfig and petConfig.DisplayName or rolledPetType,
+		Color = petConfig and petConfig.Color or Color3.fromRGB(255, 255, 255),
+		Size = petInstance.Size,
+		Weight = petInstance.Weight,
+		EggType = eggType
+	}
+	
+	-- print(string.format("%s opened %s and got %s (%s) - Size: %.2f, Weight: %.2f", 
+	--     player.Name, eggConfig.DisplayName, resultData.DisplayName, rolledRarity, petInstance.Size, petInstance.Weight))
+	
+	-- Fire result to client for animation
+	eggOpenedEvent:FireClient(player, true, resultData, nil)
+	
+	-- Sync inventory after a short delay (let animation play)
+	task.delay(3, function()
+		EconomyService.SyncPlayerData(player)
+	end)
+	
+	return true
+end
+
 -- Sell fruit
+-- Sell a single fruit by ID (for new instance-based system)
+function EconomyService.SellFruitById(player, fruitId)
+	if not fruitId or type(fruitId) ~= "string" then
+		warn("Invalid fruit ID")
+		return false
+	end
+	
+	-- Find and get the fruit
+	local profile = DataService.GetProfile(player.UserId)
+	if not profile then return false end
+	
+	local fruitInstance = nil
+	for _, fruit in ipairs(profile.Inventory.Fruits or {}) do
+		if fruit.Id == fruitId then
+			fruitInstance = fruit
+			break
+		end
+	end
+	
+	if not fruitInstance then
+		warn("Fruit not found:", fruitId)
+		return false
+	end
+	
+	-- Get the plant type from fruit name (remove "Fruit" suffix)
+	local plantType = fruitInstance.Type:gsub("Fruit$", "")
+	local config = Constants.PLANT_CONFIG[plantType]
+	
+	if not config or not config.FruitSellPrice then
+		warn("Invalid fruit or no sell price for:", fruitInstance.Type)
+		return false
+	end
+	
+	-- Calculate sell price based on weight (heavier = worth more)
+	local weight = fruitInstance.Weight or 1.0
+	local basePrice = config.FruitSellPrice
+	local sellPrice = math.floor(basePrice * weight + 0.5)
+	
+	-- Remove fruit from inventory
+	local success = DataService.RemoveFruitById(player.UserId, fruitId)
+	if not success then
+		warn("Failed to remove fruit from inventory")
+		return false
+	end
+	
+	-- Add coins
+	EconomyService.AddCoins(player, sellPrice)
+	
+	-- Sync inventory to client
+	EconomyService.SyncPlayerData(player)
+	
+	return true, sellPrice, weight
+end
+
+-- Sell all fruits of a type
+function EconomyService.SellAllFruitsOfType(player, fruitType)
+	local profile = DataService.GetProfile(player.UserId)
+	if not profile then return false end
+	
+	-- Get the plant type from fruit name (remove "Fruit" suffix)
+	local plantType = fruitType:gsub("Fruit$", "")
+	local config = Constants.PLANT_CONFIG[plantType]
+	
+	if not config or not config.FruitSellPrice then
+		warn("Invalid fruit or no sell price for:", fruitType)
+		return false
+	end
+	
+	local totalSold = 0
+	local totalCoins = 0
+	
+	-- Collect all fruit IDs of this type first (to avoid modifying while iterating)
+	local fruitsToSell = {}
+	for _, fruit in ipairs(profile.Inventory.Fruits or {}) do
+		if fruit.Type == fruitType then
+			table.insert(fruitsToSell, fruit)
+		end
+	end
+	
+	-- Sell each fruit
+	for _, fruit in ipairs(fruitsToSell) do
+		local weight = fruit.Weight or 1.0
+		local sellPrice = math.floor(config.FruitSellPrice * weight + 0.5)
+		
+		local success = DataService.RemoveFruitById(player.UserId, fruit.Id)
+		if success then
+			totalSold = totalSold + 1
+			totalCoins = totalCoins + sellPrice
+		end
+	end
+	
+	if totalSold > 0 then
+		EconomyService.AddCoins(player, totalCoins)
+		EconomyService.SyncPlayerData(player)
+	end
+	
+	return true, totalSold, totalCoins
+end
+
+-- Legacy sell function (now sells one fruit at a time with weight consideration)
 function EconomyService.SellFruit(player, fruitName, amount)
 	amount = amount or 1
 	
@@ -394,12 +692,23 @@ function EconomyService.SellFruit(player, fruitName, amount)
 		return false
 	end
 	
-	-- Calculate total sell price
-	local totalPrice = config.FruitSellPrice * amount
+	-- Get fruits to sell and calculate total based on individual weights
+	local profile = DataService.GetProfile(player.UserId)
+	local totalPrice = 0
+	local sold = 0
 	
-	-- Remove fruits from inventory
-	local success = DataService.AddFruit(player.UserId, fruitName, -amount)
-	if not success then
+	for i = #profile.Inventory.Fruits, 1, -1 do
+		if sold >= amount then break end
+		local fruit = profile.Inventory.Fruits[i]
+		if fruit.Type == fruitName then
+			local weight = fruit.Weight or 1.0
+			totalPrice = totalPrice + math.floor(config.FruitSellPrice * weight + 0.5)
+			table.remove(profile.Inventory.Fruits, i)
+			sold = sold + 1
+		end
+	end
+	
+	if sold == 0 then
 		warn("Failed to remove fruits from inventory")
 		return false
 	end
@@ -410,7 +719,6 @@ function EconomyService.SellFruit(player, fruitName, amount)
 	-- Sync inventory to client
 	EconomyService.SyncPlayerData(player)
 	
-	-- print(string.format("%s sold %dx %s for %d coins", player.Name, amount, fruitName, totalPrice))
 	return true
 end
 
@@ -423,34 +731,54 @@ function EconomyService.Initialize()
 		EconomyService.BuySeed(player, plantType, amount)
 	end)
 	
-	-- Handle buy pet requests
+	-- Handle buy pet requests (legacy - creates new pet instance)
 	buyPetEvent.OnServerEvent:Connect(function(player, petType)
 		EconomyService.BuyPet(player, petType)
 	end)
 	
-	-- Handle equip pet requests
-	equipPetEvent.OnServerEvent:Connect(function(player, petType)
-		EconomyService.EquipPet(player, petType)
+	-- Handle buy egg requests
+	buyEggEvent.OnServerEvent:Connect(function(player, eggType, amount)
+		EconomyService.BuyEgg(player, eggType, amount)
 	end)
 	
-	-- Handle unequip pet requests
-	unequipPetEvent.OnServerEvent:Connect(function(player, petType)
-		EconomyService.UnequipPet(player, petType)
+	-- Handle open egg requests
+	openEggEvent.OnServerEvent:Connect(function(player, eggType)
+		EconomyService.OpenEgg(player, eggType)
 	end)
 	
-	-- Handle add garden pet requests
-	addGardenPetEvent.OnServerEvent:Connect(function(player, petType)
-		EconomyService.AddGardenPet(player, petType)
+	-- Handle equip pet requests (now uses pet instance ID)
+	equipPetEvent.OnServerEvent:Connect(function(player, petId)
+		EconomyService.EquipPet(player, petId)
 	end)
 	
-	-- Handle remove garden pet requests
-	removeGardenPetEvent.OnServerEvent:Connect(function(player, petType)
-		EconomyService.RemoveGardenPet(player, petType)
+	-- Handle unequip pet requests (now uses pet instance ID)
+	unequipPetEvent.OnServerEvent:Connect(function(player, petId)
+		EconomyService.UnequipPet(player, petId)
 	end)
 	
-	-- Handle sell fruit requests
+	-- Handle add garden pet requests (now uses pet instance ID)
+	addGardenPetEvent.OnServerEvent:Connect(function(player, petId)
+		EconomyService.AddGardenPet(player, petId)
+	end)
+	
+	-- Handle remove garden pet requests (now uses pet instance ID)
+	removeGardenPetEvent.OnServerEvent:Connect(function(player, petId)
+		EconomyService.RemoveGardenPet(player, petId)
+	end)
+	
+	-- Handle sell fruit requests (legacy count-based)
 	sellFruitEvent.OnServerEvent:Connect(function(player, fruitName, amount)
 		EconomyService.SellFruit(player, fruitName, amount)
+	end)
+	
+	-- Handle sell fruit by ID (instance-based)
+	sellFruitByIdEvent.OnServerEvent:Connect(function(player, fruitId)
+		EconomyService.SellFruitById(player, fruitId)
+	end)
+	
+	-- Handle sell all fruits of type (instance-based)
+	sellAllFruitsOfTypeEvent.OnServerEvent:Connect(function(player, fruitType)
+		EconomyService.SellAllFruitsOfType(player, fruitType)
 	end)
 	
 	-- Handle request for player data (client can call this to get initial data)

@@ -231,23 +231,29 @@ Constants.PLOT_SIZE = Vector3.new(20, 1, 20)
 Constants.PLOT_SPACING = 25
 Constants.MAX_PLANTS_PER_PLOT = 9
 
--- Pet Types
+-- Pet Types (PascalCase to match ReplicatedStorage/Pets folder names)
 Constants.PET_TYPES = {
-	CRYSTALOWL = "crystalowl",
-	EMBERCAT = "embercat",
-	EVERFLAMEGRIFFIN = "everflamegriffin",
-	GLOWBUG = "glowbug",
-	LEAFLING = "leafling",
-	MOONDRAGON = "moondragon",
-	MOSSYSLIME = "mossyslime",
-	PEBBLEPUB = "pebblepub",
-	PHANTOMELK = "phantomelk",
-	PUFFSPIRIT = "puffspirit",
-	SPARKFOX = "sparkfox",
-	SPROUTTAIL = "sprouttail",
-	STARLIGHTPHOENIX = "starlightphoenix",
-	THORNBEAK = "thornbeak",
-	WHISPRABBIT = "whisprabbit"
+	CRYSTALOWL = "CrystalOwl",
+	EMBERCAT = "EmberCat",
+	EVERFLAMEGRIFFIN = "EverflameGriffin",
+	GLOWBUG = "GlowBug",
+	LEAFLING = "Leafling",
+	MOONDRAGON = "MoonDragon",
+	MOSSYSLIME = "MossySlime",
+	PEBBLEPUB = "PebblePup",
+	PHANTOMELK = "PhantomElk",
+	PUFFSPIRIT = "PuffSpirit",
+	SPARKFOX = "SparkFox",
+	SPROUTTAIL = "SproutTail",
+	STARLIGHTPHOENIX = "StarlightPhoenix",
+	THORNBEAK = "Thornbeak",
+	WHISPRABBIT = "WispRabbit"
+}
+
+-- Pet Movement Types
+Constants.PET_MOVEMENT = {
+	FLY = "Fly",   -- Floats/hovers in the air
+	WALK = "Walk"  -- Walks on the ground
 }
 
 -- Pet Configuration
@@ -257,106 +263,352 @@ Constants.PET_CONFIG = {
 		Price = 500,
 		FollowDistance = 3,
 		WaterBoost = 0.85, -- Makes plants grow 15% faster
-		Color = Color3.fromRGB(150, 200, 255)
+		Color = Color3.fromRGB(150, 200, 255),
+		MovementType = "Fly" -- Owl flies
 	},
 	[Constants.PET_TYPES.EMBERCAT] = {
 		DisplayName = "EmberCat",
 		Price = 400,
 		FollowDistance = 2.5,
 		WaterBoost = 0.90, -- Makes plants grow 10% faster
-		Color = Color3.fromRGB(255, 100, 50)
+		Color = Color3.fromRGB(255, 100, 50),
+		MovementType = "Walk" -- Cat walks
 	},
 	[Constants.PET_TYPES.EVERFLAMEGRIFFIN] = {
 		DisplayName = "EverflameGriffin",
 		Price = 800,
 		FollowDistance = 4,
 		WaterBoost = 0.75, -- Makes plants grow 25% faster
-		Color = Color3.fromRGB(255, 150, 0)
+		Color = Color3.fromRGB(255, 150, 0),
+		MovementType = "Fly" -- Griffin flies
 	},
 	[Constants.PET_TYPES.GLOWBUG] = {
 		DisplayName = "GlowBug",
 		Price = 250,
 		FollowDistance = 2,
 		WaterBoost = 0.95, -- Makes plants grow 5% faster
-		Color = Color3.fromRGB(255, 255, 100)
+		Color = Color3.fromRGB(255, 255, 100),
+		MovementType = "Fly" -- Bug flies
 	},
 	[Constants.PET_TYPES.LEAFLING] = {
 		DisplayName = "Leafling",
 		Price = 350,
 		FollowDistance = 3,
 		WaterBoost = 0.88, -- Makes plants grow 12% faster
-		Color = Color3.fromRGB(100, 255, 100)
+		Color = Color3.fromRGB(100, 255, 100),
+		MovementType = "Fly" -- Fairy-like, floats
 	},
 	[Constants.PET_TYPES.MOONDRAGON] = {
 		DisplayName = "MoonDragon",
 		Price = 900,
 		FollowDistance = 4.5,
 		WaterBoost = 0.70, -- Makes plants grow 30% faster
-		Color = Color3.fromRGB(200, 200, 255)
+		Color = Color3.fromRGB(200, 200, 255),
+		MovementType = "Fly" -- Dragon flies
 	},
 	[Constants.PET_TYPES.MOSSYSLIME] = {
 		DisplayName = "MossySlime",
 		Price = 300,
 		FollowDistance = 2,
 		WaterBoost = 0.92, -- Makes plants grow 8% faster
-		Color = Color3.fromRGB(100, 200, 100)
+		Color = Color3.fromRGB(100, 200, 100),
+		MovementType = "Walk" -- Slime bounces/walks
 	},
 	[Constants.PET_TYPES.PEBBLEPUB] = {
 		DisplayName = "PebblePup",
 		Price = 350,
 		FollowDistance = 2.5,
 		WaterBoost = 0.90, -- Makes plants grow 10% faster
-		Color = Color3.fromRGB(150, 150, 150)
+		Color = Color3.fromRGB(150, 150, 150),
+		MovementType = "Walk" -- Puppy walks
 	},
 	[Constants.PET_TYPES.PHANTOMELK] = {
 		DisplayName = "PhantomElk",
 		Price = 600,
 		FollowDistance = 3.5,
 		WaterBoost = 0.82, -- Makes plants grow 18% faster
-		Color = Color3.fromRGB(180, 180, 255)
+		Color = Color3.fromRGB(180, 180, 255),
+		MovementType = "Walk" -- Elk walks
 	},
 	[Constants.PET_TYPES.PUFFSPIRIT] = {
 		DisplayName = "PuffSpirit",
 		Price = 450,
 		FollowDistance = 3,
 		WaterBoost = 0.87, -- Makes plants grow 13% faster
-		Color = Color3.fromRGB(255, 255, 255)
+		Color = Color3.fromRGB(255, 255, 255),
+		MovementType = "Fly" -- Spirit floats
 	},
 	[Constants.PET_TYPES.SPARKFOX] = {
 		DisplayName = "SparkFox",
 		Price = 550,
 		FollowDistance = 3.5,
 		WaterBoost = 0.83, -- Makes plants grow 17% faster
-		Color = Color3.fromRGB(255, 200, 100)
+		Color = Color3.fromRGB(255, 200, 100),
+		MovementType = "Walk" -- Fox walks
 	},
 	[Constants.PET_TYPES.SPROUTTAIL] = {
 		DisplayName = "SproutTail",
 		Price = 400,
 		FollowDistance = 3,
 		WaterBoost = 0.89, -- Makes plants grow 11% faster
-		Color = Color3.fromRGB(150, 255, 100)
+		Color = Color3.fromRGB(150, 255, 100),
+		MovementType = "Walk" -- Sprout creature walks
 	},
 	[Constants.PET_TYPES.STARLIGHTPHOENIX] = {
 		DisplayName = "StarlightPheonix",
 		Price = 1000,
 		FollowDistance = 5,
 		WaterBoost = 0.65, -- Makes plants grow 35% faster
-		Color = Color3.fromRGB(255, 255, 200)
+		Color = Color3.fromRGB(255, 255, 200),
+		MovementType = "Fly" -- Phoenix flies
 	},
 	[Constants.PET_TYPES.THORNBEAK] = {
 		DisplayName = "Thornbeak",
 		Price = 500,
 		FollowDistance = 3,
 		WaterBoost = 0.85, -- Makes plants grow 15% faster
-		Color = Color3.fromRGB(150, 100, 50)
+		Color = Color3.fromRGB(150, 100, 50),
+		MovementType = "Fly" -- Bird-like, flies
 	},
 	[Constants.PET_TYPES.WHISPRABBIT] = {
 		DisplayName = "WispRabbit",
 		Price = 350,
 		FollowDistance = 2.5,
 		WaterBoost = 0.90, -- Makes plants grow 10% faster
-		Color = Color3.fromRGB(200, 180, 255)
+		Color = Color3.fromRGB(200, 180, 255),
+		MovementType = "Walk" -- Rabbit hops/walks
 	}
+}
+
+-- ============================================================================
+-- RARITY SYSTEM
+-- ============================================================================
+-- Rarities from lowest to highest tier
+Constants.RARITIES = {
+	COMMON = "Common",
+	UNCOMMON = "Uncommon",
+	RARE = "Rare",
+	EPIC = "Epic",
+	LEGENDARY = "Legendary"
+}
+
+-- Rarity colors for UI
+Constants.RARITY_COLORS = {
+	[Constants.RARITIES.COMMON] = Color3.fromRGB(200, 200, 200),      -- White/Gray
+	[Constants.RARITIES.UNCOMMON] = Color3.fromRGB(100, 200, 100),    -- Green
+	[Constants.RARITIES.RARE] = Color3.fromRGB(50, 150, 255),         -- Blue
+	[Constants.RARITIES.EPIC] = Color3.fromRGB(180, 100, 255),        -- Purple
+	[Constants.RARITIES.LEGENDARY] = Color3.fromRGB(255, 200, 50)     -- Yellow/Gold
+}
+
+-- ============================================================================
+-- EGG SYSTEM
+-- ============================================================================
+-- Egg types correspond to rarities - each egg can only drop pets of that rarity or lower
+Constants.EGG_TYPES = {
+	COMMON = "CommonEgg",
+	UNCOMMON = "UncommonEgg",
+	RARE = "RareEgg",
+	EPIC = "EpicEgg",
+	LEGENDARY = "LegendaryEgg"
+}
+
+-- Egg configuration with prices and drop chances
+-- Drop chances are relative weights within the egg's pool
+Constants.EGG_CONFIG = {
+	[Constants.EGG_TYPES.COMMON] = {
+		DisplayName = "Common Egg",
+		Price = 100,
+		ImageId = "rbxassetid://105531210825045", -- White egg
+		Rarity = Constants.RARITIES.COMMON,
+		-- Only drops common pets (100% common)
+		DropChances = {
+			[Constants.RARITIES.COMMON] = 100
+		}
+	},
+	[Constants.EGG_TYPES.UNCOMMON] = {
+		DisplayName = "Uncommon Egg",
+		Price = 250,
+		ImageId = "rbxassetid://79842537952035", -- Green egg
+		Rarity = Constants.RARITIES.UNCOMMON,
+		-- Drops common or uncommon
+		DropChances = {
+			[Constants.RARITIES.COMMON] = 60,
+			[Constants.RARITIES.UNCOMMON] = 40
+		}
+	},
+	[Constants.EGG_TYPES.RARE] = {
+		DisplayName = "Rare Egg",
+		Price = 500,
+		ImageId = "rbxassetid://75691996912194", -- Blue egg
+		Rarity = Constants.RARITIES.RARE,
+		-- Drops common, uncommon, or rare
+		DropChances = {
+			[Constants.RARITIES.COMMON] = 50,
+			[Constants.RARITIES.UNCOMMON] = 35,
+			[Constants.RARITIES.RARE] = 15
+		}
+	},
+	[Constants.EGG_TYPES.EPIC] = {
+		DisplayName = "Epic Egg",
+		Price = 1000,
+		ImageId = "rbxassetid://130581371031598", -- Purple egg
+		Rarity = Constants.RARITIES.EPIC,
+		-- Drops uncommon, rare, or epic (no common!)
+		DropChances = {
+			[Constants.RARITIES.UNCOMMON] = 45,
+			[Constants.RARITIES.RARE] = 35,
+			[Constants.RARITIES.EPIC] = 20
+		}
+	},
+	[Constants.EGG_TYPES.LEGENDARY] = {
+		DisplayName = "Legendary Egg",
+		Price = 2500,
+		ImageId = "rbxassetid://121874536453561", -- Yellow/Gold egg
+		Rarity = Constants.RARITIES.LEGENDARY,
+		-- Drops rare, epic, or legendary (no common/uncommon!)
+		DropChances = {
+			[Constants.RARITIES.RARE] = 50,
+			[Constants.RARITIES.EPIC] = 35,
+			[Constants.RARITIES.LEGENDARY] = 15
+		}
+	}
+}
+
+-- ============================================================================
+-- PET RARITY ASSIGNMENTS
+-- ============================================================================
+-- Assign each pet to a rarity tier
+Constants.PET_RARITIES = {
+	-- Common pets (basic, starter-friendly)
+	[Constants.PET_TYPES.GLOWBUG] = Constants.RARITIES.COMMON,
+	[Constants.PET_TYPES.MOSSYSLIME] = Constants.RARITIES.COMMON,
+	[Constants.PET_TYPES.PEBBLEPUB] = Constants.RARITIES.COMMON,
+	
+	-- Uncommon pets
+	[Constants.PET_TYPES.LEAFLING] = Constants.RARITIES.UNCOMMON,
+	[Constants.PET_TYPES.WHISPRABBIT] = Constants.RARITIES.UNCOMMON,
+	[Constants.PET_TYPES.SPROUTTAIL] = Constants.RARITIES.UNCOMMON,
+	
+	-- Rare pets
+	[Constants.PET_TYPES.EMBERCAT] = Constants.RARITIES.RARE,
+	[Constants.PET_TYPES.SPARKFOX] = Constants.RARITIES.RARE,
+	[Constants.PET_TYPES.PUFFSPIRIT] = Constants.RARITIES.RARE,
+	[Constants.PET_TYPES.THORNBEAK] = Constants.RARITIES.RARE,
+	
+	-- Epic pets
+	[Constants.PET_TYPES.CRYSTALOWL] = Constants.RARITIES.EPIC,
+	[Constants.PET_TYPES.PHANTOMELK] = Constants.RARITIES.EPIC,
+	[Constants.PET_TYPES.EVERFLAMEGRIFFIN] = Constants.RARITIES.EPIC,
+	
+	-- Legendary pets (rarest, best boosts)
+	[Constants.PET_TYPES.MOONDRAGON] = Constants.RARITIES.LEGENDARY,
+	[Constants.PET_TYPES.STARLIGHTPHOENIX] = Constants.RARITIES.LEGENDARY
+}
+
+-- ============================================================================
+-- PLANT/SEED RARITY ASSIGNMENTS
+-- ============================================================================
+-- Assign each plant to a rarity tier (based on Tier from PLANT_CONFIG)
+Constants.PLANT_RARITIES = {
+	-- Common plants (Tier 1 - starter plants)
+	[Constants.PLANT_TYPES.LUMUT] = Constants.RARITIES.COMMON,
+	[Constants.PLANT_TYPES.CLOUDCAP] = Constants.RARITIES.COMMON,
+	[Constants.PLANT_TYPES.PUFFOT] = Constants.RARITIES.COMMON,
+	[Constants.PLANT_TYPES.GLOWBUD] = Constants.RARITIES.COMMON,
+	
+	-- Uncommon plants (early Tier 2)
+	[Constants.PLANT_TYPES.TWINKLELEAF] = Constants.RARITIES.UNCOMMON,
+	[Constants.PLANT_TYPES.CHAMELEONBERRI] = Constants.RARITIES.UNCOMMON,
+	[Constants.PLANT_TYPES.DREAMSHROOM] = Constants.RARITIES.UNCOMMON,
+	
+	-- Rare plants (late Tier 2)
+	[Constants.PLANT_TYPES.EVERSPRINGACORN] = Constants.RARITIES.RARE,
+	
+	-- Epic plants (early Tier 3)
+	[Constants.PLANT_TYPES.STARVINEMELON] = Constants.RARITIES.EPIC,
+	[Constants.PLANT_TYPES.FROSTMIND] = Constants.RARITIES.EPIC,
+	[Constants.PLANT_TYPES.DREAMFRUIT] = Constants.RARITIES.EPIC,
+	
+	-- Legendary plants (late Tier 3 - best plants)
+	[Constants.PLANT_TYPES.SUNFLAREMANGO] = Constants.RARITIES.LEGENDARY,
+	[Constants.PLANT_TYPES.STARLILY] = Constants.RARITIES.LEGENDARY,
+	[Constants.PLANT_TYPES.MOONVINE] = Constants.RARITIES.LEGENDARY,
+	[Constants.PLANT_TYPES.WILLOWWHISP] = Constants.RARITIES.LEGENDARY
+}
+
+-- ============================================================================
+-- SEED SHOP CONFIGURATION
+-- ============================================================================
+Constants.SEED_SHOP_CONFIG = {
+	-- How often the shop refreshes (in seconds) - 12 hours
+	RefreshInterval = 12 * 60 * 60, -- 43200 seconds = 12 hours
+	
+	-- How many seed types to show per rarity (randomly selected)
+	SlotsPerRarity = {
+		[Constants.RARITIES.COMMON] = 3,      -- Always show 3 common seeds
+		[Constants.RARITIES.UNCOMMON] = 2,    -- Show 2 uncommon seeds
+		[Constants.RARITIES.RARE] = 1,        -- Show 1 rare seed
+		[Constants.RARITIES.EPIC] = 1,        -- Show 1 epic seed (may be empty)
+		[Constants.RARITIES.LEGENDARY] = 1    -- Show 1 legendary seed (rare appearance)
+	},
+	
+	-- Chance for each rarity slot to actually appear (0-1)
+	AppearanceChance = {
+		[Constants.RARITIES.COMMON] = 1.0,     -- 100% - always appears
+		[Constants.RARITIES.UNCOMMON] = 1.0,   -- 100% - always appears
+		[Constants.RARITIES.RARE] = 0.8,       -- 80% chance to appear
+		[Constants.RARITIES.EPIC] = 0.5,       -- 50% chance to appear
+		[Constants.RARITIES.LEGENDARY] = 0.2   -- 20% chance to appear
+	},
+	
+	-- Stock per seed based on rarity
+	StockPerRarity = {
+		[Constants.RARITIES.COMMON] = 50,      -- Abundant
+		[Constants.RARITIES.UNCOMMON] = 30,    -- Moderate
+		[Constants.RARITIES.RARE] = 15,        -- Limited
+		[Constants.RARITIES.EPIC] = 8,         -- Scarce
+		[Constants.RARITIES.LEGENDARY] = 3     -- Very rare
+	}
+}
+
+-- ============================================================================
+-- SIZE/WEIGHT VARIANCE
+-- ============================================================================
+-- Random size and weight ranges for pets and plants (makes each instance unique)
+Constants.SIZE_WEIGHT_CONFIG = {
+	Pet = {
+		SizeMin = 0.8,      -- Minimum scale multiplier
+		SizeMax = 1.2,      -- Maximum scale multiplier
+		WeightMin = 0.7,    -- Minimum weight (affects movement speed slightly)
+		WeightMax = 1.3     -- Maximum weight
+	},
+	Plant = {
+		SizeMin = 0.85,     -- Minimum scale multiplier
+		SizeMax = 1.15,     -- Maximum scale multiplier
+		WeightMin = 0.8,    -- Minimum weight (affects sell price multiplier)
+		WeightMax = 1.2     -- Maximum weight (heavier = worth more)
+	}
+}
+
+-- Pet/Garden caps
+Constants.MAX_EQUIPPED_PETS = 3
+Constants.MAX_GARDEN_PETS = 7
+
+-- ============================================================================
+-- TRADING CONFIGURATION
+-- ============================================================================
+Constants.TRADING_CONFIG = {
+	-- Maximum items per side of trade
+	MaxItemsPerTrade = 10,
+	-- Trade request timeout (seconds)
+	RequestTimeout = 30,
+	-- Trade confirmation timeout (seconds)
+	ConfirmTimeout = 60,
+	-- Minimum distance to trade (studs) - 0 means no limit
+	MaxTradeDistance = 50,
+	-- Cooldown between trade requests to same player (seconds)
+	RequestCooldown = 10
 }
 
 -- RemoteEvent Names
@@ -367,13 +619,49 @@ Constants.EVENTS = {
 	HARVEST_FRUIT = "HarvestFruit",
 	BUY_SEED = "BuySeed",
 	BUY_PET = "BuyPet",
+	BUY_EGG = "BuyEgg",
+	OPEN_EGG = "OpenEgg",
+	EGG_OPENED = "EggOpened", -- Server to client: egg result
 	EQUIP_PET = "EquipPet",
 	UNEQUIP_PET = "UnequipPet",
 	ADD_GARDEN_PET = "AddGardenPet",
 	REMOVE_GARDEN_PET = "RemoveGardenPet",
 	SELL_FRUIT = "SellFruit",
 	UPDATE_CURRENCY = "UpdateCurrency",
-	UPDATE_INVENTORY = "UpdateInventory"
+	UPDATE_INVENTORY = "UpdateInventory",
+	-- Shop events
+	GET_SHOP_INVENTORY = "GetShopInventory",
+	SHOP_INVENTORY_UPDATE = "ShopInventoryUpdate",
+	-- Trading events
+	TRADE_REQUEST = "TradeRequest",           -- Client requests trade with player
+	TRADE_RESPONSE = "TradeResponse",         -- Accept/decline trade request
+	TRADE_UPDATE = "TradeUpdate",             -- Update trade offer (add/remove items)
+	TRADE_CONFIRM = "TradeConfirm",           -- Confirm trade ready
+	TRADE_CANCEL = "TradeCancel",             -- Cancel trade
+	TRADE_COMPLETE = "TradeComplete",         -- Trade completed successfully
+	TRADE_INCOMING = "TradeIncoming"          -- Server notifies of incoming trade request
 }
+
+-- Helper function to generate unique IDs
+function Constants.GenerateUniqueId()
+	return game:GetService("HttpService"):GenerateGUID(false)
+end
+
+-- Helper function to generate random size/weight for a pet or plant
+function Constants.GenerateRandomSizeWeight(entityType)
+	local config = Constants.SIZE_WEIGHT_CONFIG[entityType]
+	if not config then
+		return { Size = 1, Weight = 1 }
+	end
+	
+	local size = config.SizeMin + math.random() * (config.SizeMax - config.SizeMin)
+	local weight = config.WeightMin + math.random() * (config.WeightMax - config.WeightMin)
+	
+	-- Round to 2 decimal places
+	size = math.floor(size * 100 + 0.5) / 100
+	weight = math.floor(weight * 100 + 0.5) / 100
+	
+	return { Size = size, Weight = weight }
+end
 
 return Constants
