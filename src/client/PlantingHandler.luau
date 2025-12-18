@@ -8,20 +8,6 @@ local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild(
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 local UIHandler = require(script.Parent.UIHandler)
 
--- Prefer new modular UI if present; fall back to legacy UIHandler
-local UI
-local useNewUI = false
-local uiFolder = script.Parent:FindFirstChild("UI")
-if uiFolder then
-	local ok, mod = pcall(function()
-		return require(uiFolder:WaitForChild("init"))
-	end)
-	if ok and mod and mod.Controller then
-		UI = mod
-		useNewUI = true
-	end
-end
-
 local PlantingHandler = {}
 local player = Players.LocalPlayer
 local connections = {}
@@ -60,13 +46,8 @@ local function setupAnchorClick(anchor)
 			return
 		end
 		
-		-- Get selected plant type from new UI (if available) or legacy UIHandler
-		local selectedPlantType
-		if useNewUI and UI and UI.Controller then
-			selectedPlantType = UI.Controller.GetSelectedPlantType()
-		else
-			selectedPlantType = UIHandler.GetSelectedPlantType()
-		end
+		-- Get selected plant type from UIHandler
+		local selectedPlantType = UIHandler.GetSelectedPlantType()
 		if not selectedPlantType then
 			-- No seed selected
 			warn("[PlantingHandler] No seed selected! Select a seed from your inventory first.")

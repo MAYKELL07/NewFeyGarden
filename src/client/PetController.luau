@@ -39,6 +39,78 @@ local PET_BOOST_RADIUS = 12
 local MAX_EQUIPPED_PETS = Constants.MAX_EQUIPPED_PETS or 3
 local MAX_GARDEN_PETS = Constants.MAX_GARDEN_PETS or 7
 
+-- Track animation per pet without leaking
+local animationTracks = setmetatable({}, { __mode = "k" })
+
+local function getAnimator(model)
+	local humanoid = model:FindFirstChildWhichIsA("Humanoid")
+	if humanoid then
+		local animator = humanoid:FindFirstChildWhichIsA("Animator")
+		if not animator then
+			animator = Instance.new("Animator")
+			animator.Parent = humanoid
+		end
+		return animator
+	end
+
+	local controller = model:FindFirstChildWhichIsA("AnimationController")
+	if not controller then
+		controller = Instance.new("AnimationController")
+		controller.Name = "PetAnimationController"
+		controller.Parent = model
+	end
+
+	local animator = controller:FindFirstChildWhichIsA("Animator")
+	if not animator then
+		animator = Instance.new("Animator")
+		animator.Parent = controller
+	end
+
+	return animator
+end
+
+local function stopMoveAnimation(model)
+	local track = animationTracks[model]
+	if track then
+		track:Stop()
+		animationTracks[model] = nil
+	end
+end
+
+local function ensureMoveAnimation(model)
+	if animationTracks[model] then return end
+
+	local anim = model:FindFirstChild("Automatic Save", true)
+	if not (anim and anim:IsA("Animation")) then return end
+
+	local animator = getAnimator(model)
+	if not animator then return end
+
+	local ok, track = pcall(function()
+		return animator:LoadAnimation(anim)
+	end)
+
+	if ok and track then
+		track.Looped = true
+		track:Play()
+		animationTracks[model] = track
+	end
+end
+
+local function faceTarget(petBody, targetPosition, movementType)
+	local bodyGyro = petBody and petBody:FindFirstChild("BodyGyro")
+	if not bodyGyro then return end
+
+	local direction = targetPosition - petBody.Position
+	if movementType ~= "Fly" then
+		direction = Vector3.new(direction.X, 0, direction.Z)
+	end
+	if direction.Magnitude < 0.1 then return end
+
+	local lookTarget = petBody.Position + direction.Unit
+	bodyGyro.CFrame = CFrame.lookAt(petBody.Position, lookTarget, Vector3.yAxis)
+end
+
 -- Create pet model with size scaling
 local function createPetModel(petInstance, petName)
 	-- petInstance is now {Id, PetType, Size, Weight}
@@ -252,23 +324,9 @@ local function updateEquippedPets()
 						
 						-- Smooth follow with BodyPosition
 						bodyPosition.Position = targetPosition
-						
-						-- Update BodyGyro for smooth rotation
-						local bodyGyro = petBody:FindFirstChild("BodyGyro")
-						if bodyGyro then
-							if movementType == "Fly" then
-								-- Flying pets slowly rotate
-								local rotationSpeed = time * 0.5
-								bodyGyro.CFrame = CFrame.Angles(0, rotationSpeed, 0)
-							else
-								-- Walking pets face the direction they're moving
-								local moveDir = (targetPosition - petBody.Position)
-								if moveDir.Magnitude > 0.5 then
-									local lookAt = CFrame.lookAt(Vector3.zero, Vector3.new(moveDir.X, 0, moveDir.Z).Unit)
-									bodyGyro.CFrame = lookAt
-								end
-							end
-						end
+
+						-- Make pet face its movement direction (fly and walk)
+						faceTarget(petBody, targetPosition, movementType)
 					end
 				end
 			end
@@ -501,24 +559,9 @@ local function updateGardenPets()
 							end
 						end
 						
-						-- Update BodyGyro for rotation
-						local bodyGyro = petBody:FindFirstChild("BodyGyro")
-						if bodyGyro then
-							if movementType == "Fly" then
-								-- Flying pets slowly rotate
-								local rotationSpeed = time * 0.3 / petWeight
-								bodyGyro.CFrame = CFrame.Angles(0, rotationSpeed, 0)
-							else
-								-- Walking pets face the direction they're moving
-								if petData.state == "moving" then
-									local moveDir = (petData.targetPos - currentPos)
-									if moveDir.Magnitude > 0.5 then
-										local lookAt = CFrame.lookAt(Vector3.zero, Vector3.new(moveDir.X, 0, moveDir.Z).Unit)
-										bodyGyro.CFrame = lookAt
-									end
-								end
-								-- When idle, walking pets just face forward
-							end
+						-- Face the direction of travel when moving
+						if petData.state == "moving" then
+							faceTarget(petBody, finalTargetPos, movementType)
 						end
 					end
 				end
@@ -597,6 +640,7 @@ function PetController.SpawnEquippedPets(equippedPets)
 	-- Remove all existing equipped pets
 	for _, petModel in ipairs(PetController.EquippedPets) do
 		if petModel and petModel.Parent then
+			stopMoveAnimation(petModel)
 			petModel:Destroy()
 		end
 	end
@@ -616,6 +660,7 @@ function PetController.SpawnEquippedPets(equippedPets)
 			local petModel = createPetModel(petInstance, player.Name .. "_Equipped_" .. i)
 			if petModel then
 				petModel.Parent = Workspace
+				ensureMoveAnimation(petModel)
 				
 				-- Position pet near player
 				if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -646,6 +691,7 @@ function PetController.SpawnGardenPets(gardenPets)
 	-- Remove all existing garden pets
 	for _, petData in ipairs(PetController.GardenPets) do
 		if petData.model and petData.model.Parent then
+			stopMoveAnimation(petData.model)
 			petData.model:Destroy()
 		end
 	end
@@ -682,6 +728,7 @@ function PetController.SpawnGardenPets(gardenPets)
 			local petModel = createPetModel(petInstance, player.Name .. "_Garden_" .. i)
 			if petModel then
 				petModel.Parent = Workspace
+				ensureMoveAnimation(petModel)
 				
 				-- Position pet in garden (random within bounds)
 				local offsetX = (math.random() * 2 - 1) * gardenInfo.halfWidth * 0.6
@@ -735,8 +782,10 @@ end
 -- Remove a specific equipped pet
 function PetController.RemoveEquippedPet(index)
 	if PetController.EquippedPets[index] then
-		if PetController.EquippedPets[index].Parent then
-			PetController.EquippedPets[index]:Destroy()
+		local petModel = PetController.EquippedPets[index]
+		stopMoveAnimation(petModel)
+		if petModel.Parent then
+			petModel:Destroy()
 		end
 		table.remove(PetController.EquippedPets, index)
 	end
@@ -745,8 +794,10 @@ end
 -- Remove a specific garden pet
 function PetController.RemoveGardenPet(index)
 	if PetController.GardenPets[index] then
-		if PetController.GardenPets[index].model and PetController.GardenPets[index].model.Parent then
-			PetController.GardenPets[index].model:Destroy()
+		local petModel = PetController.GardenPets[index].model
+		stopMoveAnimation(petModel)
+		if petModel and petModel.Parent then
+			petModel:Destroy()
 		end
 		table.remove(PetController.GardenPets, index)
 	end

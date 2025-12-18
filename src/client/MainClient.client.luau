@@ -24,16 +24,7 @@ local PlantingHandler = require(script.Parent.PlantingHandler)
 local NPCUIHandler = require(script.Parent.NPCUIHandler)
 local TutorialUI = require(script.Parent.TutorialUI)
 local EggOpeningUI = require(script.Parent.EggOpeningUI)
-local ToolController = require(script.Parent.ToolController)
-
--- New modular UI system (falls back to legacy UIHandler inside PlantingHandler if needed)
-local UI
-local okUI, uiModule = pcall(function()
-	return require(script.Parent:WaitForChild("UI"):WaitForChild("init"))
-end)
-if okUI and uiModule then
-	UI = uiModule
-end
+local UIHandler = require(script.Parent.UIHandler)
 
 -- Wait for character to load
 local player = game.Players.LocalPlayer
@@ -42,12 +33,7 @@ player.CharacterAdded:Wait()
 -- Initialize client systems
 task.wait(1) -- Give server time to set up
 
-if UI and UI.Controller then
-	UI.Initialize()
-	UI.Controller.SetToolController(ToolController)
-else
-	warn("[MainClient] UI module missing; UIHandler fallback used by PlantingHandler")
-end
+UIHandler.Initialize()
 
 NPCUIHandler.Initialize()
 TutorialUI.Initialize()
