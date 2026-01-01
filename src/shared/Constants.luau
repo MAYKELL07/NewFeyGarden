@@ -222,6 +222,144 @@ Constants.PLANT_CONFIG = {
 	}
 }
 
+-- =============================================================================
+-- ROBUX SEED PURCHASES (Developer Products)
+-- =============================================================================
+-- ProductId is the Developer Product ID from the Roblox Creator Dashboard
+-- RobuxPrice is for display purposes (actual price is set on Roblox)
+-- SeedAmount is how many seeds the player receives per purchase
+-- 
+-- To set up:
+-- 1. Create Developer Products in Game Settings > Monetization > Developer Products
+-- 2. Set the Robux price for each product
+-- 3. Copy the Product ID and paste it here
+-- 
+-- NOTE: ProductIds below are placeholders - replace with your actual IDs!
+Constants.SEED_ROBUX_PRODUCTS = {
+	-- Tier 1 Starter Seeds (5 Robux = 5 seeds bundle)
+	[Constants.PLANT_TYPES.LUMUT] = {
+		ProductId = 0, -- TODO: Replace with actual Developer Product ID
+		RobuxPrice = 5,
+		SeedAmount = 5,
+		DisplayName = "Lumut Seed Pack"
+	},
+	[Constants.PLANT_TYPES.CLOUDCAP] = {
+		ProductId = 0,
+		RobuxPrice = 5,
+		SeedAmount = 5,
+		DisplayName = "Cloudcap Seed Pack"
+	},
+	[Constants.PLANT_TYPES.PUFFOT] = {
+		ProductId = 0,
+		RobuxPrice = 5,
+		SeedAmount = 5,
+		DisplayName = "Puffot Seed Pack"
+	},
+	[Constants.PLANT_TYPES.GLOWBUD] = {
+		ProductId = 0,
+		RobuxPrice = 5,
+		SeedAmount = 5,
+		DisplayName = "Glowbud Seed Pack"
+	},
+	
+	-- Tier 2 Mid-Game Seeds (10 Robux = 5 seeds bundle)
+	[Constants.PLANT_TYPES.TWINKLELEAF] = {
+		ProductId = 0,
+		RobuxPrice = 10,
+		SeedAmount = 5,
+		DisplayName = "Twinkleleaf Seed Pack"
+	},
+	[Constants.PLANT_TYPES.CHAMELEONBERRI] = {
+		ProductId = 0,
+		RobuxPrice = 10,
+		SeedAmount = 5,
+		DisplayName = "Chameleonberri Seed Pack"
+	},
+	[Constants.PLANT_TYPES.DREAMSHROOM] = {
+		ProductId = 0,
+		RobuxPrice = 10,
+		SeedAmount = 5,
+		DisplayName = "Dreamshroom Seed Pack"
+	},
+	[Constants.PLANT_TYPES.EVERSPRINGACORN] = {
+		ProductId = 0,
+		RobuxPrice = 10,
+		SeedAmount = 5,
+		DisplayName = "Everspringacorn Seed Pack"
+	},
+	
+	-- Tier 3 Rare Seeds (25 Robux = 5 seeds bundle)
+	[Constants.PLANT_TYPES.STARVINEMELON] = {
+		ProductId = 0,
+		RobuxPrice = 25,
+		SeedAmount = 5,
+		DisplayName = "Starvinemelon Seed Pack"
+	},
+	[Constants.PLANT_TYPES.FROSTMIND] = {
+		ProductId = 0,
+		RobuxPrice = 25,
+		SeedAmount = 5,
+		DisplayName = "Frostmind Seed Pack"
+	},
+	[Constants.PLANT_TYPES.DREAMFRUIT] = {
+		ProductId = 0,
+		RobuxPrice = 25,
+		SeedAmount = 5,
+		DisplayName = "Dreamfruit Seed Pack"
+	},
+	[Constants.PLANT_TYPES.SUNFLAREMANGO] = {
+		ProductId = 0,
+		RobuxPrice = 25,
+		SeedAmount = 5,
+		DisplayName = "Sunflaremango Seed Pack"
+	},
+	[Constants.PLANT_TYPES.STARLILY] = {
+		ProductId = 0,
+		RobuxPrice = 25,
+		SeedAmount = 5,
+		DisplayName = "Starlily Seed Pack"
+	},
+	[Constants.PLANT_TYPES.MOONVINE] = {
+		ProductId = 0,
+		RobuxPrice = 30,
+		SeedAmount = 5,
+		DisplayName = "Moonvine Seed Pack"
+	},
+	[Constants.PLANT_TYPES.WILLOWWHISP] = {
+		ProductId = 0,
+		RobuxPrice = 35,
+		SeedAmount = 5,
+		DisplayName = "Willowwhisp Seed Pack"
+	}
+}
+
+-- Developer product for instant growth of all plants in the player's garden
+Constants.GROW_ALL_PRODUCT = {
+	ProductId = 0, -- TODO: Replace with actual Developer Product ID
+	RobuxPrice = 49,
+	DisplayName = "Grow All Plants"
+}
+
+-- Helper to get product ID by plant type
+function Constants.GetSeedProductId(plantType)
+	local product = Constants.SEED_ROBUX_PRODUCTS[plantType]
+	return product and product.ProductId or nil
+end
+
+function Constants.GetGrowAllProductId()
+	return Constants.GROW_ALL_PRODUCT and Constants.GROW_ALL_PRODUCT.ProductId or nil
+end
+
+-- Helper to get plant type by product ID
+function Constants.GetPlantTypeByProductId(productId)
+	for plantType, product in pairs(Constants.SEED_ROBUX_PRODUCTS) do
+		if product.ProductId == productId then
+			return plantType, product
+		end
+	end
+	return nil, nil
+end
+
 -- Economy
 -- Starting coins: Enough to buy 5-6 starter plants (Lumut) and have buffer for mistakes
 Constants.STARTING_COINS = 100
@@ -596,6 +734,126 @@ Constants.MAX_EQUIPPED_PETS = 3
 Constants.MAX_GARDEN_PETS = 7
 
 -- ============================================================================
+-- GEAR/TOOL SYSTEM
+-- ============================================================================
+-- Gear types that can be purchased from the Gear Shop
+Constants.GEAR_TYPES = {
+	WATERING_CAN = "WateringCan",
+	SHOVEL = "Shovel",
+	GOLDEN_WATERING_CAN = "GoldenWateringCan",
+	ENCHANTED_SHOVEL = "EnchantedShovel"
+}
+
+-- Gear configuration: pricing, stats, and abilities
+Constants.GEAR_CONFIG = {
+	[Constants.GEAR_TYPES.WATERING_CAN] = {
+		DisplayName = "Watering Can",
+		Description = "Waters up to 5 plants at once to speed growth",
+		Price = 50,
+		Icon = "💧",
+		MaxPlantsPerUse = 5,       -- Maximum plants that can be boosted per use
+		WaterDuration = 90,        -- Seconds the water buff lasts
+		Cooldown = 1.5,
+		Tier = 1
+	},
+	[Constants.GEAR_TYPES.SHOVEL] = {
+		DisplayName = "Shovel",
+		Description = "Dig up plants to clear space",
+		Price = 30,
+		Icon = "🪓",
+		Cooldown = 1.0,
+		Tier = 1
+	},
+	[Constants.GEAR_TYPES.GOLDEN_WATERING_CAN] = {
+		DisplayName = "Golden Watering Can",
+		Description = "Waters up to 10 plants with extended duration",
+		Price = 500,
+		Icon = "✨💧",
+		MaxPlantsPerUse = 10,
+		WaterDuration = 180,       -- 3 minutes
+		Cooldown = 1.0,
+		Tier = 2
+	},
+	[Constants.GEAR_TYPES.ENCHANTED_SHOVEL] = {
+		DisplayName = "Enchanted Shovel",
+		Description = "Instantly clears plants and returns seeds",
+		Price = 400,
+		Icon = "✨🪓",
+		ReturnSeeds = true,        -- Returns seeds when digging up plants
+		Cooldown = 0.5,
+		Tier = 2
+	}
+}
+
+-- Player starting gear (free tools)
+Constants.STARTING_GEAR = {
+	Constants.GEAR_TYPES.WATERING_CAN,
+	Constants.GEAR_TYPES.SHOVEL
+}
+
+-- ============================================================================
+-- FRUIT CONFIGURATION
+-- ============================================================================
+-- Settings for fruit spawning on plants at bloom stage
+Constants.FRUIT_CONFIG = {
+	-- Min/max fruits per plant (random within range)
+	MinFruitsPerPlant = 2,
+	MaxFruitsPerPlant = 4,
+	
+	-- Fruit spawn positions relative to plant (offsets from plant center)
+	-- These create a natural "hanging" look around the plant
+	SpawnOffsets = {
+		Vector3.new(0.8, 0, 0.3),
+		Vector3.new(-0.7, 0.2, 0.5),
+		Vector3.new(0.3, -0.1, -0.8),
+		Vector3.new(-0.5, 0.1, -0.6),
+		Vector3.new(0.6, 0.15, 0.7),
+		Vector3.new(-0.4, -0.05, 0.4),
+		Vector3.new(0.2, 0.1, -0.5),
+	},
+	
+	-- Vertical offset from plant top (fruits hang below/around bloom)
+	HeightOffset = -0.3,
+	
+	-- Fruit model size relative to plant
+	FruitScale = 0.4,
+	
+	-- ProximityPrompt settings
+	PromptHoldDuration = 0.3,
+	PromptMaxDistance = 12,
+	PromptActionText = "Collect",
+	PromptObjectText = "Fruit",
+	
+	-- Respawn settings (0 = no respawn, fruits only spawn once per bloom)
+	RespawnTime = 0,
+	
+	-- Fruit reveal settings (fruits spawn invisible and reveal one by one)
+	-- If plant has 0-1 fruits, harvesting removes the whole plant (plant IS the fruit)
+	-- If plant has 2+ fruits, they reveal one at a time over this interval
+	FruitRevealTimeSeconds = 20, -- Time between each fruit becoming visible
+	FruitRevealScale = true, -- If true, fruits scale up; if false, just fade in
+	FruitRevealDuration = 1.5, -- How long the scale-up/fade-in animation takes
+}
+
+-- ============================================================================
+-- FREE PLANTING CONFIGURATION
+-- ============================================================================
+-- Settings for free-form planting anywhere on plots
+Constants.FREE_PLANTING = {
+	-- Enable/disable free-form planting (vs anchor-based)
+	Enabled = true,
+	
+	-- Minimum distance between plants (studs)
+	MinPlantSpacing = 3.0,
+	
+	-- Maximum plants per garden (replaces SlotsPerGarden when free planting)
+	MaxPlantsPerGarden = 20,
+	
+	-- Y offset above plot surface for planting
+	PlantHeightOffset = 0.1,
+}
+
+-- ============================================================================
 -- TRADING CONFIGURATION
 -- ============================================================================
 Constants.TRADING_CONFIG = {
@@ -615,11 +873,14 @@ Constants.TRADING_CONFIG = {
 Constants.EVENTS = {
 	WEATHER_CHANGED = "WeatherChanged",
 	PLANT_SEED = "PlantSeed",
+	PLANT_SEED_AT_POSITION = "PlantSeedAtPosition", -- Free-form planting
 	HARVEST_PLANT = "HarvestPlant",
 	HARVEST_FRUIT = "HarvestFruit",
 	BUY_SEED = "BuySeed",
+	BUY_SEED_ROBUX = "BuySeedRobux", -- Robux purchase for seeds
 	BUY_PET = "BuyPet",
 	BUY_EGG = "BuyEgg",
+	BUY_GEAR = "BuyGear", -- Gear shop purchase
 	OPEN_EGG = "OpenEgg",
 	EGG_OPENED = "EggOpened", -- Server to client: egg result
 	EQUIP_PET = "EquipPet",

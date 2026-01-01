@@ -35,9 +35,33 @@ local PetController = {}
 PetController.EquippedPets = {} -- Array of pets following player (max 3)
 PetController.GardenPets = {} -- Array of pets roaming in garden (max 7)
 local player = Players.LocalPlayer
-local PET_BOOST_RADIUS = 12
+local PET_BOOST_RADIUS = 30
+local PET_FOLLOW_DISTANCE_MULTIPLIER = 2.5 -- Multiply config.FollowDistance by this (makes pets orbit further from player)
 local MAX_EQUIPPED_PETS = Constants.MAX_EQUIPPED_PETS or 3
 local MAX_GARDEN_PETS = Constants.MAX_GARDEN_PETS or 7
+
+-- Weight to scale mapping
+-- Weight 1 = scale 1.0, Weight increases/decreases scale proportionally
+local MIN_WEIGHT_SCALE = 0.6  -- Minimum scale at very low weight
+local MAX_WEIGHT_SCALE = 1.8  -- Maximum scale at very high weight
+local WEIGHT_SCALE_FACTOR = 0.15  -- How much each weight point affects scale
+
+-- Animation IDs keyed by pet type string (matches Constants.PET_TYPES values)
+local PET_ANIMATION_IDS = {
+	CrystalOwl = "rbxassetid://123529384488047",
+	EmberCat = "rbxassetid://78828702711075",
+	EverflameGriffin = "rbxassetid://134717447296684",
+	GlowBug = "rbxassetid://103068963428519",
+	Leafling = "rbxassetid://92889904712907",
+	MoonDragon = "rbxassetid://121557478752388",
+	MossySlime = "rbxassetid://113805401501210",
+	PebblePup = "rbxassetid://135071793175470",
+	SparkFox = "rbxassetid://123453968074742",
+	SproutTail = "rbxassetid://88562824413900",
+	StarlightPhoenix = "rbxassetid://109320769613379",
+	Thornbeak = "rbxassetid://90563216315905",
+	WispRabbit = "rbxassetid://94499105982343"
+}
 
 -- Track animation per pet without leaking
 local animationTracks = setmetatable({}, { __mode = "k" })
@@ -77,11 +101,82 @@ local function stopMoveAnimation(model)
 	end
 end
 
+-- Calculate scale based on weight
+local function calculateWeightScale(weight)
+	local baseWeight = 1
+	local weightDiff = (weight or 1) - baseWeight
+	local scale = 1 + (weightDiff * WEIGHT_SCALE_FACTOR)
+	return math.clamp(scale, MIN_WEIGHT_SCALE, MAX_WEIGHT_SCALE)
+end
+
+-- Apply scale to pet model based on weight
+local function applyWeightScale(petModel, weight)
+	if not petModel or not petModel.Parent then return end
+	
+	local scale = calculateWeightScale(weight)
+	local currentScale = petModel:GetAttribute("AppliedScale") or 1
+	
+	-- Skip if scale hasn't changed significantly
+	if math.abs(scale - currentScale) < 0.01 then return end
+	
+	-- Calculate relative scale change
+	local relativeScale = scale / currentScale
+	
+	-- Scale all BaseParts in the model
+	for _, part in ipairs(petModel:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.Size = part.Size * relativeScale
+		end
+	end
+	
+	-- Update light range if present
+	local body = petModel.PrimaryPart or petModel:FindFirstChildWhichIsA("BasePart")
+	if body then
+		local light = body:FindFirstChild("PetLight")
+		if light and light:IsA("PointLight") then
+			light.Range = 8 * scale
+		end
+	end
+	
+	-- Store the applied scale for future reference
+	petModel:SetAttribute("AppliedScale", scale)
+end
+
+-- Setup weight attribute listener for a pet model
+local function setupWeightListener(petModel)
+	if not petModel then return end
+	
+	-- Listen for weight changes
+	petModel:GetAttributeChangedSignal("Weight"):Connect(function()
+		local newWeight = petModel:GetAttribute("Weight") or 1
+		applyWeightScale(petModel, newWeight)
+	end)
+end
+
+local function getMoveAnimation(model)
+	local existing = model:FindFirstChildWhichIsA("Animation", true)
+	if existing and existing.AnimationId ~= "" then
+		return existing
+	end
+
+	local petType = model:GetAttribute("PetType")
+	local mappedId = petType and PET_ANIMATION_IDS[petType]
+	if mappedId then
+		local animation = Instance.new("Animation")
+		animation.Name = "PetMove"
+		animation.AnimationId = mappedId
+		animation.Parent = model
+		return animation
+	end
+
+	return nil
+end
+
 local function ensureMoveAnimation(model)
 	if animationTracks[model] then return end
 
-	local anim = model:FindFirstChild("Automatic Save", true)
-	if not (anim and anim:IsA("Animation")) then return end
+	local anim = getMoveAnimation(model)
+	if not anim then return end
 
 	local animator = getAnimator(model)
 	if not animator then return end
@@ -102,13 +197,28 @@ local function faceTarget(petBody, targetPosition, movementType)
 	if not bodyGyro then return end
 
 	local direction = targetPosition - petBody.Position
-	if movementType ~= "Fly" then
-		direction = Vector3.new(direction.X, 0, direction.Z)
-	end
+	-- Always flatten to horizontal (no pitch rotation for any pet type)
+	direction = Vector3.new(direction.X, 0, direction.Z)
 	if direction.Magnitude < 0.1 then return end
 
 	local lookTarget = petBody.Position + direction.Unit
 	bodyGyro.CFrame = CFrame.lookAt(petBody.Position, lookTarget, Vector3.yAxis)
+end
+
+-- Control animation playback based on movement state
+local function setAnimationPlaying(model, shouldPlay)
+	local track = animationTracks[model]
+	if not track then return end
+	
+	if shouldPlay then
+		if not track.IsPlaying then
+			track:Play()
+		end
+	else
+		if track.IsPlaying then
+			track:Stop()
+		end
+	end
 end
 
 -- Create pet model with size scaling
@@ -241,10 +351,19 @@ local function createPetModel(petInstance, petName)
 		end
 	end
 	
-	-- Weld all parts to the primary part so the model moves as one unit
+	-- Collect parts that are connected via Motor6D (animated joints) - don't weld these
+	local motorConnectedParts = {}
+	for _, motor in ipairs(petModel:GetDescendants()) do
+		if motor:IsA("Motor6D") then
+			if motor.Part0 then motorConnectedParts[motor.Part0] = true end
+			if motor.Part1 then motorConnectedParts[motor.Part1] = true end
+		end
+	end
+	
+	-- Weld only parts that are NOT connected via Motor6D (so animations still work)
 	if petModel:IsA("Model") and body then
 		for _, part in ipairs(petModel:GetDescendants()) do
-			if part:IsA("BasePart") and part ~= body then
+			if part:IsA("BasePart") and part ~= body and not motorConnectedParts[part] then
 				local weld = Instance.new("WeldConstraint")
 				weld.Part0 = body
 				weld.Part1 = part
@@ -258,6 +377,31 @@ local function createPetModel(petInstance, petName)
 	petModel:SetAttribute("Size", petSize)
 	petModel:SetAttribute("Weight", petWeight)
 	petModel:SetAttribute("MovementType", movementType)
+	
+	-- Apply weight-based scaling and setup listener for future changes
+	local weightScale = calculateWeightScale(petWeight)
+	petModel:SetAttribute("AppliedScale", petSize * weightScale)  -- Combined initial scale
+	
+	-- Apply additional weight scale on top of size
+	if petWeight ~= 1 then
+		local relativeScale = weightScale  -- Weight scale relative to base (size already applied)
+		for _, part in ipairs(petModel:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.Size = part.Size * relativeScale
+			end
+		end
+		
+		-- Update light range
+		if body then
+			local light = body:FindFirstChild("PetLight")
+			if light and light:IsA("PointLight") then
+				light.Range = 8 * petSize * weightScale
+			end
+		end
+	end
+	
+	-- Setup listener for weight attribute changes
+	setupWeightListener(petModel)
 	
 	return petModel
 end
@@ -283,8 +427,9 @@ local function updateEquippedPets()
 					if config then
 						-- Calculate follow position (spread pets around player)
 						local angle = (index - 1) * (math.pi * 2 / MAX_EQUIPPED_PETS)
-						local offsetX = math.cos(angle) * config.FollowDistance
-						local offsetZ = math.sin(angle) * config.FollowDistance
+						local followDist = config.FollowDistance * PET_FOLLOW_DISTANCE_MULTIPLIER
+						local offsetX = math.cos(angle) * followDist
+						local offsetZ = math.sin(angle) * followDist
 						
 						local targetPosition
 						if movementType == "Fly" then
@@ -325,8 +470,23 @@ local function updateEquippedPets()
 						-- Smooth follow with BodyPosition
 						bodyPosition.Position = targetPosition
 
-						-- Make pet face its movement direction (fly and walk)
-						faceTarget(petBody, targetPosition, movementType)
+						-- Check if pet is actually moving (distance to target)
+						local distanceToTarget = (petBody.Position - targetPosition).Magnitude
+						local isMoving = distanceToTarget > 0.5
+						
+						-- Face movement direction (use player's look direction when close)
+						if isMoving then
+							faceTarget(petBody, targetPosition, movementType)
+						end
+						
+						-- Control animation based on movement type
+						if movementType == "Walk" then
+							-- Walking pets only animate when moving
+							setAnimationPlaying(petModel, isMoving)
+						else
+							-- Flying pets always animate (hovering)
+							setAnimationPlaying(petModel, true)
+						end
 					end
 				end
 			end
@@ -347,8 +507,8 @@ local function getPlayerGardenInfo()
 		local roamConfig = Config.GardenPetRoaming or {}
 		return {
 			center = centerPos,
-			halfWidth = roamConfig.BoundsHalfWidth or 18,
-			halfLength = roamConfig.BoundsHalfLength or 18,
+			halfWidth = roamConfig.BoundsHalfWidth or 28,
+			halfLength = roamConfig.BoundsHalfLength or 28,
 			minHeight = roamConfig.MinHeight or 1,
 			maxHeight = roamConfig.MaxHeight or 4,
 			idleChance = roamConfig.IdleChance or 0.6,
@@ -364,6 +524,12 @@ local function getPlayerGardenInfo()
 	
 	-- Helper to find a valid center in a garden
 	local function findGardenCenter(garden)
+		-- Prefer explicit Center marker for consistent roaming origin
+		local explicitCenter = garden:FindFirstChild("Center")
+		if explicitCenter and explicitCenter:IsA("BasePart") then
+			return explicitCenter.Position
+		end
+
 		-- Try Floor first
 		local floor = garden:FindFirstChild(Config.World.FloorName)
 		if floor and floor:IsA("BasePart") then
@@ -446,11 +612,21 @@ local function getPlayerGardenCenter()
 end
 
 -- Update garden pets roaming behavior with box bounds and idle
-local function updateGardenPets()
+local function updateGardenPets(deltaTime)
 	if #PetController.GardenPets == 0 then return end
 	
 	local gardenInfo = getPlayerGardenInfo()
 	if not gardenInfo then return end
+
+	-- Clamp smoothing factor so pets glide instead of snapping to new targets
+	local baseMoveAlpha = math.clamp(gardenInfo.moveSpeed or 0.3, 0.05, 0.8)
+	local moveAlpha
+	if deltaTime then
+		local frameScale = math.clamp(deltaTime * 60, 0.5, 2)
+		moveAlpha = math.clamp(baseMoveAlpha * frameScale, 0.05, 0.8)
+	else
+		moveAlpha = baseMoveAlpha
+	end
 	
 	local time = tick()
 	
@@ -547,21 +723,23 @@ local function updateGardenPets()
 						
 						-- Smooth move to target
 						if petData.state == "moving" then
-							bodyPosition.Position = finalTargetPos
+							local smoothed = currentPos:Lerp(finalTargetPos, moveAlpha)
+							bodyPosition.Position = smoothed
+							faceTarget(petBody, smoothed, movementType)
 						else
-							-- When idle, stay in place with subtle motion
-							if movementType == "Fly" then
-								local idlePos = Vector3.new(currentPos.X, finalTargetPos.Y, currentPos.Z)
-								bodyPosition.Position = idlePos
-							else
-								-- Walking pets just sit still when idle
-								bodyPosition.Position = Vector3.new(currentPos.X, finalTargetPos.Y, currentPos.Z)
-							end
+							-- When idle, gently settle toward the current vertical plane
+							local idlePos = Vector3.new(currentPos.X, finalTargetPos.Y, currentPos.Z)
+							local smoothedIdle = currentPos:Lerp(idlePos, moveAlpha * 0.5)
+							bodyPosition.Position = smoothedIdle
 						end
 						
-						-- Face the direction of travel when moving
-						if petData.state == "moving" then
-							faceTarget(petBody, finalTargetPos, movementType)
+						-- Control animation based on movement type
+						if movementType == "Walk" then
+							-- Walking pets only animate when moving
+							setAnimationPlaying(petModel, petData.state == "moving")
+						else
+							-- Flying pets always animate (hovering)
+							setAnimationPlaying(petModel, true)
 						end
 					end
 				end
@@ -634,9 +812,52 @@ local function applyPetBoosts()
 	end
 end
 
+-- Helper to compare pet arrays and check if respawn is needed
+local function arePetArraysEqual(currentPets, newPets, isEquipped)
+	-- Handle nil/empty cases
+	local currentCount = currentPets and #currentPets or 0
+	local newCount = newPets and #newPets or 0
+	
+	if currentCount == 0 and newCount == 0 then return true end
+	if currentCount ~= newCount then return false end
+	if not newPets then return currentCount == 0 end
+	
+	-- Build a set of current pet IDs for fast lookup
+	local currentPetIds = {}
+	for _, entry in ipairs(currentPets) do
+		local model = isEquipped and entry or (entry and entry.model)
+		if model and model.Parent then
+			local petId = model:GetAttribute("PetId")
+			if petId then
+				currentPetIds[petId] = true
+			end
+		end
+	end
+	
+	-- Check if all new pets exist in current pets
+	local matchedCount = 0
+	for _, newPet in ipairs(newPets) do
+		local newPetId = newPet.Id
+		if newPetId and currentPetIds[newPetId] then
+			matchedCount = matchedCount + 1
+		else
+			-- Pet not found by ID, they're different
+			return false
+		end
+	end
+	
+	-- Ensure we matched all current pets
+	return matchedCount == currentCount
+end
+
 -- Spawn equipped pets (follow player)
 -- equippedPets is now an array of pet instances: [{Id, PetType, Size, Weight}]
 function PetController.SpawnEquippedPets(equippedPets)
+	-- Check if pets are the same - skip respawn if unchanged
+	if arePetArraysEqual(PetController.EquippedPets, equippedPets, true) then
+		return -- No change, skip respawn
+	end
+	
 	-- Remove all existing equipped pets
 	for _, petModel in ipairs(PetController.EquippedPets) do
 		if petModel and petModel.Parent then
@@ -688,6 +909,11 @@ end
 -- Spawn garden pets (roam in garden)
 -- gardenPets is now an array of pet instances: [{Id, PetType, Size, Weight}]
 function PetController.SpawnGardenPets(gardenPets)
+	-- Check if pets are the same - skip respawn if unchanged
+	if arePetArraysEqual(PetController.GardenPets, gardenPets, false) then
+		return -- No change, skip respawn
+	end
+	
 	-- Remove all existing garden pets
 	for _, petData in ipairs(PetController.GardenPets) do
 		if petData.model and petData.model.Parent then
@@ -849,42 +1075,56 @@ function PetController.Initialize()
 	local updateInventoryEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.UPDATE_INVENTORY)
 	updateInventoryEvent.OnClientEvent:Connect(function(inventory)
 		-- Spawn equipped pets (follow player)
-		if inventory.EquippedPets and type(inventory.EquippedPets) == "table" then
-			PetController.SpawnEquippedPets(inventory.EquippedPets)
-		else
-			-- Remove all equipped pets if none
-			for _, petModel in ipairs(PetController.EquippedPets) do
-				if petModel and petModel.Parent then
-					petModel:Destroy()
+		-- Only update if EquippedPets key is present in inventory
+		if inventory.EquippedPets ~= nil then
+			if type(inventory.EquippedPets) == "table" and #inventory.EquippedPets > 0 then
+				PetController.SpawnEquippedPets(inventory.EquippedPets)
+			elseif type(inventory.EquippedPets) == "table" and #inventory.EquippedPets == 0 then
+				-- Only clear pets if server explicitly sends empty array
+				if #PetController.EquippedPets > 0 then
+					for _, petModel in ipairs(PetController.EquippedPets) do
+						if petModel and petModel.Parent then
+							stopMoveAnimation(petModel)
+							petModel:Destroy()
+						end
+					end
+					PetController.EquippedPets = {}
 				end
 			end
-			PetController.EquippedPets = {}
 		end
+		-- If EquippedPets key is nil/missing, keep existing pets (no change)
 		
 		-- Spawn garden pets (roam in garden)
-		if inventory.GardenPets and type(inventory.GardenPets) == "table" then
-			-- Store pending pets in case garden isn't assigned yet
-			pendingGardenPets = inventory.GardenPets
-			PetController.SpawnGardenPets(inventory.GardenPets)
-		else
-			pendingGardenPets = nil
-			-- Remove all garden pets if none
-			for _, petData in ipairs(PetController.GardenPets) do
-				if petData.model and petData.model.Parent then
-					petData.model:Destroy()
+		-- Only update if GardenPets key is present in inventory
+		if inventory.GardenPets ~= nil then
+			if type(inventory.GardenPets) == "table" and #inventory.GardenPets > 0 then
+				-- Store pending pets in case garden isn't assigned yet
+				pendingGardenPets = inventory.GardenPets
+				PetController.SpawnGardenPets(inventory.GardenPets)
+			elseif type(inventory.GardenPets) == "table" and #inventory.GardenPets == 0 then
+				pendingGardenPets = nil
+				-- Only clear pets if server explicitly sends empty array
+				if #PetController.GardenPets > 0 then
+					for _, petData in ipairs(PetController.GardenPets) do
+						if petData.model and petData.model.Parent then
+							stopMoveAnimation(petData.model)
+							petData.model:Destroy()
+						end
+					end
+					PetController.GardenPets = {}
 				end
 			end
-			PetController.GardenPets = {}
 		end
+		-- If GardenPets key is nil/missing, keep existing pets (no change)
 	end)
 	
 	-- Set up garden assignment listener
 	setupGardenListener()
 	
 	-- Update pets on every frame
-	RunService.RenderStepped:Connect(function()
-		updateEquippedPets()
-		updateGardenPets()
+	RunService.RenderStepped:Connect(function(dt)
+		updateEquippedPets(dt)
+		updateGardenPets(dt)
 		applyPetBoosts()
 	end)
 	

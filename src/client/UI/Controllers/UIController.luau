@@ -10,6 +10,7 @@ local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild(
 
 -- UI Modules
 local Theme = require(script.Parent:WaitForChild("Theme"))
+local Styles = require(script.Parent:WaitForChild("Styles"))
 local ClientState = require(script.Parent:WaitForChild("ClientState"))
 
 -- Components
@@ -26,6 +27,10 @@ local UIController = {}
 
 local player = Players.LocalPlayer
 local screenGui: ScreenGui? = nil
+local uiRoot: Frame? = nil
+local hudLayer: Frame? = nil
+local windowLayer: Frame? = nil
+local hudContainer: Frame? = nil
 local initialized = false
 
 -- Remote events
@@ -59,6 +64,70 @@ function UIController.Initialize()
 		screenGui.IgnoreGuiInset = true
 		screenGui.Parent = playerGui
 	end
+
+	-- Root container with aspect ratio to keep UI consistent across devices
+	uiRoot = screenGui:FindFirstChild("UIRoot") :: Frame?
+	if not uiRoot then
+		local root = Instance.new("Frame")
+		root.Name = "UIRoot"
+		root.Size = UDim2.new(1, 0, 1, 0)
+		root.Position = UDim2.new(0.5, 0, 0.5, 0)
+		root.AnchorPoint = Vector2.new(0.5, 0.5)
+		root.BackgroundTransparency = 1
+		Styles.AddAspectRatio(root, 16 / 9)
+		root.Parent = screenGui
+		uiRoot = root
+	end
+
+	-- Layer frames for HUD and windows
+	hudLayer = uiRoot:FindFirstChild("HUDLayer") :: Frame?
+	if not hudLayer then
+		local hud = Instance.new("Frame")
+		hud.Name = "HUDLayer"
+		hud.Size = UDim2.new(1, 0, 1, 0)
+		hud.BackgroundTransparency = 1
+		hud.Parent = uiRoot
+		hudLayer = hud
+	end
+
+	windowLayer = uiRoot:FindFirstChild("WindowLayer") :: Frame?
+	if not windowLayer then
+		local layer = Instance.new("Frame")
+		layer.Name = "WindowLayer"
+		layer.Size = UDim2.new(1, 0, 1, 0)
+		layer.BackgroundTransparency = 1
+		layer.ZIndex = 50
+		layer.Parent = uiRoot
+		windowLayer = layer
+	end
+
+	-- HUD container (top-left stack) for compact HUD elements
+	hudContainer = hudLayer and hudLayer:FindFirstChild("HUDContainer") :: Frame?
+	if hudLayer and not hudContainer then
+		local container = Instance.new("Frame")
+		container.Name = "HUDContainer"
+		container.Size = UDim2.new(0, 0, 0, 60)
+		container.AutomaticSize = Enum.AutomaticSize.XY
+		container.BackgroundTransparency = 1
+		container.Position = UDim2.new(0, 0, 0, 0)
+		container.ZIndex = 5
+		container.Parent = hudLayer
+
+		local padding = Instance.new("UIPadding")
+		padding.PaddingTop = UDim.new(0, Styles.GetTopPadding() + 10)
+		padding.PaddingLeft = UDim.new(0, 10)
+		padding.Parent = container
+
+		local layout = Instance.new("UIListLayout")
+		layout.FillDirection = Enum.FillDirection.Horizontal
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+		layout.VerticalAlignment = Enum.VerticalAlignment.Top
+		layout.Padding = UDim.new(0, 10)
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		layout.Parent = container
+
+		hudContainer = container
+	end
 	
 	-- Get remote events
 	local events = ReplicatedStorage:FindFirstChild("Events")
@@ -69,15 +138,17 @@ function UIController.Initialize()
 	end
 	
 	-- Initialize HUD components
-	CurrencyDisplay.Create(screenGui)
-	WeatherDisplay.Create(screenGui)
-	Hotbar.Create(screenGui, function(slotIndex)
+	local hudParent = hudContainer or hudLayer or screenGui
+	CurrencyDisplay.Create(hudParent)
+	WeatherDisplay.Create(hudParent)
+	Hotbar.Create(hudParent, function(slotIndex)
 		UIController.OnHotbarSelect(slotIndex)
 	end)
 	
 	-- Initialize controllers
-	ShopController.Initialize(screenGui)
-	InventoryController.Initialize(screenGui)
+	local windowParent = windowLayer or screenGui
+	ShopController.Initialize(windowParent)
+	InventoryController.Initialize(windowParent)
 	
 	-- Set up seed selection callback
 	InventoryController.SetOnSeedSelected(function(seedType)
@@ -92,7 +163,8 @@ function UIController.Initialize()
 	
 	initialized = true
 	
-	Notification.Show(screenGui, "Welcome to Fey Garden! 🌿", "info", 3)
+	local notifParent = hudLayer or screenGui
+	Notification.Show(notifParent, "Welcome to Fey Garden! 🌿", "info", 3)
 end
 
 -- =============================================================================
@@ -221,8 +293,9 @@ end
 -- =============================================================================
 
 function UIController.ShowNotification(message: string, notifType: string?, duration: number?)
-	if screenGui then
-		Notification.Show(screenGui, message, notifType or "info", duration or 3)
+	local parent = hudLayer or uiRoot or screenGui
+	if parent then
+		Notification.Show(parent, message, notifType or "info", duration or 3)
 	end
 end
 
@@ -250,6 +323,10 @@ end
 -- Get screen gui
 function UIController.GetScreenGui(): ScreenGui?
 	return screenGui
+end
+
+function UIController.GetRoot(): GuiObject?
+	return uiRoot
 end
 
 return UIController

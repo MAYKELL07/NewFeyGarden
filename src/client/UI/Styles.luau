@@ -3,9 +3,39 @@
 -- Reusable UI styling helper functions
 -- Apply corners, shadows, gradients, strokes consistently
 
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
 local Theme = require(script.Parent:WaitForChild("Theme"))
 
 local Styles = {}
+
+-- =============================================================================
+-- DEVICE AWARENESS (Lightweight responsiveness helpers)
+-- =============================================================================
+
+local SMALL_SCREEN_WIDTH = 1200
+local MOBILE_SCALE = 0.85
+local DESKTOP_SCALE = 1
+local MOBILE_TOP_PADDING = 24
+
+local function isSmallScreen(): boolean
+	local camera = Workspace.CurrentCamera
+	local viewportSize = camera and camera.ViewportSize or Vector2.new(0, 0)
+	return UserInputService.TouchEnabled or viewportSize.X <= SMALL_SCREEN_WIDTH
+end
+
+function Styles.IsSmallScreen(): boolean
+	return isSmallScreen()
+end
+
+function Styles.GetDeviceScale(): number
+	return isSmallScreen() and MOBILE_SCALE or DESKTOP_SCALE
+end
+
+function Styles.GetTopPadding(): number
+	return isSmallScreen() and MOBILE_TOP_PADDING or 0
+end
 
 -- =============================================================================
 -- CORNER RADIUS
@@ -96,7 +126,7 @@ function Styles.ApplyFrameImage(parent: GuiObject, assetId: string?, sliceRect: 
 	bg.Name = "FrameArt"
 	bg.BackgroundTransparency = 1
 	bg.Image = assetId or Theme.FrameWindowTall
-	
+
 	local isWindow = bg.Image == Theme.FrameWindowTall or bg.Image == Theme.FrameWindowWide
 	bg.ScaleType = isWindow and Enum.ScaleType.Stretch or Enum.ScaleType.Crop
 	bg.Size = UDim2.new(1.4, 0, 1.4, 0)

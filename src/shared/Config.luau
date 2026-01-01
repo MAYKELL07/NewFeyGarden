@@ -34,6 +34,7 @@ Config.World = {
 	GardensFolder = "Gardens",           -- Folder containing all pre-made garden folders
 	PlayerSignName = "PlayerSign",       -- Name of the Model containing the player sign
 	PlayerSignPartName = "Sign",         -- Name of the Part within PlayerSign Model that has the SurfaceGui
+	GrowAllSignName = "GrowAll",         -- Name of the Model containing the Grow All purchase sign
 	FloorName = "Floor",                 -- Name of the main floor/platform part in each garden
 	PlotsFolder = "Plots",               -- Name of the folder containing PlantAnchors within each garden
 	TeleportPartName = "TpPart",         -- Name of the part where players spawn in their garden
@@ -183,10 +184,10 @@ Config.EggOpening = {
 -- Settings for how pets roam within the player's garden
 Config.GardenPetRoaming = {
 	-- Roaming bounds (box centered on garden floor)
-	BoundsHalfWidth = 18,                -- Half-width of roaming box (X axis)
-	BoundsHalfLength = 18,               -- Half-length of roaming box (Z axis)
-	MinHeight = 1,                       -- Minimum hover height above floor
-	MaxHeight = 4,                       -- Maximum hover height above floor
+	BoundsHalfWidth = 30,                -- Half-width of roaming box (X axis)
+	BoundsHalfLength = 30,               -- Half-length of roaming box (Z axis)
+	MinHeight = 2,                       -- Minimum hover height above floor
+	MaxHeight = 10,                       -- Maximum hover height above floor
 	
 	-- Movement behavior
 	IdleChance = 0.6,                    -- Chance to stay idle vs moving (0-1)

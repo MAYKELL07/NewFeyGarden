@@ -56,9 +56,8 @@ local function ensureRemoteEvent(eventName: string): RemoteEvent
 	return remote
 end
 
-local plantSeedEvent = ensureRemoteEvent(Constants.EVENTS.PLANT_SEED)
-local harvestPlantEvent = ensureRemoteEvent(Constants.EVENTS.HARVEST_PLANT)
 local harvestFruitEvent = ensureRemoteEvent(Constants.EVENTS.HARVEST_FRUIT)
+local plantSeedAtPositionEvent = ensureRemoteEvent(Constants.EVENTS.PLANT_SEED_AT_POSITION) -- Free-form planting
 
 local function getGardensFolder(): Folder?
 	local folder = Config.functions.GetWorldFolder(Config.World.GardensFolder)
@@ -77,56 +76,102 @@ local function ensurePlayerCache(userId: number): {[number]: Model}
 	return cache
 end
 
-local function isValidSlot(slotIndex: number): boolean
-	return typeof(slotIndex) == "number" and slotIndex >= 1 and slotIndex <= (Config.Garden.SlotsPerGarden or 0)
-end
-
 function GardenManager.GetPlayerGarden(player: Player): Folder?
 	return GardenManager.PlayerGardens[player.UserId]
 end
 
-function GardenManager.GetPlantAnchor(gardenFolder: Folder?, slotIndex: number): BasePart?
-	if not gardenFolder or not isValidSlot(slotIndex) then
-		return nil
-	end
-
-	local plotsFolder = gardenFolder:FindFirstChild(Config.World.PlotsFolder)
-	if not plotsFolder or not plotsFolder:IsA("Folder") then
-		return nil
-	end
-
-	local anchorName = Config.Garden.PlantAnchorPrefix .. tostring(slotIndex)
-	local anchor = plotsFolder:FindFirstChild(anchorName)
-	
-	if not anchor then
-		return nil
+-- Setup ProximityPrompt on a single fruit for collection
+local function setupFruitPrompt(fruit: Instance, plantModel: Model, userId: number)
+	-- Remove existing prompt if present
+	local existingPrompt = fruit:FindFirstChildOfClass("ProximityPrompt")
+	if existingPrompt then
+		existingPrompt:Destroy()
 	end
 	
-	if not anchor:IsA("BasePart") then
-		return nil
+	local fruitConfig = Constants.FRUIT_CONFIG
+	local fruitPart = fruit:IsA("BasePart") and fruit or fruit:FindFirstChildWhichIsA("BasePart")
+	
+	if not fruitPart then
+		warn("[GardenManager] Fruit has no BasePart for ProximityPrompt")
+		return
 	end
 	
-	return anchor
-end
-
-local function findPlantModel(anchor: Instance): Model?
-	for _, child in ipairs(anchor:GetChildren()) do
-		if child:IsA("Model") and child:GetAttribute("PlantType") then
-			return child
+	-- Create ProximityPrompt for fruit collection
+	local prompt = Instance.new("ProximityPrompt")
+	prompt.ActionText = fruitConfig.PromptActionText or "Collect"
+	prompt.ObjectText = fruit:GetAttribute("FruitType") or fruitConfig.PromptObjectText or "Fruit"
+	prompt.HoldDuration = fruitConfig.PromptHoldDuration or 0.3
+	prompt.MaxActivationDistance = fruitConfig.PromptMaxDistance or 12
+	prompt.RequiresLineOfSight = false
+	-- Start with prompt disabled until fruit is revealed
+	prompt.Enabled = fruit:GetAttribute("Revealed") == true
+	prompt.Parent = fruitPart
+	
+	-- Listen for fruit reveal to enable the prompt
+	fruit:GetAttributeChangedSignal("Revealed"):Connect(function()
+		if fruit:GetAttribute("Revealed") then
+			prompt.Enabled = true
 		end
-	end
-	return nil
-end
-
-local function clearAnchor(anchor: Instance)
-	for _, child in ipairs(anchor:GetChildren()) do
-		if child:IsA("Model") and child:GetAttribute("PlantType") then
-			child:Destroy()
+	end)
+	
+	-- Handle fruit collection
+	prompt.Triggered:Connect(function(triggeringPlayer)
+		-- Only owner can collect
+		if triggeringPlayer.UserId ~= userId then
+			return
 		end
-	end
+		
+		-- Verify fruit still exists and is revealed
+		if not fruit.Parent then
+			return
+		end
+		
+		-- Don't allow collecting unrevealed fruits
+		if not fruit:GetAttribute("Revealed") then
+			return
+		end
+		
+		local fruitType = fruit:GetAttribute("FruitType")
+		local fruitWeight = fruit:GetAttribute("FruitWeight") or 1.0
+		
+		-- Check if this plant should be removed after harvest (0-1 fruit plants)
+		local shouldRemovePlant = PlantModule.ShouldRemovePlantOnHarvest(plantModel)
+		
+		-- Add fruit to player inventory
+		local success, fruitInstance = DataService.AddFruitInstance(userId, fruitType, fruitWeight)
+		if success then
+			-- Sync inventory to client
+			EconomyService.SyncPlayerData(triggeringPlayer)
+			
+			-- Fire event to client for visual feedback
+			harvestFruitEvent:FireClient(triggeringPlayer, fruitType, 1)
+			
+			if shouldRemovePlant then
+				-- Plant has 0-1 fruits, harvesting removes the whole plant
+				local plantId = plantModel:GetAttribute("PlantId")
+				if plantId then
+					DataService.RemoveFreePlant(userId, plantId)
+				end
+				
+				-- Remove from active plants cache
+				local cache = GardenManager.ActivePlants[userId]
+				if cache and plantId then
+					cache[plantId] = nil
+				end
+				
+				plantModel:Destroy()
+			else
+				-- Plant has multiple fruits, just remove the fruit
+				PlantModule.RemoveFruit(fruit)
+			end
+		else
+			warn(string.format("[GardenManager] Failed to add fruit for player %d", userId))
+		end
+	end)
 end
 
 -- Public function to setup harvest detector (can be called from AdminCommands)
+-- Now spawns fruits with ProximityPrompts instead of ClickDetector
 function GardenManager.SetupPlantHarvestDetector(plantModel: Model, userId: number)
 	-- Only setup harvest detector for bloom stage plants
 	local stage = plantModel:GetAttribute("Stage")
@@ -139,71 +184,39 @@ function GardenManager.SetupPlantHarvestDetector(plantModel: Model, userId: numb
 		return
 	end
 	
-	-- Remove existing ClickDetector if present
+	-- Remove old ClickDetector if present (legacy cleanup)
 	local existingCD = plantPart:FindFirstChildOfClass("ClickDetector")
 	if existingCD then
 		existingCD:Destroy()
 	end
 	
-	-- Create harvest ClickDetector
-	local clickDetector = Instance.new("ClickDetector")
-	clickDetector.MaxActivationDistance = 15
-	clickDetector.Parent = plantPart
+	-- Spawn fruits on the plant (they start invisible)
+	local fruits = PlantModule.SpawnFruits(plantModel)
 	
-	-- Connect harvest handler
-	clickDetector.MouseClick:Connect(function(clickingPlayer)
-		if clickingPlayer.UserId ~= userId then
-			return -- Only owner can harvest
-		end
-		
-		local plantType = plantModel:GetAttribute("PlantType")
-		if not plantType then
-			return
-		end
-		
-		-- Check if still in bloom stage
-		if plantModel:GetAttribute("Stage") ~= Constants.GROWTH_STAGES.BLOOM then
-			return
-		end
-		
-		-- Generate fruit name
-		local fruitName = plantType .. "Fruit"
-		
-		-- Calculate fruit weight based on plant size (bigger plant = heavier fruit)
-		-- Base weight is 1.0 lbs, scaled by plant's SizeMultiplier
-		local plantSize = plantModel:GetAttribute("SizeMultiplier") or 1.0
-		local baseWeight = 1.0 -- Base weight in pounds
-		local fruitWeight = baseWeight * plantSize
-		-- Add small random variance (+/- 10%)
-		fruitWeight = fruitWeight * (0.9 + math.random() * 0.2)
-		fruitWeight = math.floor(fruitWeight * 100 + 0.5) / 100 -- Round to 2 decimals
-		
-		-- Add fruit instance to inventory with calculated weight
-		local success, fruitInstance = DataService.AddFruitInstance(userId, fruitName, fruitWeight)
-		if success then
-			-- Sync inventory to client
-			EconomyService.SyncPlayerData(clickingPlayer)
-			
-			-- Remove the plant after harvest
-			plantModel:Destroy()
-			
-			-- Clear from cache
-			local cache = GardenManager.ActivePlants[userId]
-			if cache then
-				for slotIndex, cachedPlant in pairs(cache) do
-					if cachedPlant == plantModel then
-						cache[slotIndex] = nil
-						break
-					end
-				end
-			end
-			
-			-- Fire event to client for visual feedback
-			harvestFruitEvent:FireClient(clickingPlayer, fruitName, 1)
-		else
-			warn(string.format("[HarvestFruit] Failed to add fruit for player %d", userId))
-		end
+	-- Setup ProximityPrompt on each fruit (prompts disabled until revealed)
+	for _, fruit in ipairs(fruits) do
+		setupFruitPrompt(fruit, plantModel, userId)
+	end
+	
+	-- Start fruit reveal timer - fruits become visible one by one over time
+	PlantModule.StartFruitRevealTimer(plantModel, function(revealedFruit, plant, revealIndex)
+		-- Callback when a fruit is revealed (already has prompt setup)
+		-- VFX could be added here if desired
 	end)
+	
+	-- Feature 4: Start fruit regrowth system (plants don't die, fruits regrow)
+	-- Only for plants with multiple fruits (single-fruit plants get removed on harvest)
+	if not PlantModule.ShouldRemovePlantOnHarvest(plantModel) then
+		PlantModule.StartFruitRegrowth(plantModel, function(newFruit, plant)
+			-- Setup prompt on newly regrown fruit
+			local ownerUserId = plant:GetAttribute("OwnerUserId") or plant:GetAttribute("Owner")
+			if ownerUserId then
+				setupFruitPrompt(newFruit, plant, ownerUserId)
+				-- Newly regrown fruits should be revealed immediately
+				PlantModule.RevealFruit(newFruit)
+			end
+		end)
+	end
 end
 
 local function updateGardenSign(gardenFolder: Folder, playerName: string?)
@@ -242,67 +255,330 @@ local function updateGardenSign(gardenFolder: Folder, playerName: string?)
 	end
 end
 
-local function serializePlant(model: Model)
-	local plantType = model:GetAttribute("PlantType")
-	if type(plantType) ~= "string" then
-		return nil
-	end
-
-	return {
-		Id = model:GetAttribute("PlantId") or game:GetService("HttpService"):GenerateGUID(false),
-		Type = plantType,
-		Stage = model:GetAttribute("Stage") or Constants.GROWTH_STAGES.SEED,
-		WateredUntil = model:GetAttribute("WateredUntil") or 0,
-		PetBoost = model:GetAttribute("PetBoost") or false,
-		Size = model:GetAttribute("Size") or 1,
-		Weight = model:GetAttribute("Weight") or 1,
-	}
-end
-
-local function continueGrowthFromStage(plantModel: Model, savedStage: string?)
-	local plantType = plantModel:GetAttribute("PlantType")
-	local config = Constants.PLANT_CONFIG[plantType]
-	if not config then
+local function setupGrowAllPrompt(gardenFolder: Folder)
+	local signName = Config.World.GrowAllSignName or "GrowAll"
+	local growAllModel = gardenFolder:FindFirstChild(signName)
+	if not growAllModel then
 		return
 	end
 
-	local startIndex = 1
-	if type(savedStage) == "string" then
-		for index, stage in ipairs(stageOrder) do
-			if stage == savedStage then
-				startIndex = index
+	-- Theme colors (matching GardenSignHandler)
+	local THEME = {
+		ForestDark = Color3.fromRGB(18, 10, 28),
+		ForestDeep = Color3.fromRGB(28, 16, 40),
+		TealGem = Color3.fromRGB(86, 108, 186),
+		GoldLeaf = Color3.fromRGB(210, 168, 120),
+		TextLight = Color3.fromRGB(228, 218, 240),
+		TextGold = Color3.fromRGB(210, 190, 230),
+	}
+
+	local function ensureGrowAllGui()
+		local product = Constants.GROW_ALL_PRODUCT
+		local displayName = product and product.DisplayName or "Grow All"
+		local priceText = product and product.RobuxPrice and tostring(product.RobuxPrice) or "?"
+
+		local signPart = growAllModel:FindFirstChild(Config.World.PlayerSignPartName)
+		if not signPart or not signPart:IsA("BasePart") then
+			signPart = growAllModel:FindFirstChildWhichIsA("BasePart")
+		end
+		if not signPart then
+			return
+		end
+
+		-- Find the existing SurfaceGui (like PlayerSign)
+		local surfaceGui = signPart:FindFirstChildOfClass("SurfaceGui")
+		if not surfaceGui then
+			-- Create one if missing
+			surfaceGui = Instance.new("SurfaceGui")
+			surfaceGui.Name = "SignSurfaceGui"
+			surfaceGui.Face = Enum.NormalId.Front
+			surfaceGui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+			surfaceGui.PixelsPerStud = 50
+			surfaceGui.Parent = signPart
+		end
+
+		-- Clear existing content
+		for _, child in ipairs(surfaceGui:GetChildren()) do
+			if child.Name == "GrowAllContent" then
+				child:Destroy()
+			end
+		end
+
+		-- Create main content frame (same structure as GardenSignHandler)
+		local mainFrame = Instance.new("Frame")
+		mainFrame.Name = "GrowAllContent"
+		mainFrame.Size = UDim2.new(1, 0, 1, 0)
+		mainFrame.BackgroundColor3 = THEME.ForestDark
+		mainFrame.BackgroundTransparency = 0.7
+		mainFrame.Parent = surfaceGui
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 8)
+		corner.Parent = mainFrame
+
+		local stroke = Instance.new("UIStroke")
+		stroke.Color = THEME.TealGem
+		stroke.Thickness = 2
+		stroke.Transparency = 0.3
+		stroke.Parent = mainFrame
+
+		local padding = Instance.new("UIPadding")
+		padding.PaddingLeft = UDim.new(0, 10)
+		padding.PaddingRight = UDim.new(0, 10)
+		padding.PaddingTop = UDim.new(0, 8)
+		padding.PaddingBottom = UDim.new(0, 8)
+		padding.Parent = mainFrame
+
+		-- Left side: Title and price (same layout as GardenSignHandler infoFrame)
+		local infoFrame = Instance.new("Frame")
+		infoFrame.Name = "InfoFrame"
+		infoFrame.Size = UDim2.new(0.6, 0, 1, 0)
+		infoFrame.Position = UDim2.new(0, 0, 0, 0)
+		infoFrame.BackgroundTransparency = 1
+		infoFrame.Parent = mainFrame
+
+		local infoLayout = Instance.new("UIListLayout")
+		infoLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		infoLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+		infoLayout.Padding = UDim.new(0, 4)
+		infoLayout.Parent = infoFrame
+
+		-- Title label (like player name)
+		local titleLabel = Instance.new("TextLabel")
+		titleLabel.Name = "TitleLabel"
+		titleLabel.Size = UDim2.new(1, 0, 0, 24)
+		titleLabel.LayoutOrder = 1
+		titleLabel.BackgroundTransparency = 1
+		titleLabel.Text = displayName
+		titleLabel.TextColor3 = THEME.TextLight
+		titleLabel.Font = Enum.Font.GothamBold
+		titleLabel.TextSize = 20
+		titleLabel.TextScaled = true
+		titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+		titleLabel.TextTruncate = Enum.TextTruncate.AtEnd
+		titleLabel.Parent = infoFrame
+
+		-- Subtitle (like garden level)
+		local subtitleLabel = Instance.new("TextLabel")
+		subtitleLabel.Name = "SubtitleLabel"
+		subtitleLabel.Size = UDim2.new(1, 0, 0, 18)
+		subtitleLabel.LayoutOrder = 2
+		subtitleLabel.BackgroundTransparency = 1
+		subtitleLabel.Text = "🌱 Instant Bloom"
+		subtitleLabel.TextColor3 = THEME.TextGold
+		subtitleLabel.Font = Enum.Font.Gotham
+		subtitleLabel.TextSize = 16
+		subtitleLabel.TextScaled = true
+		subtitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+		subtitleLabel.Parent = infoFrame
+
+		-- Price row (like likes row)
+		local priceFrame = Instance.new("Frame")
+		priceFrame.Name = "PriceFrame"
+		priceFrame.Size = UDim2.new(1, 0, 0, 22)
+		priceFrame.LayoutOrder = 3
+		priceFrame.BackgroundTransparency = 1
+		priceFrame.Parent = infoFrame
+
+		local priceLayout = Instance.new("UIListLayout")
+		priceLayout.FillDirection = Enum.FillDirection.Horizontal
+		priceLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		priceLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+		priceLayout.Padding = UDim.new(0, 6)
+		priceLayout.Parent = priceFrame
+
+		-- Robux icon badge (like heart icon)
+		local robuxBadge = Instance.new("TextLabel")
+		robuxBadge.Name = "RobuxIcon"
+		robuxBadge.Size = UDim2.new(0, 22, 0, 22)
+		robuxBadge.LayoutOrder = 1
+		robuxBadge.BackgroundColor3 = THEME.ForestDeep
+		robuxBadge.BackgroundTransparency = 0.5
+		robuxBadge.Text = "R$"
+		robuxBadge.TextSize = 12
+		robuxBadge.Font = Enum.Font.GothamBold
+		robuxBadge.TextColor3 = THEME.GoldLeaf
+		robuxBadge.Parent = priceFrame
+
+		local robuxCorner = Instance.new("UICorner")
+		robuxCorner.CornerRadius = UDim.new(0.5, 0)
+		robuxCorner.Parent = robuxBadge
+
+		-- Price amount (like like count)
+		local priceLabel = Instance.new("TextLabel")
+		priceLabel.Name = "PriceLabel"
+		priceLabel.Size = UDim2.new(0, 40, 0, 22)
+		priceLabel.LayoutOrder = 2
+		priceLabel.BackgroundTransparency = 1
+		priceLabel.Text = priceText
+		priceLabel.TextColor3 = THEME.GoldLeaf
+		priceLabel.Font = Enum.Font.GothamBold
+		priceLabel.TextSize = 16
+		priceLabel.TextScaled = true
+		priceLabel.TextXAlignment = Enum.TextXAlignment.Left
+		priceLabel.Parent = priceFrame
+
+		-- Right side: Icon (like avatar frame)
+		local iconFrame = Instance.new("Frame")
+		iconFrame.Name = "IconFrame"
+		iconFrame.Size = UDim2.new(0.35, 0, 0.9, 0)
+		iconFrame.Position = UDim2.new(0.62, 0, 0.05, 0)
+		iconFrame.BackgroundColor3 = THEME.ForestDeep
+		iconFrame.Parent = mainFrame
+
+		local iconCorner = Instance.new("UICorner")
+		iconCorner.CornerRadius = UDim.new(0.5, 0)
+		iconCorner.Parent = iconFrame
+
+		local iconStroke = Instance.new("UIStroke")
+		iconStroke.Color = THEME.GoldLeaf
+		iconStroke.Thickness = 2
+		iconStroke.Parent = iconFrame
+
+		local iconAspect = Instance.new("UIAspectRatioConstraint")
+		iconAspect.AspectRatio = 1
+		iconAspect.Parent = iconFrame
+
+		-- Plant/growth emoji icon
+		local iconLabel = Instance.new("TextLabel")
+		iconLabel.Name = "Icon"
+		iconLabel.Size = UDim2.new(1, -6, 1, -6)
+		iconLabel.Position = UDim2.new(0.5, 0, 0.5, 0)
+		iconLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+		iconLabel.BackgroundTransparency = 1
+		iconLabel.Text = "🌸"
+		iconLabel.TextScaled = true
+		iconLabel.Font = Enum.Font.GothamBold
+		iconLabel.Parent = iconFrame
+	end
+
+	if growAllModel:GetAttribute("GrowAllPromptBound") then
+		ensureGrowAllGui()
+		return
+	end
+
+	local prompt = growAllModel:FindFirstChildWhichIsA("ProximityPrompt")
+	if not prompt then
+		for _, descendant in ipairs(growAllModel:GetDescendants()) do
+			if descendant:IsA("ProximityPrompt") then
+				prompt = descendant
 				break
 			end
 		end
 	end
 
-	local currentStage = stageOrder[startIndex]
-	plantModel:SetAttribute("Stage", currentStage)
-	plantModel:SetAttribute("Harvestable", currentStage == Constants.GROWTH_STAGES.BLOOM)
-	PlantModule.UpdatePlantVisual(plantModel)
+	if not prompt then
+		warn("[GardenManager] GrowAll sign is missing a ProximityPrompt")
+		return
+	end
 
-	-- Setup harvest detector if at bloom stage
-	if currentStage == Constants.GROWTH_STAGES.BLOOM then
+	local product = Constants.GROW_ALL_PRODUCT
+	prompt.ActionText = product and product.DisplayName or "Grow All"
+	prompt.ObjectText = product and product.RobuxPrice and ("R$ " .. tostring(product.RobuxPrice)) or "R$ ?"
+
+	growAllModel:SetAttribute("GrowAllPromptBound", true)
+	ensureGrowAllGui()
+
+	prompt.Triggered:Connect(function(player)
+		if not player or not player:IsA("Player") then
+			return
+		end
+
+		local ownerId = gardenFolder:GetAttribute("OwnerUserId")
+		if ownerId ~= player.UserId then
+			return
+		end
+
+		EconomyService.PromptGrowAllPurchase(player)
+	end)
+end
+
+-- Calculate the correct stage and remaining time based on PlantTime (supports offline growth)
+local function calculateOfflineGrowth(plantType: string, plantTime: number)
+	local config = Constants.PLANT_CONFIG[plantType]
+	if not config then
+		return Constants.GROWTH_STAGES.SEED, 0, config and config.GrowthTime or 60
+	end
+	
+	local growthTime = config.GrowthTime or 60
+	local elapsed = os.time() - plantTime
+	
+	-- Stage timeline: SEED (0 to growthTime) -> SPROUT (growthTime to 2*growthTime) -> BLOOM (after 2*growthTime)
+	if elapsed >= growthTime * 2 then
+		-- Already at BLOOM
+		return Constants.GROWTH_STAGES.BLOOM, 0, 0
+	elseif elapsed >= growthTime then
+		-- At SPROUT, calculate remaining time to BLOOM
+		local remainingTime = (growthTime * 2) - elapsed
+		return Constants.GROWTH_STAGES.SPROUT, remainingTime, growthTime
+	else
+		-- Still at SEED, calculate remaining time to SPROUT
+		local remainingTime = growthTime - elapsed
+		return Constants.GROWTH_STAGES.SEED, remainingTime, growthTime
+	end
+end
+
+local function continueGrowthFromStage(plantModel: Model, savedStage: string?, savedPlantTime: number?)
+	local plantType = plantModel:GetAttribute("PlantType")
+	local config = Constants.PLANT_CONFIG[plantType]
+	if not config then
+		return
+	end
+	
+	-- Use saved PlantTime for offline growth calculation, or current time if not available
+	local plantTime = savedPlantTime or plantModel:GetAttribute("PlantTime") or os.time()
+	plantModel:SetAttribute("PlantTime", plantTime)
+	
+	-- Calculate correct stage based on elapsed time (offline growth)
+	local calculatedStage, remainingTime, stageGrowthTime = calculateOfflineGrowth(plantType, plantTime)
+	
+	-- Set the calculated stage
+	plantModel:SetAttribute("Stage", calculatedStage)
+	plantModel:SetAttribute("Harvestable", calculatedStage == Constants.GROWTH_STAGES.BLOOM)
+	plantModel:SetAttribute("StageStartTime", os.time())
+	plantModel:SetAttribute("StageGrowthTime", remainingTime)
+	PlantModule.UpdatePlantVisual(plantModel)
+	
+	-- If already at BLOOM, setup harvest detector and return
+	if calculatedStage == Constants.GROWTH_STAGES.BLOOM then
 		local ownerId = plantModel:GetAttribute("OwnerUserId")
 		if ownerId then
 			GardenManager.SetupPlantHarvestDetector(plantModel, ownerId)
 		end
 		return
 	end
+	
+	-- Continue growth from calculated stage with remaining time
+	local startIndex = 1
+	for index, stage in ipairs(stageOrder) do
+		if stage == calculatedStage then
+			startIndex = index
+			break
+		end
+	end
 
 	task.spawn(function()
-		for index = startIndex + 1, #stageOrder do
-			local nextStage = stageOrder[index]
-			local multiplier = BuffsModule.GetGrowthMultiplier(plantModel)
-			local waitTime = math.max(config.GrowthTime * multiplier, 0.1)
-			task.wait(waitTime)
-
+		-- Wait remaining time for current stage first
+		if remainingTime > 0 then
+			task.wait(remainingTime)
+			
 			if not plantModel.Parent then
 				return
 			end
+		end
+		
+		-- Progress through remaining stages
+		for index = startIndex + 1, #stageOrder do
+			local nextStage = stageOrder[index]
+			
+			-- Apply buffs for future stages
+			local multiplier = BuffsModule.GetGrowthMultiplier(plantModel)
+			local waitTime = math.max(config.GrowthTime * multiplier, 0.1)
 
 			plantModel:SetAttribute("Stage", nextStage)
 			plantModel:SetAttribute("Harvestable", nextStage == Constants.GROWTH_STAGES.BLOOM)
+			plantModel:SetAttribute("StageStartTime", os.time())
+			plantModel:SetAttribute("StageGrowthTime", waitTime)
 			PlantModule.UpdatePlantVisual(plantModel)
 			
 			-- Setup harvest detector when reaching bloom stage
@@ -311,6 +587,13 @@ local function continueGrowthFromStage(plantModel: Model, savedStage: string?)
 				if ownerId then
 					GardenManager.SetupPlantHarvestDetector(plantModel, ownerId)
 				end
+				return
+			end
+			
+			task.wait(waitTime)
+			
+			if not plantModel.Parent then
+				return
 			end
 		end
 	end)
@@ -318,108 +601,104 @@ end
 
 local function savePlantSlots(userId: number, gardenFolder: Folder)
 	if not Config.Economy.EnablePersistence then
-		-- print("[SavePlants] Persistence disabled, skipping save")
 		return
 	end
 	
--- print(string.format("[SavePlants] Saving plant slots for UserId %d in %s", userId, gardenFolder.Name))
+	-- Save all free-form plants in the garden
+	local plotsFolder = gardenFolder:FindFirstChild(Config.World.PlotsFolder)
+	local parentFolder = plotsFolder or gardenFolder
 	local savedCount = 0
-	local clearedCount = 0
 	
-	for slotIndex = 1, Config.Garden.SlotsPerGarden do
-		local anchor = GardenManager.GetPlantAnchor(gardenFolder, slotIndex)
-		local plantModel = anchor and findPlantModel(anchor) or nil
-		
-		if plantModel then
-			local payload = serializePlant(plantModel)
-			if payload then
-				DataService.SetPlantSlot(userId, slotIndex, payload)
-				savedCount = savedCount + 1
--- print(string.format("[SavePlants] ✓ Saved slot %d: %s (Stage: %s)", slotIndex, payload.Type, payload.Stage))
-			else
-				DataService.ClearPlantSlot(userId, slotIndex)
-				clearedCount = clearedCount + 1
-				warn(string.format("[SavePlants] Failed to serialize plant in slot %d", slotIndex))
+	-- First, clear existing free plants data to avoid duplicates
+	DataService.ClearAllFreePlants(userId)
+	
+	-- Find and save all plants
+	for _, child in ipairs(parentFolder:GetChildren()) do
+		if child:IsA("Model") and child:GetAttribute("PlantType") then
+			local plantId = child:GetAttribute("PlantId")
+			if not plantId then
+				plantId = game:GetService("HttpService"):GenerateGUID(false)
+				child:SetAttribute("PlantId", plantId)
 			end
-		else
-			DataService.ClearPlantSlot(userId, slotIndex)
-			clearedCount = clearedCount + 1
+			
+			local position = child.PrimaryPart and child.PrimaryPart.Position 
+				or child:FindFirstChild("Base") and child.Base.Position
+				or Vector3.new(0, 0, 0)
+			
+			DataService.AddFreePlant(userId, {
+				Id = plantId,
+				Type = child:GetAttribute("PlantType"),
+				Stage = child:GetAttribute("Stage") or Constants.GROWTH_STAGES.SEED,
+				PlantTime = child:GetAttribute("PlantTime") or os.time(),
+				Position = {X = position.X, Y = position.Y, Z = position.Z},
+				WateredUntil = child:GetAttribute("WateredUntil") or 0,
+				PetBoost = child:GetAttribute("PetBoost") or false,
+				Size = child:GetAttribute("Size") or 1,
+				Weight = child:GetAttribute("Weight") or 1,
+			})
+			savedCount = savedCount + 1
 		end
 	end
 	
--- print(string.format("[SavePlants] ✅ Save complete - %d saved, %d cleared", savedCount, clearedCount))
+	-- print(string.format("[SavePlants] Saved %d free-form plants for UserId %d", savedCount, userId))
 end
 
 local function restorePlantSlots(userId: number, gardenFolder: Folder)
--- print(string.format("[RestorePlants] Starting restoration for UserId %d in %s", userId, gardenFolder.Name))
-	
 	local cache = ensurePlayerCache(userId)
 
 	-- Clear all existing plants first
-	for slotIndex = 1, Config.Garden.SlotsPerGarden do
-		cache[slotIndex] = nil
-		local anchor = GardenManager.GetPlantAnchor(gardenFolder, slotIndex)
-		if anchor then
-			clearAnchor(anchor)
+	local plotsFolder = gardenFolder:FindFirstChild(Config.World.PlotsFolder)
+	local parentFolder = plotsFolder or gardenFolder
+	
+	for _, child in ipairs(parentFolder:GetChildren()) do
+		if child:IsA("Model") and child:GetAttribute("PlantType") then
+			child:Destroy()
 		end
 	end
 
 	if not Config.Garden.RestorePlantsOnJoin then
-		-- print("[RestorePlants] RestorePlantsOnJoin is disabled in config")
 		return
 	end
 
-	local savedSlots = DataService.GetAllPlantSlots(userId)
-	local slotCount = 0
-	for _ in pairs(savedSlots) do slotCount = slotCount + 1 end
+	-- Restore free-form plants
+	local freePlants = DataService.GetAllFreePlants(userId)
+	local freePlantCount = 0
+	for _ in pairs(freePlants) do freePlantCount = freePlantCount + 1 end
 	
--- print(string.format("[RestorePlants] Found %d saved plant slots for UserId %d", slotCount, userId))
-	
-	local restoredCount = 0
-	for slotIndex, state in pairs(savedSlots) do
-		-- print(string.format("[RestorePlants] Processing slot %s: %s", tostring(slotIndex), type(state) == "table" and string.format("Type=%s, Stage=%s", state.Type or "nil", state.Stage or "nil") or "invalid"))
+	if freePlantCount > 0 then
+		-- print(string.format("[RestorePlants] Restoring %d free-form plants", freePlantCount))
 		
-		local numericIndex = tonumber(slotIndex)
-		if numericIndex and isValidSlot(numericIndex) then
-			if type(state) == "table" and type(state.Type) == "string" then
-				local anchor = GardenManager.GetPlantAnchor(gardenFolder, numericIndex)
-				if anchor then
--- print(string.format("[RestorePlants] Creating plant: %s at slot %d", state.Type, numericIndex))
+		for plantId, state in pairs(freePlants) do
+			if type(state) == "table" and type(state.Type) == "string" and state.Position then
+				local position = Vector3.new(
+					state.Position.X or 0,
+					state.Position.Y or 0,
+					state.Position.Z or 0
+				)
+				
+				local savedSize = state.Size or 1
+				local plantModel = PlantModule.CreatePlantModel(state.Type, position, savedSize)
+				
+				if plantModel then
+					plantModel:SetAttribute("PlantId", plantId)
+					plantModel:SetAttribute("OwnerUserId", userId)
+					plantModel:SetAttribute("Owner", userId)
+					plantModel:SetAttribute("WateredUntil", state.WateredUntil or 0)
+					plantModel:SetAttribute("PetBoost", state.PetBoost or false)
+					plantModel:SetAttribute("Size", state.Size or 1)
+					plantModel:SetAttribute("Weight", state.Weight or 1)
+					plantModel:SetAttribute("PlantTime", state.PlantTime or os.time())
+					plantModel:SetAttribute("FreePlanted", true)
+					plantModel.Parent = parentFolder
 					
-					-- Pass saved size to CreatePlantModel
-					local savedSize = state.Size or 1
-					local plantModel = PlantModule.CreatePlantModel(state.Type, anchor.Position, savedSize)
-					if plantModel then
-						plantModel:SetAttribute("PlantId", state.Id or game:GetService("HttpService"):GenerateGUID(false))
-						plantModel:SetAttribute("OwnerUserId", userId)
-						plantModel:SetAttribute("Owner", userId)
-						plantModel:SetAttribute("SlotIndex", numericIndex)
-						plantModel:SetAttribute("WateredUntil", state.WateredUntil or 0)
-						plantModel:SetAttribute("PetBoost", state.PetBoost or false)
-						plantModel:SetAttribute("Size", state.Size or 1)
-						plantModel:SetAttribute("Weight", state.Weight or 1)
-					plantModel.Parent = anchor
-
-					continueGrowthFromStage(plantModel, state.Stage)
-					cache[numericIndex] = plantModel
-					restoredCount = restoredCount + 1
+					continueGrowthFromStage(plantModel, state.Stage, state.PlantTime)
+					cache[plantId] = plantModel
 					
-					-- print(string.format("[RestorePlants] ✓ Restored %s in slot %d (Stage: %s)", state.Type, numericIndex, state.Stage or "SEED"))
-				else
-					warn(string.format("[RestorePlants] ✗ Failed to create plant model for %s", state.Type))
+					-- print(string.format("[RestorePlants] ✓ Restored free plant %s at position", state.Type))
 				end
-				else
-					warn(string.format("[RestorePlants] ✗ No anchor found for slot %d", numericIndex))
-				end
-			else
-				warn(string.format("[RestorePlants] ✗ Invalid slot data for slot %s", tostring(slotIndex)))
 			end
-		else
-			warn(string.format("[RestorePlants] ✗ Invalid slot index: %s", tostring(slotIndex)))
 		end
 	end
-	
--- print(string.format("[RestorePlants] ✅ Restoration complete - %d/%d plants restored", restoredCount, slotCount))
 end
 
 local function findGardenForPlayer(userId: number): Folder?
@@ -472,29 +751,39 @@ local function findGardenForPlayer(userId: number): Folder?
 	return nil
 end
 
-local function setupClickDetectors(garden: Folder)
-	local successCount = 0
-	
-	for slotIndex = 1, Config.Garden.SlotsPerGarden do
-		local anchor = GardenManager.GetPlantAnchor(garden, slotIndex)
-		if anchor then
-			-- Remove existing ClickDetector if present
-			local existingCD = anchor:FindFirstChildOfClass("ClickDetector")
-			if existingCD then
-				existingCD:Destroy()
-			end
-			
-			-- Create new ClickDetector
-			local clickDetector = Instance.new("ClickDetector")
-			clickDetector.MaxActivationDistance = 15
-			clickDetector.Parent = anchor
-			
-			successCount = successCount + 1
-		else
-			warn(string.format("[ClickDetector] ❌ Failed to get anchor for slot %d in %s", slotIndex, garden.Name))
+local function growPlantToBloom(plantModel: Model, ownerId: number)
+	plantModel:SetAttribute("Stage", Constants.GROWTH_STAGES.BLOOM)
+	plantModel:SetAttribute("Harvestable", true)
+	plantModel:SetAttribute("StageStartTime", os.time())
+	plantModel:SetAttribute("StageGrowthTime", 0)
+	PlantModule.UpdatePlantVisual(plantModel)
+	GardenManager.SetupPlantHarvestDetector(plantModel, ownerId)
+end
+
+local function growAllPlantsInGarden(gardenFolder: Folder, ownerId: number): number
+	local grown = 0
+	local container = gardenFolder:FindFirstChild(Config.World.PlotsFolder) or gardenFolder
+
+	for _, descendant in ipairs(container:GetDescendants()) do
+		if descendant:IsA("Model") and descendant:GetAttribute("PlantType") then
+			growPlantToBloom(descendant, ownerId)
+			grown += 1
 		end
 	end
+
+	return grown
 end
+
+function GardenManager.GrowAllPlantsForUser(userId: number): number
+	local garden = GardenManager.PlayerGardens[userId] or findGardenForPlayer(userId)
+	if not garden then
+		return 0
+	end
+
+	return growAllPlantsInGarden(garden, userId)
+end
+
+-- Note: Old slot-based setupClickDetectors removed - using free-form planting now
 
 local function bootstrapGardens()
 	local gardensFolder = getGardensFolder()
@@ -508,14 +797,17 @@ local function bootstrapGardens()
 			garden:SetAttribute("OwnerUserId", 0)
 			GardenManager.GardenAssignments[garden.Name] = nil
 			updateGardenSign(garden, nil)
-			for slotIndex = 1, Config.Garden.SlotsPerGarden do
-				local anchor = GardenManager.GetPlantAnchor(garden, slotIndex)
-				if anchor then
-					clearAnchor(anchor)
+			setupGrowAllPrompt(garden)
+			
+			-- Clear any existing plants in the plots folder
+			local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
+			if plotsFolder then
+				for _, child in ipairs(plotsFolder:GetChildren()) do
+					if child:IsA("Model") and child:GetAttribute("PlantType") then
+						child:Destroy()
+					end
 				end
 			end
-			-- Setup ClickDetectors for all anchors
-			setupClickDetectors(garden)
 		end
 	end
 end
@@ -576,9 +868,6 @@ function GardenManager.AssignGarden(player: Player): (boolean, string?)
 	else
 		restorePlantSlots(player.UserId, garden)
 	end
-	
-	-- Ensure ClickDetectors are set up
-	setupClickDetectors(garden)
 
 -- print(string.format("[AssignGarden] ✓ Successfully assigned %s to %s", garden.Name, player.Name))
 	return true, nil
@@ -590,18 +879,20 @@ function GardenManager.ReleaseGarden(player: Player)
 		return
 	end
 
+	-- Save free-form plants before releasing
 	if Config.Garden.SavePlantsOnLeave then
 		savePlantSlots(player.UserId, garden)
 	else
-		for slotIndex = 1, Config.Garden.SlotsPerGarden do
-			DataService.ClearPlantSlot(player.UserId, slotIndex)
-		end
+		DataService.ClearAllFreePlants(player.UserId)
 	end
 
-	for slotIndex = 1, Config.Garden.SlotsPerGarden do
-		local anchor = GardenManager.GetPlantAnchor(garden, slotIndex)
-		if anchor then
-			clearAnchor(anchor)
+	-- Clear all plants from the plots folder
+	local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
+	if plotsFolder then
+		for _, child in ipairs(plotsFolder:GetChildren()) do
+			if child:IsA("Model") and child:GetAttribute("PlantType") then
+				child:Destroy()
+			end
 		end
 	end
 
@@ -619,172 +910,238 @@ function GardenManager.ReleaseGarden(player: Player)
 	end
 end
 
-local function getPlantInSlot(player: Player, slotIndex: number): Model?
-	local cache = GardenManager.ActivePlants[player.UserId]
-	local cached = cache and cache[slotIndex]
-	if cached and cached.Parent then
-		return cached
+-- Get the plot floor/ground for a garden
+function GardenManager.GetPlotFloor(gardenFolder: Folder): BasePart?
+	-- Try looking in Plots folder for "Plot" part first (used for validation bounds)
+	local plotsFolder = gardenFolder:FindFirstChild(Config.World.PlotsFolder)
+	if plotsFolder then
+		local plotPart = plotsFolder:FindFirstChild("Plot")
+		if plotPart and plotPart:IsA("BasePart") then
+			return plotPart
+		end
+		
+		local floor = plotsFolder:FindFirstChild(Config.World.FloorName) or plotsFolder:FindFirstChild("Floor")
+		if floor and floor:IsA("BasePart") then
+			return floor
+		end
 	end
-
-	local garden = GardenManager.PlayerGardens[player.UserId]
-	if not garden then
-		return nil
+	
+	-- Try to find Floor part directly in garden
+	local floor = gardenFolder:FindFirstChild(Config.World.FloorName)
+	if floor and floor:IsA("BasePart") then
+		return floor
 	end
-
-	local anchor = GardenManager.GetPlantAnchor(garden, slotIndex)
-	if not anchor then
-		return nil
-	end
-
-	local model = findPlantModel(anchor)
-	if model then
-		ensurePlayerCache(player.UserId)[slotIndex] = model
-	end
-	return model
+	
+	return nil
 end
 
-function GardenManager.PlantSeed(player: Player, slotIndex: number, plantType: string): (boolean, string?)
--- print(string.format("[PlantSeed] %s attempting to plant %s in slot %d", player.Name, plantType, slotIndex))
+-- Check if position is within garden plot bounds (uses "Plot1-Plot8" parts in Plots folder)
+function GardenManager.IsPositionInPlot(gardenFolder: Folder, position: Vector3): boolean
+	local plotsFolder = gardenFolder:FindFirstChild(Config.World.PlotsFolder)
 	
-	if not isValidSlot(slotIndex) then
--- print(string.format("[PlantSeed] FAILED - Invalid slot index: %d (max: %d)", slotIndex, Config.Garden.SlotsPerGarden))
-		return false, "Invalid slot index"
+	if not plotsFolder then
+		-- No plots folder, use distance-based fallback
+		return false
 	end
+	
+	-- Check against all plot parts (Plot1 through Plot8)
+	for i = 1, 8 do
+		local plotPart = plotsFolder:FindFirstChild("Plot" .. i)
+		if plotPart and plotPart:IsA("BasePart") then
+			-- Convert position to local space of the plot part to properly handle rotation
+			local localPos = plotPart.CFrame:PointToObjectSpace(position)
+			local halfSize = plotPart.Size / 2
+			
+			-- Add a small margin to avoid edge-case rejections (1 stud buffer)
+			local margin = 1.0
+			
+			local inBounds = localPos.X >= -halfSize.X - margin
+				and localPos.X <= halfSize.X + margin
+				and localPos.Z >= -halfSize.Z - margin
+				and localPos.Z <= halfSize.Z + margin
+			
+			if inBounds then
+				return true
+			end
+		end
+	end
+	
+	-- Fallback: check if within reasonable distance of any part in plots folder
+	for _, child in ipairs(plotsFolder:GetChildren()) do
+		if child:IsA("BasePart") then
+			local maxDistance = 30 -- studs
+			if (position - child.Position).Magnitude < maxDistance then
+				return true
+			end
+		end
+	end
+	
+	return false
+end
 
+-- Get all plants in a garden (for free planting mode)
+function GardenManager.GetAllPlantsInGarden(userId: number): {Model}
+	local plants = {}
+	local cache = GardenManager.ActivePlants[userId]
+	if cache then
+		for _, plant in pairs(cache) do
+			if plant and plant.Parent then
+				table.insert(plants, plant)
+			end
+		end
+	end
+	return plants
+end
+
+-- Check minimum spacing between plants
+function GardenManager.CheckPlantSpacing(gardenFolder: Folder, userId: number, position: Vector3): boolean
+	local minSpacing = Constants.FREE_PLANTING and Constants.FREE_PLANTING.MinPlantSpacing or 3.0
+	
+	local plants = GardenManager.GetAllPlantsInGarden(userId)
+	for _, plant in ipairs(plants) do
+		local basePart = plant:FindFirstChild("Base") or plant.PrimaryPart
+		if basePart then
+			local distance = (basePart.Position - position).Magnitude
+			if distance < minSpacing then
+				return false
+			end
+		end
+	end
+	
+	return true
+end
+
+-- Count plants in garden (for max limit)
+function GardenManager.CountPlantsInGarden(userId: number): number
+	local count = 0
+	local cache = GardenManager.ActivePlants[userId]
+	if cache then
+		for _, plant in pairs(cache) do
+			if plant and plant.Parent then
+				count = count + 1
+			end
+		end
+	end
+	return count
+end
+
+-- Free-form planting at any position on the plot
+function GardenManager.PlantSeedAtPosition(player: Player, position: Vector3, plantType: string): (boolean, string?)
 	if type(plantType) ~= "string" then
--- print(string.format("[PlantSeed] FAILED - Invalid plant type: %s", tostring(plantType)))
 		return false, "Invalid plant type"
 	end
-
+	
 	local garden = GardenManager.PlayerGardens[player.UserId]
 	if not garden then
--- print(string.format("[PlantSeed] FAILED - No garden assigned to %s", player.Name))
 		return false, "No garden assigned"
 	end
 	
--- print(string.format("[PlantSeed] Player has garden: %s", garden.Name))
-
-	local anchor = GardenManager.GetPlantAnchor(garden, slotIndex)
-	if not anchor then
--- print(string.format("[PlantSeed] FAILED - Missing plant anchor for slot %d in %s", slotIndex, garden.Name))
-		return false, "Missing plant anchor"
+	-- Check if position is within the plot bounds
+	if not GardenManager.IsPositionInPlot(garden, position) then
+		return false, "Position outside plot bounds"
 	end
 	
--- print(string.format("[PlantSeed] Found anchor at: %s", tostring(anchor.Position)))
-
-	if getPlantInSlot(player, slotIndex) then
--- print(string.format("[PlantSeed] FAILED - Slot %d already occupied", slotIndex))
-		return false, "Slot already occupied"
+	-- Check max plants limit
+	local freePlantingConfig = Constants.FREE_PLANTING or {}
+	local maxPlants = freePlantingConfig.MaxPlantsPerGarden or 20
+	local currentCount = GardenManager.CountPlantsInGarden(player.UserId)
+	if currentCount >= maxPlants then
+		return false, "Maximum plants reached"
 	end
-
+	
+	-- Check plant spacing
+	if not GardenManager.CheckPlantSpacing(garden, player.UserId, position) then
+		return false, "Too close to another plant"
+	end
+	
+	-- Check if player has the seed
 	if not EconomyService.RemoveSeed(player, plantType) then
--- print(string.format("[PlantSeed] FAILED - %s doesn't have %s seed", player.Name, plantType))
 		return false, "Seed unavailable"
 	end
-
-	-- Generate unique ID and random size/weight for the plant
+	
+	-- Generate unique ID and random size/weight
 	local HttpService = game:GetService("HttpService")
 	local plantId = HttpService:GenerateGUID(false)
 	local sizeWeight = Constants.GenerateRandomSizeWeight("Plant")
-
-	local plantModel = PlantModule.CreatePlantModel(plantType, anchor.Position, sizeWeight.Size)
+	
+	-- Adjust Y position to be on/above plot surface
+	local plotFloor = GardenManager.GetPlotFloor(garden)
+	local plantY = position.Y
+	if plotFloor then
+		plantY = plotFloor.Position.Y + plotFloor.Size.Y / 2 + (freePlantingConfig.PlantHeightOffset or 0.1)
+	end
+	local adjustedPosition = Vector3.new(position.X, plantY, position.Z)
+	
+	-- Create the plant model
+	local plantModel = PlantModule.CreatePlantModel(plantType, adjustedPosition, sizeWeight.Size)
 	if not plantModel then
 		EconomyService.AddSeed(player, plantType, 1)
--- print(string.format("[PlantSeed] FAILED - Could not create plant model for %s", plantType))
 		return false, "Failed to create plant model"
 	end
-
+	
+	-- Set attributes
 	plantModel:SetAttribute("PlantId", plantId)
 	plantModel:SetAttribute("OwnerUserId", player.UserId)
 	plantModel:SetAttribute("Owner", player.UserId)
-	plantModel:SetAttribute("SlotIndex", slotIndex)
 	plantModel:SetAttribute("WateredUntil", 0)
 	plantModel:SetAttribute("PetBoost", false)
 	plantModel:SetAttribute("Size", sizeWeight.Size)
 	plantModel:SetAttribute("Weight", sizeWeight.Weight)
-	plantModel.Parent = anchor
-
+	plantModel:SetAttribute("FreePlanted", true)
+	plantModel:SetAttribute("PlantPosition", adjustedPosition) -- Store position for persistence
+	
+	-- Parent to plots folder
+	local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
+	if plotsFolder then
+		plantModel.Parent = plotsFolder
+	else
+		plantModel.Parent = garden
+	end
+	
+	-- Cache the plant using plantId as key
 	local cache = ensurePlayerCache(player.UserId)
-	cache[slotIndex] = plantModel
-
-	-- Only save to DataStore if persistence is enabled
+	cache[plantId] = plantModel
+	
+	-- Save to DataStore if persistence enabled
 	if Config.Economy.EnablePersistence then
-		DataService.SetPlantSlot(player.UserId, slotIndex, {
+		DataService.AddFreePlant(player.UserId, {
 			Id = plantId,
 			Type = plantType,
 			Stage = plantModel:GetAttribute("Stage"),
+			PlantTime = plantModel:GetAttribute("PlantTime") or os.time(),
+			Position = {X = adjustedPosition.X, Y = adjustedPosition.Y, Z = adjustedPosition.Z},
 			WateredUntil = 0,
 			PetBoost = false,
 			Size = sizeWeight.Size,
 			Weight = sizeWeight.Weight,
 		})
-		-- Force save to prevent data loss
 		task.spawn(function()
 			DataService.ForceSave(player.UserId)
 		end)
 	end
-
+	
+	-- Start growth
 	task.spawn(PlantModule.GrowPlant, plantModel)
-
--- print(string.format("[PlantSeed] ✓ SUCCESS - %s planted %s in slot %d", player.Name, plantType, slotIndex))
-	return true, nil
-end
-
-function GardenManager.HarvestPlant(player: Player, slotIndex: number): (boolean, string?)
-	if not isValidSlot(slotIndex) then
-		return false, "Invalid slot index"
-	end
-
-	local plantModel = getPlantInSlot(player, slotIndex)
-	if not plantModel then
-		return false, "No plant in slot"
-	end
-
-	local ownerId = plantModel:GetAttribute("OwnerUserId") or plantModel:GetAttribute("Owner")
-	if ownerId ~= player.UserId then
-		return false, "Plant belongs to another player"
-	end
-
-	if not PlantModule.CanHarvest(plantModel) then
-		return false, "Plant is not ready"
-	end
-
-	local reward = PlantModule.GetHarvestValue(plantModel)
-	if reward > 0 then
-		EconomyService.AddCoins(player, reward)
-	end
-
-	-- Only clear from DataStore if persistence is enabled
-	if Config.Economy.EnablePersistence then
-		DataService.ClearPlantSlot(player.UserId, slotIndex)
-		-- Force save to prevent data loss
-		task.spawn(function()
-			DataService.ForceSave(player.UserId)
-		end)
-	end
-
-	local cache = ensurePlayerCache(player.UserId)
-	cache[slotIndex] = nil
-
-	plantModel:Destroy()
-
+	
 	return true, nil
 end
 
 function GardenManager.Initialize()
 	bootstrapGardens()
 
-	plantSeedEvent.OnServerEvent:Connect(function(player, slotIndex, plantType)
-		local success, message = GardenManager.PlantSeed(player, slotIndex, plantType)
-		if not success then
-			warn(string.format("GardenManager: PlantSeed rejected for %s (%s)", player.Name, message or "unknown error"))
-		end
+	EconomyService.SetGrowAllRewardHandler(function(userId)
+		return GardenManager.GrowAllPlantsForUser(userId)
 	end)
-
-	harvestPlantEvent.OnServerEvent:Connect(function(player, slotIndex)
-		local success, message = GardenManager.HarvestPlant(player, slotIndex)
+	
+	-- Free-form planting event handler
+	plantSeedAtPositionEvent.OnServerEvent:Connect(function(player, position, plantType)
+		if typeof(position) ~= "Vector3" then
+			warn(string.format("GardenManager: Invalid position type from %s", player.Name))
+			return
+		end
+		local success, message = GardenManager.PlantSeedAtPosition(player, position, plantType)
 		if not success then
-			warn(string.format("GardenManager: Harvest rejected for %s (%s)", player.Name, message or "unknown error"))
+			warn(string.format("GardenManager: PlantSeedAtPosition rejected for %s (%s)", player.Name, message or "unknown error"))
 		end
 	end)
 

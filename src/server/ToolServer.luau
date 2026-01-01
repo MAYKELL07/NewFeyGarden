@@ -129,27 +129,102 @@ local function handleShovel(player, target, position)
 	end
 end
 
+-- Helper: Find player's garden and all plants in it
+local function getPlayerGardenPlants(player)
+	local gardensFolder = workspace:FindFirstChild(Config.World.GardensFolder)
+	if not gardensFolder then return {} end
+	
+	for _, garden in ipairs(gardensFolder:GetChildren()) do
+		local ownerId = garden:GetAttribute("OwnerUserId")
+		if ownerId == player.UserId then
+			local plants = {}
+			-- Get all plants from PlotAnchors
+			local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
+			if plotsFolder then
+				for _, anchor in ipairs(plotsFolder:GetChildren()) do
+					for _, child in ipairs(anchor:GetChildren()) do
+						if child:IsA("Model") and child:GetAttribute("PlantType") then
+							table.insert(plants, child)
+						end
+					end
+				end
+			end
+			-- Also check direct children for free-placed plants
+			for _, child in ipairs(garden:GetDescendants()) do
+				if child:IsA("Model") and child:GetAttribute("PlantType") then
+					local found = false
+					for _, p in ipairs(plants) do
+						if p == child then found = true break end
+					end
+					if not found then
+						table.insert(plants, child)
+					end
+				end
+			end
+			return plants
+		end
+	end
+	
+	return {}
+end
+
 -- Watering Can tool handler
+-- Waters up to MAX_PLANTS nearby plants (closest first)
 local function handleWateringCan(player, target, position)
-	-- Check ownership8
+	-- Check ownership
 	if not playerOwnsGarden(player, target) then
 		return
 	end
 	
-	-- Find plant from target
-	local plant = getPlantFromTarget(target)
+	-- Get max plants from Constants GEAR_CONFIG or fallback to 5
+	local Constants = require(game:GetService("ReplicatedStorage"):WaitForChild("Shared"):WaitForChild("Constants"))
+	local maxPlants = 5
+	local waterSeconds = Config.Tools.WateringCan.WaterSeconds
 	
-	if plant then
+	if Constants.GEAR_CONFIG and Constants.GEAR_CONFIG[Constants.GEAR_TYPES.WATERING_CAN] then
+		local gearConfig = Constants.GEAR_CONFIG[Constants.GEAR_TYPES.WATERING_CAN]
+		maxPlants = gearConfig.MaxPlantsPerUse or 5
+		waterSeconds = gearConfig.WaterDuration or waterSeconds
+	end
+	
+	-- Find clicked plant first
+	local clickedPlant = getPlantFromTarget(target)
+	
+	-- Get all plants in player's garden
+	local allPlants = getPlayerGardenPlants(player)
+	
+	-- Sort plants by distance to click position
+	table.sort(allPlants, function(a, b)
+		local posA = a:GetBoundingBox().Position
+		local posB = b:GetBoundingBox().Position
+		return (posA - position).Magnitude < (posB - position).Magnitude
+	end)
+	
+	-- Water up to maxPlants closest plants
+	local wateredCount = 0
+	for _, plant in ipairs(allPlants) do
+		if wateredCount >= maxPlants then break end
+		
 		local plantPosition = plant:GetBoundingBox().Position
 		
-		if BuffsModule and Config then
-			BuffsModule.WaterPlant(plant, Config.Tools.WateringCan.WaterSeconds)
+		-- Only water plants within 15 studs of click
+		if (plantPosition - position).Magnitude <= 15 then
+			if BuffsModule and Config then
+				BuffsModule.WaterPlant(plant, waterSeconds)
+			end
+			
+			if VFXModule then
+				VFXModule.TryEmitWater(plant)
+				VFXModule.ShowWateringEffect(plantPosition)
+			end
+			
+			wateredCount = wateredCount + 1
 		end
+	end
 	
-		if VFXModule then
-			VFXModule.TryEmitWater(plant)
-			VFXModule.ShowWateringEffect(plantPosition)
-		end
+	-- If no plants in range, still show effect at position (feedback to player)
+	if wateredCount == 0 and VFXModule then
+		VFXModule.ShowWateringEffect(position)
 	end
 end
 

@@ -28,13 +28,22 @@ local WEATHER_COLORS = {
 
 -- Create the weather display
 function WeatherDisplay.Create(parent: GuiObject): Frame
+	local scale = Styles.GetDeviceScale()
+	local topPadding = Styles.GetTopPadding()
+
 	local frame = Instance.new("Frame")
 	frame.Name = "WeatherFrame"
 	frame.Size = UDim2.new(0, 140, 0, 50)
-	frame.Position = UDim2.new(0, 210, 0, 20)
+	frame.Position = UDim2.new(0, 210, 0, 20 + topPadding)
 	frame.BackgroundColor3 = Theme.WoodPanel
 	frame.BorderSizePixel = 0
 	frame.ZIndex = 10
+
+	if scale ~= 1 then
+		local uiScale = Instance.new("UIScale")
+		uiScale.Scale = scale
+		uiScale.Parent = frame
+	end
 	
 	Styles.AddCorner(frame, 12)
 	Styles.AddStroke(frame, Theme.VineStroke, 2, 0.3)

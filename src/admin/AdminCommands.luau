@@ -137,43 +137,8 @@ end
 function AdminCommands.GrowAllPlants(player)
 	local ServerScriptService = game:GetService("ServerScriptService")
 	local GardenManager = require(ServerScriptService.Server.GardenManager)
-	local Config = require(ReplicatedStorage.Shared.Config)
-	local Constants = require(ReplicatedStorage.Shared.Constants)
-	local PlantModule = require(ReplicatedStorage.Shared.PlantModule)
-	
-	local garden = GardenManager.PlayerGardens[player.UserId]
 
-	if not garden then
-		return false, "No garden assigned. Please wait for garden assignment."
-	end
-
-	local count = 0
-	local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
-	if plotsFolder then
-		for _, anchor in ipairs(plotsFolder:GetChildren()) do
-			if anchor:IsA("BasePart") then
-				for _, child in ipairs(anchor:GetChildren()) do
-					if child:IsA("Model") and child:GetAttribute("PlantType") then
-						-- Set stage and harvestable attributes
-						child:SetAttribute("Stage", Constants.GROWTH_STAGES.BLOOM)
-						child:SetAttribute("Harvestable", true)
-
-						-- Update visual
-						PlantModule.UpdatePlantVisual(child)
-
-						-- Setup harvest detector using public function
-						local ownerId = child:GetAttribute("OwnerUserId")
-						if ownerId then
-							GardenManager.SetupPlantHarvestDetector(child, ownerId)
-						end
-
-						count = count + 1
-					end
-				end
-			end
-		end
-	end
-
+	local count = GardenManager.GrowAllPlantsForUser(player.UserId)
 	if count == 0 then
 		return false, "No plants found in garden. Plant some seeds first!"
 	end

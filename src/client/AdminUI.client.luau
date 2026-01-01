@@ -133,7 +133,4 @@ end)
 -- Listen for responses
 adminCommandEvent.OnClientEvent:Connect(function(success, message)
 	showOutput(success, message)
-	print("[Admin]", message)
 end)
-
-print("🔧 Admin UI Loaded - Press 'P' to open command console")

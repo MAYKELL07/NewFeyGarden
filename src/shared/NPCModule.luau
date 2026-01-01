@@ -7,7 +7,8 @@ local NPCModule = {}
 NPCModule.NPC_TYPES = {
 	SEED_SHOP = "SeedShop",
 	FRUIT_SELLER = "FruitSeller",
-	PET_STORE = "PetStore"
+	PET_STORE = "PetStore",
+	GEAR_SHOP = "GearShop"
 }
 
 -- NPC Configurations
@@ -109,6 +110,40 @@ NPCModule.NPC_CONFIG = {
 				"That pet costs more than you have.",
 				"Save up coins by selling fruits!",
 				"There are cheaper pets available!"
+			}
+		}
+	},
+	
+	[NPCModule.NPC_TYPES.GEAR_SHOP] = {
+		Name = "Gear Emporium",
+		Title = "Tools & Equipment",
+		Shopkeeper = "Tinker Ironroot",
+		Description = "Purchase magical tools to enhance your gardening",
+		Color = Color3.fromRGB(180, 140, 100),
+		Icon = "🔧",
+		CameraPartName = "GearCamera",
+		Dialogs = {
+			Welcome = {
+				"Welcome to the Gear Emporium!",
+				"Looking for some quality tools?",
+				"Every gardener needs proper equipment!"
+			},
+			Browse = {
+				"My tools are forged with magic!",
+				"A good watering can makes all the difference.",
+				"Quality gear helps your garden thrive!",
+				"Browse my finest creations!"
+			},
+			Purchase = {
+				"Excellent choice, adventurer!",
+				"Use it well in your garden!",
+				"May your tools serve you faithfully!",
+				"Crafted with care, just for you!"
+			},
+			NoMoney = {
+				"That's a bit pricey for your purse.",
+				"Sell some fruits and come back!",
+				"I have cheaper options too!"
 			}
 		}
 	}

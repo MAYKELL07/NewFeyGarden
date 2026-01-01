@@ -559,8 +559,6 @@ function TradingService.Initialize(dataServiceRef)
 	
 	-- Clean up on player leave
 	Players.PlayerRemoving:Connect(onPlayerRemoving)
-	
-	print("[TradingService] Initialized")
 end
 
 return TradingService

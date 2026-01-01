@@ -65,7 +65,7 @@ end)
 
 -- Initialize all systems
 WeatherController.Initialize()
+ShopService.Initialize() -- Must be before EconomyService so shop inventory is ready
 EconomyService.Initialize()
 GardenManager.Initialize()
-ShopService.Initialize()
 TradingService.Initialize(DataService)

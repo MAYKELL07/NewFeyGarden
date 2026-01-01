@@ -14,11 +14,13 @@ function Schema.Default()
 			Seeds = {}, -- {PlantType = count}
 			Pets = {}, -- Array of pet instances: {Id, PetType, Size, Weight}
 			Eggs = {}, -- {EggType = count}
-			Fruits = {} -- Array of fruit instances: {Id, Type, Weight}
+			Fruits = {}, -- Array of fruit instances: {Id, Type, Weight}
+			Gear = {} -- {GearType = true} - owned gear
 		},
 		EquippedPets = {}, -- Array of pet instance IDs (up to 3)
 		GardenPets = {}, -- Array of pet instance IDs (up to 7)
-		PlantSlots = {}, -- {[slotIndex] = {Id, Type, Stage, WateredUntil, PetBoost, Size, Weight}}
+		PlantSlots = {}, -- {[slotIndex] = {Id, Type, Stage, PlantTime, WateredUntil, PetBoost, Size, Weight}}
+		FreePlants = {}, -- {[plantId] = {Id, Type, Stage, PlantTime, Position, WateredUntil, PetBoost, Size, Weight}}
 		SessionLock = nil, -- Session lock for preventing conflicts
 		SessionLockTime = 0,
 		LastSaved = os.time(),
@@ -39,10 +41,11 @@ function Schema.Migrate(data)
 	
 	-- Add missing fields safely
 	data.Coins = data.Coins or 10000000000
-	data.Inventory = data.Inventory or {Seeds = {}, Pets = {}, Eggs = {}, Fruits = {}}
+	data.Inventory = data.Inventory or {Seeds = {}, Pets = {}, Eggs = {}, Fruits = {}, Gear = {}}
 	data.Inventory.Seeds = data.Inventory.Seeds or {}
 	data.Inventory.Eggs = data.Inventory.Eggs or {}
 	data.Inventory.Fruits = data.Inventory.Fruits or {}
+	data.Inventory.Gear = data.Inventory.Gear or {}
 	
 	-- Migrate old EquippedPet to new EquippedPets array
 	if data.EquippedPet and type(data.EquippedPet) == "string" then
@@ -53,6 +56,7 @@ function Schema.Migrate(data)
 	data.EquippedPets = data.EquippedPets or {}
 	data.GardenPets = data.GardenPets or {}
 	data.PlantSlots = data.PlantSlots or {}
+	data.FreePlants = data.FreePlants or {} -- Free-form planting data
 	data.SessionLock = data.SessionLock or nil
 	data.SessionLockTime = data.SessionLockTime or 0
 	data.LastSaved = data.LastSaved or os.time()

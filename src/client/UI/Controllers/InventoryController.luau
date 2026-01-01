@@ -16,7 +16,7 @@ local InventoryController = {}
 
 local inventoryWindow: Frame? = nil
 local inventoryGrid: ScrollingFrame? = nil
-local screenGui: ScreenGui? = nil
+local screenGui: GuiObject? = nil
 
 -- Currently selected seed for planting
 local selectedSeedType: string? = nil
@@ -99,7 +99,7 @@ function InventoryController.SetOnSeedSelected(callback: (string?) -> ())
 end
 
 -- Initialize the inventory controller
-function InventoryController.Initialize(gui: ScreenGui)
+function InventoryController.Initialize(gui: GuiObject)
 	screenGui = gui
 	
 	-- Create inventory window

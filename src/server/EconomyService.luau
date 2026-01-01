@@ -4,6 +4,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local ServerScriptService = game:GetService("ServerScriptService")
+local MarketplaceService = game:GetService("MarketplaceService")
 
 local sharedFolder = ReplicatedStorage:FindFirstChild("Shared") or ReplicatedStorage:WaitForChild("Shared", 5)
 if not sharedFolder then
@@ -33,6 +34,7 @@ local ShopService = require(ServerScriptService.Server.ShopService)
 
 local EconomyService = {}
 EconomyService.PlayerData = {} -- Legacy cache, now backed by DataService
+local growAllRewardHandler
 
 -- Create RemoteEvents
 local buySeedEvent = Instance.new("RemoteEvent")
@@ -71,6 +73,10 @@ local eggOpenedEvent = Instance.new("RemoteEvent")
 eggOpenedEvent.Name = Constants.EVENTS.EGG_OPENED
 eggOpenedEvent.Parent = ReplicatedStorage
 
+local buyGearEvent = Instance.new("RemoteEvent")
+buyGearEvent.Name = Constants.EVENTS.BUY_GEAR
+buyGearEvent.Parent = ReplicatedStorage
+
 local sellFruitEvent = Instance.new("RemoteEvent")
 sellFruitEvent.Name = Constants.EVENTS.SELL_FRUIT
 sellFruitEvent.Parent = ReplicatedStorage
@@ -95,6 +101,39 @@ updateCurrencyEvent.Parent = ReplicatedStorage
 local updateInventoryEvent = Instance.new("RemoteEvent")
 updateInventoryEvent.Name = Constants.EVENTS.UPDATE_INVENTORY
 updateInventoryEvent.Parent = ReplicatedStorage
+
+-- Robux purchase event (client requests to buy seeds with Robux)
+local buySeedRobuxEvent = Instance.new("RemoteEvent")
+buySeedRobuxEvent.Name = Constants.EVENTS.BUY_SEED_ROBUX
+buySeedRobuxEvent.Parent = ReplicatedStorage
+
+function EconomyService.SetGrowAllRewardHandler(callback)
+	growAllRewardHandler = callback
+end
+
+function EconomyService.TriggerGrowAllReward(userId)
+	if growAllRewardHandler then
+		local ok, result = pcall(growAllRewardHandler, userId)
+		if not ok then
+			warn("[EconomyService] GrowAll reward handler failed:", result)
+			return 0
+		end
+		return result or 0
+	end
+
+	return 0
+end
+
+function EconomyService.PromptGrowAllPurchase(player)
+	local productId = Constants.GetGrowAllProductId()
+	if not productId or productId == 0 then
+		warn("[EconomyService] GrowAll product ID not configured")
+		return false
+	end
+
+	MarketplaceService:PromptProductPurchase(player, productId)
+	return true
+end
 
 -- Initialize player data (now loads from DataService)
 function EconomyService.InitializePlayerData(player)
@@ -172,6 +211,7 @@ function EconomyService.SyncPlayerData(player)
 		Pets = profile.Inventory.Pets, -- Full pet instances array [{Id, PetType, Size, Weight}]
 		Eggs = profile.Inventory.Eggs or {},
 		Fruits = profile.Inventory.Fruits,
+		Gear = profile.Inventory.Gear or {},
 		EquippedPets = equippedPetInstances, -- Full instances for rendering
 		EquippedPetIds = profile.EquippedPets or {}, -- Just IDs for quick lookup
 		GardenPets = gardenPetInstances, -- Full instances for rendering
@@ -321,6 +361,39 @@ function EconomyService.BuyPet(player, petType)
 	EconomyService.SyncPlayerData(player)
 	
 	-- print(player.Name .. " bought " .. petType .. " pet")
+	return true
+end
+
+-- Buy gear
+function EconomyService.BuyGear(player, gearType)
+	local config = Constants.GEAR_CONFIG[gearType]
+	if not config then
+		warn("Invalid gear type:", gearType)
+		return false
+	end
+	
+	-- Check if player already owns this gear
+	if DataService.HasGear(player.UserId, gearType) then
+		warn(player.Name .. " already owns this gear")
+		return false
+	end
+	
+	if not EconomyService.RemoveCoins(player, config.Price) then
+		warn(player.Name .. " doesn't have enough coins")
+		return false
+	end
+	
+	DataService.AddGear(player.UserId, gearType)
+	
+	-- Update cache
+	local profile = DataService.GetProfile(player.UserId)
+	if profile then
+		EconomyService.PlayerData[player.UserId].Inventory = profile.Inventory
+	end
+	
+	EconomyService.SyncPlayerData(player)
+	
+	-- print(player.Name .. " bought " .. gearType .. " gear")
 	return true
 end
 
@@ -564,8 +637,11 @@ function EconomyService.OpenEgg(player, eggType)
 	-- Fire result to client for animation
 	eggOpenedEvent:FireClient(player, true, resultData, nil)
 	
-	-- Sync inventory after a short delay (let animation play)
-	task.delay(3, function()
+	-- Sync inventory immediately so UI updates right away
+	EconomyService.SyncPlayerData(player)
+	
+	-- Sync again after animation finishes (in case client missed the first one)
+	task.delay(3.5, function()
 		EconomyService.SyncPlayerData(player)
 	end)
 	
@@ -741,6 +817,11 @@ function EconomyService.Initialize()
 		EconomyService.BuyEgg(player, eggType, amount)
 	end)
 	
+	-- Handle buy gear requests
+	buyGearEvent.OnServerEvent:Connect(function(player, gearType)
+		EconomyService.BuyGear(player, gearType)
+	end)
+	
 	-- Handle open egg requests
 	openEggEvent.OnServerEvent:Connect(function(player, eggType)
 		EconomyService.OpenEgg(player, eggType)
@@ -785,6 +866,70 @@ function EconomyService.Initialize()
 	requestDataEvent.OnServerEvent:Connect(function(player)
 		EconomyService.SyncPlayerData(player)
 	end)
+	
+	-- Handle Robux seed purchase requests (prompts the purchase)
+	buySeedRobuxEvent.OnServerEvent:Connect(function(player, plantType)
+		local product = Constants.SEED_ROBUX_PRODUCTS[plantType]
+		if not product then
+			warn("[EconomyService] Invalid plant type for Robux purchase:", plantType)
+			return
+		end
+		
+		if product.ProductId == 0 then
+			warn("[EconomyService] Product ID not configured for:", plantType)
+			return
+		end
+		
+		-- Prompt the purchase
+		MarketplaceService:PromptProductPurchase(player, product.ProductId)
+	end)
+	
+	-- Handle Developer Product purchases (ProcessReceipt callback)
+	MarketplaceService.ProcessReceipt = function(receiptInfo)
+		local userId = receiptInfo.PlayerId
+		local productId = receiptInfo.ProductId
+		
+		local player = Players:GetPlayerByUserId(userId)
+		if not player then
+			-- Player left, but we should still grant the purchase
+			-- Return NotProcessedYet so it retries when they rejoin
+			return Enum.ProductPurchaseDecision.NotProcessedYet
+		end
+
+		-- Grow All product
+		local growAllProductId = Constants.GetGrowAllProductId()
+		if growAllProductId and productId == growAllProductId then
+			local grown = EconomyService.TriggerGrowAllReward(userId)
+			if grown > 0 then
+				print(string.format("[EconomyService] GrowAll purchase: %s grew %d plants", player.Name, grown))
+			else
+				warn(string.format("[EconomyService] GrowAll purchase granted but no plants were grown for %s", player.Name))
+			end
+			return Enum.ProductPurchaseDecision.PurchaseGranted
+		end
+		
+		-- Find which seed product was purchased
+		local plantType, product = Constants.GetPlantTypeByProductId(productId)
+		if plantType and product then
+			-- Grant the seeds
+			local seedAmount = product.SeedAmount or 5
+			local success = DataService.AddSeed(userId, plantType, seedAmount)
+			
+			if success then
+				-- Sync inventory to client
+				EconomyService.SyncPlayerData(player)
+				print(string.format("[EconomyService] Robux purchase: %s bought %dx %s seeds", player.Name, seedAmount, plantType))
+				return Enum.ProductPurchaseDecision.PurchaseGranted
+			else
+				warn("[EconomyService] Failed to grant seeds for Robux purchase:", plantType)
+				return Enum.ProductPurchaseDecision.NotProcessedYet
+			end
+		end
+		
+		-- Unknown product - could be from another system
+		warn("[EconomyService] Unknown product ID in ProcessReceipt:", productId)
+		return Enum.ProductPurchaseDecision.NotProcessedYet
+	end
 	
 	-- Handle harvest rewards (listen for update currency from GardenManager)
 	updateCurrencyEvent.OnServerEvent:Connect(function(player, amount)

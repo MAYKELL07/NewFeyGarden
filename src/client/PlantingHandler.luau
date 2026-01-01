@@ -1,80 +1,185 @@
 -- PlantingHandler.luau
--- Handles clicking on PlantAnchors to plant seeds
+-- Handles clicking on plots to plant seeds using raycast for free-form planting
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
-local UIHandler = require(script.Parent.UIHandler)
 
 local PlantingHandler = {}
-local player = Players.LocalPlayer
-local connections = {}
+local selectedPlantProvider = nil
 
-local function getSlotIndexFromAnchor(anchor)
-	local anchorName = anchor.Name
-	local prefix = Config.Garden.PlantAnchorPrefix
-	local slotIndex = tonumber(anchorName:match(prefix .. "(%d+)"))
-	return slotIndex
+function PlantingHandler.SetSelectedPlantProvider(provider)
+	selectedPlantProvider = provider
+end
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local connections = {}
+local playerGarden = nil
+local plotParts = {} -- Plot1-Plot8 parts used for validation
+
+-- Raycast from screen position to world
+local function raycastFromMouse()
+	local mouseLocation = UserInputService:GetMouseLocation()
+	local ray = camera:ViewportPointToRay(mouseLocation.X, mouseLocation.Y)
+	
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterType = Enum.RaycastFilterType.Exclude
+	
+	-- Exclude the player's character
+	local character = player.Character
+	if character then
+		raycastParams.FilterDescendantsInstances = {character}
+	end
+	
+	local result = workspace:Raycast(ray.Origin, ray.Direction * 500, raycastParams)
+	return result
 end
 
-local function setupAnchorClick(anchor)
-	local clickDetector = anchor:FindFirstChildOfClass("ClickDetector")
-	if not clickDetector then
+-- Check if a position is inside any of the Plot parts bounds (Plot1-Plot8)
+local function isPositionInPlot(position)
+	if #plotParts == 0 then
+		return false
+	end
+	
+	-- Check against each plot part
+	for _, plotPart in ipairs(plotParts) do
+		-- Convert position to local space to handle rotation
+		local localPos = plotPart.CFrame:PointToObjectSpace(position)
+		local halfSize = plotPart.Size / 2
+		local margin = 1.0 -- Small margin to avoid edge-case rejections
+		
+		local inBounds = localPos.X >= -halfSize.X - margin
+			and localPos.X <= halfSize.X + margin
+			and localPos.Z >= -halfSize.Z - margin
+			and localPos.Z <= halfSize.Z + margin
+		
+		if inBounds then
+			return true
+		end
+	end
+	
+	return false
+end
+
+-- Check if hit part is part of the plot area (for planting)
+local function isValidPlantingSurface(hitPart)
+	if not hitPart then
+		return false
+	end
+	
+	-- Check if it's one of the plot parts
+	for _, plotPart in ipairs(plotParts) do
+		if hitPart == plotPart then
+			return true
+		end
+	end
+	
+	-- Check if it's named Plot (including Plot1-Plot8), Floor, or Ground
+	local name = hitPart.Name:lower()
+	if name:match("^plot%d*$") or name == "floor" or name == "ground" then
+		return true
+	end
+	
+	-- Check if it's a descendant of the plots folder
+	local plotsFolder = playerGarden and playerGarden:FindFirstChild(Config.World.PlotsFolder)
+	if plotsFolder and hitPart:IsDescendantOf(plotsFolder) then
+		return true
+	end
+	
+	-- Check if it's a descendant of the player's garden
+	if playerGarden and hitPart:IsDescendantOf(playerGarden) then
+		-- Make sure it's not a plant or other object
+		if not hitPart:FindFirstAncestorOfClass("Model") then
+			return true
+		end
+		-- Allow if the ancestor model doesn't have PlantType (not a plant)
+		local ancestorModel = hitPart:FindFirstAncestorOfClass("Model")
+		if ancestorModel and not ancestorModel:GetAttribute("PlantType") then
+			return true
+		end
+	end
+	
+	return false
+end
+
+-- Handle mouse click for free-form planting
+local function onMouseClick()
+	-- Get selected plant type
+	local selectedPlantType = selectedPlantProvider and selectedPlantProvider()
+	if not selectedPlantType then
+		-- No seed selected, don't show warning on every click
 		return
 	end
 	
-	-- Disconnect if already connected
-	if connections[anchor] then
-		connections[anchor]:Disconnect()
+	-- Raycast from mouse position
+	local result = raycastFromMouse()
+	if not result then
+		return
 	end
 	
-	-- Connect to click event
-	connections[anchor] = clickDetector.MouseClick:Connect(function()
-		-- Check if anchor already has a plant
-		local hasPlant = false
-		for _, child in ipairs(anchor:GetChildren()) do
-			if child:IsA("Model") and child:GetAttribute("PlantType") then
-				hasPlant = true
-				break
+	-- Check if we hit a valid planting surface
+	if not isValidPlantingSurface(result.Instance) then
+		return
+	end
+	
+	-- Check if position is within plot bounds
+	local hitPosition = result.Position
+	if not isPositionInPlot(hitPosition) then
+		return
+	end
+	
+	-- Fire to server with position
+	local plantSeedAtPositionEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.PLANT_SEED_AT_POSITION)
+	if plantSeedAtPositionEvent then
+		plantSeedAtPositionEvent:FireServer(hitPosition, selectedPlantType)
+	else
+		warn("[PlantingHandler] PLANT_SEED_AT_POSITION event not found!")
+	end
+end
+
+-- Setup free-form planting with raycast
+local function setupFreePlanting(garden)
+	playerGarden = garden
+	plotParts = {} -- Reset plot parts
+	
+	-- Find all Plot parts (Plot1-Plot8) for validation
+	local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
+	if plotsFolder then
+		for i = 1, 8 do
+			local plotPart = plotsFolder:FindFirstChild("Plot" .. i)
+			if plotPart and plotPart:IsA("BasePart") then
+				table.insert(plotParts, plotPart)
 			end
 		end
-		
-		if hasPlant then
-			-- Don't plant if there's already a plant here
+	end
+	
+	if #plotParts == 0 then
+		warn("[PlantingHandler] No plot parts (Plot1-Plot8) found for bounds validation!")
+	end
+	
+	-- Connect mouse click for planting
+	if connections.mouseClick then
+		connections.mouseClick:Disconnect()
+	end
+	
+	connections.mouseClick = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+		-- Don't process if UI is handling it
+		if gameProcessed then
 			return
 		end
 		
-		-- Get selected plant type from UIHandler
-		local selectedPlantType = UIHandler.GetSelectedPlantType()
-		if not selectedPlantType then
-			-- No seed selected
-			warn("[PlantingHandler] No seed selected! Select a seed from your inventory first.")
-			return
-		end
-		
-		-- Get slot index from anchor name
-		local slotIndex = getSlotIndexFromAnchor(anchor)
-		if not slotIndex then
-			warn("[PlantingHandler] Could not determine slot index from anchor:", anchor.Name)
-			return
-		end
-		
-		-- Fire plant seed event to server
-		local plantSeedEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.PLANT_SEED)
-		if plantSeedEvent then
-			-- print(string.format("[PlantingHandler] Planting %s at slot %d", selectedPlantType, slotIndex))
-			plantSeedEvent:FireServer(slotIndex, selectedPlantType)
-		else
-			warn("[PlantingHandler] PLANT_SEED event not found!")
+		-- Only handle left mouse button
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			onMouseClick()
 		end
 	end)
 end
 
 function PlantingHandler.Initialize()
-	-- print("[PlantingHandler] Initializing...")
-	
 	-- Wait for player's garden
 	task.wait(2) -- Give time for garden assignment
 	
@@ -86,37 +191,23 @@ function PlantingHandler.Initialize()
 	end
 	
 	-- Find the garden with our UserId
-	local playerGarden = nil
+	local foundGarden = nil
 	for _, garden in ipairs(gardensFolder:GetChildren()) do
 		if garden:IsA("Folder") and garden:GetAttribute("OwnerUserId") == player.UserId then
-			playerGarden = garden
+			foundGarden = garden
 			break
 		end
 	end
 	
-	if not playerGarden then
+	if not foundGarden then
 		warn("[PlantingHandler] Player garden not found!")
 		return
 	end
 	
-	-- print("[PlantingHandler] Found player garden:", playerGarden.Name)
+	playerGarden = foundGarden
 	
-	-- Setup click detectors for all plant anchors
-	local plotsFolder = playerGarden:FindFirstChild(Config.World.PlotsFolder)
-	if not plotsFolder then
-		warn("[PlantingHandler] Plots folder not found in garden!")
-		return
-	end
-	
-	local anchorCount = 0
-	for _, child in ipairs(plotsFolder:GetChildren()) do
-		if child:IsA("BasePart") and child.Name:match(Config.Garden.PlantAnchorPrefix) then
-			setupAnchorClick(child)
-			anchorCount = anchorCount + 1
-		end
-	end
-	
-	-- print(string.format("[PlantingHandler] ✅ Setup complete - %d anchors ready", anchorCount))
+	-- Free-form planting mode - raycast click anywhere on the plot
+	setupFreePlanting(foundGarden)
 end
 
 return PlantingHandler

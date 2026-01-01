@@ -297,6 +297,83 @@ function DataService.ClearPlantSlot(userId, slotIndex)
 	return true
 end
 
+-- ============================================================================
+-- FREE PLANTING FUNCTIONS (for position-based planting)
+-- ============================================================================
+
+-- Initialize FreePlants table if needed
+local function ensureFreePlants(profile)
+	if not profile.FreePlants then
+		profile.FreePlants = {}
+	end
+	return profile.FreePlants
+end
+
+-- Add a freely-placed plant
+function DataService.AddFreePlant(userId, plantData)
+	local profile = Profiles[userId]
+	if not profile then return false end
+	
+	local freePlants = ensureFreePlants(profile)
+	
+	-- Use plant ID as key
+	if plantData.Id then
+		freePlants[plantData.Id] = plantData
+		return true
+	end
+	
+	return false
+end
+
+-- Remove a freely-placed plant by ID
+function DataService.RemoveFreePlant(userId, plantId)
+	local profile = Profiles[userId]
+	if not profile then return false end
+	
+	local freePlants = ensureFreePlants(profile)
+	
+	if freePlants[plantId] then
+		freePlants[plantId] = nil
+		return true
+	end
+	
+	return false
+end
+
+-- Get all freely-placed plants
+function DataService.GetAllFreePlants(userId)
+	local profile = Profiles[userId]
+	if not profile then return {} end
+	
+	return profile.FreePlants or {}
+end
+
+-- Update a freely-placed plant's data (e.g., stage change)
+function DataService.UpdateFreePlant(userId, plantId, updates)
+	local profile = Profiles[userId]
+	if not profile then return false end
+	
+	local freePlants = ensureFreePlants(profile)
+	
+	if freePlants[plantId] then
+		for key, value in pairs(updates) do
+			freePlants[plantId][key] = value
+		end
+		return true
+	end
+	
+	return false
+end
+
+-- Clear all freely-placed plants
+function DataService.ClearAllFreePlants(userId)
+	local profile = Profiles[userId]
+	if not profile then return false end
+	
+	profile.FreePlants = {}
+	return true
+end
+
 -- Get inventory
 function DataService.GetInventory(userId)
 	local profile = Profiles[userId]
@@ -332,6 +409,37 @@ function DataService.GetSeedCount(userId, plantType)
 	if not profile then return 0 end
 	
 	return profile.Inventory.Seeds[plantType] or 0
+end
+
+-- ============================================================================
+-- GEAR MANAGEMENT
+-- ============================================================================
+
+-- Add gear to inventory
+function DataService.AddGear(userId, gearType)
+	local profile = Profiles[userId]
+	if not profile then return false end
+	
+	profile.Inventory.Gear = profile.Inventory.Gear or {}
+	profile.Inventory.Gear[gearType] = true
+	return true
+end
+
+-- Check if player has gear
+function DataService.HasGear(userId, gearType)
+	local profile = Profiles[userId]
+	if not profile then return false end
+	
+	profile.Inventory.Gear = profile.Inventory.Gear or {}
+	return profile.Inventory.Gear[gearType] == true
+end
+
+-- Get all owned gear
+function DataService.GetAllGear(userId)
+	local profile = Profiles[userId]
+	if not profile then return {} end
+	
+	return profile.Inventory.Gear or {}
 end
 
 -- ============================================================================
@@ -731,7 +839,5 @@ end
 function DataService.IsDataLoaded(userId)
 	return DataLoaded[userId] == true
 end
-
-print("💾 DataService initialized")
 
 return DataService

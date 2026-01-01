@@ -100,8 +100,6 @@ function ShopService.RefreshShop()
 	currentShopInventory = generateShopInventory()
 	lastRefreshTime = os.time()
 	
-	print("[ShopService] Shop refreshed with", #currentShopInventory, "seed types")
-	
 	-- Notify all players of the new inventory
 	if shopInventoryUpdateEvent then
 		for _, player in ipairs(Players:GetPlayers()) do
@@ -222,7 +220,6 @@ function ShopService.Initialize()
 	end)
 	
 	shopInitialized = true
-	print("[ShopService] Initialized")
 end
 
 return ShopService

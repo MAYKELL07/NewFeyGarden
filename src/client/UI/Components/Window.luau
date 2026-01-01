@@ -20,14 +20,16 @@ export type WindowConfig = {
 
 -- Create a styled window
 function Window.Create(config: WindowConfig, parent: GuiObject): Frame
+	local scale = Styles.GetDeviceScale()
+	local topPadding = Styles.GetTopPadding()
 	local size = config.Size or UDim2.new(0, 400, 0, 500)
-	local position = config.Position or UDim2.new(0.5, 0, 0.5, 0)
+	local position = config.Position or UDim2.new(0.5, 0, 0.5, topPadding)
 	
 	-- Main window frame
 	local window = Instance.new("Frame")
 	window.Name = config.Name
 	window.Size = size
-	window.Position = position
+	window.Position = UDim2.new(position.X.Scale, position.X.Offset, position.Y.Scale, position.Y.Offset + topPadding)
 	window.AnchorPoint = Vector2.new(0.5, 0.5)
 	window.BackgroundColor3 = Theme.ForestDark
 	window.BorderSizePixel = 0
@@ -37,6 +39,12 @@ function Window.Create(config: WindowConfig, parent: GuiObject): Frame
 	Styles.AddCorner(window, 20)
 	Styles.AddStroke(window, Theme.VineStroke, 3, 0.2)
 	Styles.AddShadow(window, 8)
+
+	if scale ~= 1 then
+		local uiScale = Instance.new("UIScale")
+		uiScale.Scale = scale
+		uiScale.Parent = window
+	end
 	
 	-- Apply frame art if requested
 	if config.UseFrameArt then

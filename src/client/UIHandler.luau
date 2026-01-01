@@ -12,6 +12,9 @@ local PlantModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChil
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+local hudGroup: Instance? = nil
+local windowGroup: Instance? = nil
+local overlayGroup: Instance? = nil
 
 -- NPCUIHandler for camera control
 local NPCUIHandler = require(script.Parent:WaitForChild("NPCUIHandler"))
@@ -21,6 +24,14 @@ local ToolController
 pcall(function()
 	ToolController = require(script.Parent:WaitForChild("ToolController"))
 end)
+
+-- ItemHoldController for holding seeds/fruits in hand
+local ItemHoldController
+pcall(function()
+	ItemHoldController = require(script.Parent:WaitForChild("ItemHoldController"))
+end)
+
+print("[UIHandler] ItemHoldController loaded:", ItemHoldController ~= nil)
 
 -- Audio Manager (optional - won't break if not loaded)
 local AudioManager
@@ -33,6 +44,11 @@ local playerInventory = {Seeds = {}, Pets = {}, Fruits = {}}
 local playerCoins = 0
 local currentWeather = Constants.WEATHER_TYPES.SUNNY
 local screenGui = nil
+local uiRoot: Instance? = nil
+
+-- Ready state for LoadingScreen synchronization
+UIHandler.IsReady = false
+UIHandler.ReadyEvent = Instance.new("BindableEvent")
 
 -- FANTASY FRAME THEME - Purple/Blue palette (matches UISetup)
 local THEME = {
@@ -97,6 +113,7 @@ local updateShopInventoryGrid
 local updateEggShop
 local updateSellInventoryGrid
 local updatePetShopWindow
+local updateGearShopWindow
 local isPetEquipped
 local isPetInGarden
 local createPetShopPreviewItem
@@ -108,31 +125,50 @@ local function playSound(soundName)
 	end
 end
 
--- Helper to hide/show HUD elements
+local function getSidePanel()
+	return hudGroup and hudGroup:FindFirstChild("SidePanel")
+end
+
+local function findSideButton(name: string)
+	local panel = getSidePanel()
+	if panel then
+		local button = panel:FindFirstChild(name)
+		if button then
+			return button
+		end
+	end
+
+	return hudGroup and hudGroup:FindFirstChild(name)
+end
+
+-- Helper to hide/show HUD elements (for shop windows)
 local function hideHUD()
 	if not screenGui then return end
-	local currencyFrame = screenGui:FindFirstChild("CurrencyFrame")
-	local weatherFrame = screenGui:FindFirstChild("WeatherFrame")
-	local hotbarFrame = screenGui:FindFirstChild("HotbarFrame")
-	local petsButton = screenGui:FindFirstChild("PetsButton")
-	local navigationFrame = screenGui:FindFirstChild("NavigationFrame")
-	
+	local currencyFrame = hudGroup and hudGroup:FindFirstChild("CurrencyFrame")
+	local sidePanel = getSidePanel()
+	local weatherFrame = (sidePanel and sidePanel:FindFirstChild("WeatherFrame")) or (hudGroup and hudGroup:FindFirstChild("WeatherFrame"))
+	local petsButton = hudGroup and hudGroup:FindFirstChild("PetsButton")
+	local navigationFrame = hudGroup and hudGroup:FindFirstChild("NavigationFrame")
+
 	if currencyFrame then currencyFrame.Visible = false end
+	if sidePanel then sidePanel.Visible = false end
 	if weatherFrame then weatherFrame.Visible = false end
-	if hotbarFrame then hotbarFrame.Visible = false end
 	if petsButton then petsButton.Visible = false end
 	if navigationFrame then navigationFrame.Visible = false end
+	-- NOTE: Hotbar stays visible
 end
 
 local function showHUD()
 	if not screenGui then return end
-	local currencyFrame = screenGui:FindFirstChild("CurrencyFrame")
-	local weatherFrame = screenGui:FindFirstChild("WeatherFrame")
-	local hotbarFrame = screenGui:FindFirstChild("HotbarFrame")
-	local petsButton = screenGui:FindFirstChild("PetsButton")
-	local navigationFrame = screenGui:FindFirstChild("NavigationFrame")
-	
+	local currencyFrame = hudGroup and hudGroup:FindFirstChild("CurrencyFrame")
+	local sidePanel = getSidePanel()
+	local weatherFrame = (sidePanel and sidePanel:FindFirstChild("WeatherFrame")) or (hudGroup and hudGroup:FindFirstChild("WeatherFrame"))
+	local hotbarFrame = hudGroup and hudGroup:FindFirstChild("HotbarFrame")
+	local petsButton = hudGroup and hudGroup:FindFirstChild("PetsButton")
+	local navigationFrame = hudGroup and hudGroup:FindFirstChild("NavigationFrame")
+
 	if currencyFrame then currencyFrame.Visible = true end
+	if sidePanel then sidePanel.Visible = true end
 	if weatherFrame then weatherFrame.Visible = true end
 	if hotbarFrame then hotbarFrame.Visible = true end
 	if petsButton then petsButton.Visible = true end
@@ -148,6 +184,40 @@ local hotbarData = {
 	[1] = {type = "Tool", name = "WateringCan"},
 	[2] = {type = "Tool", name = "Shovel"},
 }
+
+-- Hotbar slots 1 and 2 are reserved for core tools
+local lockedToolSlots = {
+	[1] = {type = "Tool", name = "WateringCan"},
+	[2] = {type = "Tool", name = "Shovel"},
+}
+
+local function isLockedToolSlot(slotIndex: number): boolean
+	return lockedToolSlots[slotIndex] ~= nil
+end
+
+local function enforceToolSlots()
+	for slotIndex, data in pairs(lockedToolSlots) do
+		local slotData = hotbarData[slotIndex]
+		if not slotData or slotData.type ~= "Tool" or slotData.name ~= data.name then
+			hotbarData[slotIndex] = {type = "Tool", name = data.name}
+		end
+	end
+end
+
+local function getFallbackHotbarSlot(): number
+	for i = 3, 6 do
+		local slotData = hotbarData[i]
+		if not slotData or slotData.type ~= "Tool" then
+			return i
+		end
+	end
+
+	return 3
+end
+
+-- Ensure default tool slots are set on load
+enforceToolSlots()
+
 local currentInventoryFilter = "All"
 
 -- Helper to get item icon
@@ -179,12 +249,14 @@ local function getItemIcon(itemName, itemType)
 end
 
 local function selectHotbarSlot(slotNumber)
+	enforceToolSlots()
 	if not screenGui then return end
-	local hotbarFrame = screenGui:FindFirstChild("HotbarFrame")
+	local hotbarFrame = hudGroup and hudGroup:FindFirstChild("HotbarFrame")
 	if not hotbarFrame then return end
+	local slotsContainer = hotbarFrame:FindFirstChild("Slots") or hotbarFrame
 	
 	-- Deselect old slot
-	local oldSlot = hotbarFrame:FindFirstChild("Slot" .. selectedSlot)
+	local oldSlot = slotsContainer:FindFirstChild("Slot" .. selectedSlot)
 	if oldSlot then
 		local oldStroke = oldSlot:FindFirstChild("UIStroke")
 		if oldStroke then
@@ -193,25 +265,48 @@ local function selectHotbarSlot(slotNumber)
 		end
 	end
 	
-	-- Handle tool equipping/unequipping
-	if ToolController then
-		local newSlotData = hotbarData[slotNumber]
-		local oldSlotData = hotbarData[selectedSlot]
-		
-		-- Unequip tool if leaving a tool slot
-		if oldSlotData and oldSlotData.type == "Tool" then
+	-- Handle tool/item equipping/unequipping
+	local newSlotData = hotbarData[slotNumber]
+	local oldSlotData = hotbarData[selectedSlot]
+	
+	print("[UIHandler DEBUG] selectHotbarSlot:", slotNumber)
+	print("[UIHandler DEBUG] oldSlotData:", oldSlotData and oldSlotData.type or "nil", oldSlotData and oldSlotData.name or "")
+	print("[UIHandler DEBUG] newSlotData:", newSlotData and newSlotData.type or "nil", newSlotData and newSlotData.name or "")
+	
+	-- Unequip old item/tool
+	if oldSlotData then
+		if oldSlotData.type == "Tool" and ToolController then
 			ToolController.UnequipTool()
+		elseif (oldSlotData.type == "Seed" or oldSlotData.type == "Fruit") and ItemHoldController then
+			print("[UIHandler DEBUG] Unholding old item")
+			ItemHoldController.UnholdItem()
 		end
-		
-		-- Equip tool if selecting a tool slot
-		if newSlotData and newSlotData.type == "Tool" then
+	end
+	
+	-- Equip new item/tool
+	if newSlotData then
+		if newSlotData.type == "Tool" and ToolController then
 			ToolController.EquipTool(newSlotData.name)
+		elseif (newSlotData.type == "Seed" or newSlotData.type == "Fruit") and ItemHoldController then
+			print("[UIHandler DEBUG] Holding new item:", newSlotData.type, newSlotData.name)
+			-- Generate or use existing weight for the item
+			local weight = newSlotData.weight or 1.0
+			if not newSlotData.weight then
+				-- Generate random weight if not already set
+				local sizeWeight = Constants.GenerateRandomSizeWeight("Plant")
+				weight = sizeWeight.Weight
+				newSlotData.weight = weight
+			end
+			local success = ItemHoldController.HoldItem(newSlotData.type, newSlotData.name, weight)
+			print("[UIHandler DEBUG] HoldItem result:", success)
+		else
+			print("[UIHandler DEBUG] Empty slot or unknown type")
 		end
 	end
 	
 	-- Select new slot
 	selectedSlot = slotNumber
-	local newSlot = hotbarFrame:FindFirstChild("Slot" .. slotNumber)
+	local newSlot = slotsContainer:FindFirstChild("Slot" .. slotNumber)
 	if newSlot then
 		local newStroke = newSlot:FindFirstChild("UIStroke")
 		if newStroke then
@@ -224,12 +319,14 @@ local function selectHotbarSlot(slotNumber)
 end
 
 local function updateHotbar()
+	enforceToolSlots()
 	if not screenGui then return end
-	local hotbarFrame = screenGui:FindFirstChild("HotbarFrame")
+	local hotbarFrame = hudGroup and hudGroup:FindFirstChild("HotbarFrame")
 	if not hotbarFrame then return end
+	local slotsContainer = hotbarFrame:FindFirstChild("Slots") or hotbarFrame
 	
 	for i = 1, 6 do
-		local slot = hotbarFrame:FindFirstChild("Slot" .. i)
+		local slot = slotsContainer:FindFirstChild("Slot" .. i)
 		if slot then
 			local itemIcon = slot:FindFirstChild("ItemIcon")
 			local itemCount = slot:FindFirstChild("ItemCount")
@@ -281,93 +378,84 @@ local function updateHotbar()
 	end
 end
 
-local function createInventoryItem(itemName, itemCount, itemType)
-	local item = Instance.new("Frame")
+local function createInventoryItem(itemName, itemCount, itemType, container)
+	-- Find and clone the template
+	local template = container and container:FindFirstChild("InventoryItemTemplate")
+	if not template then
+		warn("[UIHandler] InventoryItemTemplate not found in container")
+		return nil
+	end
+	
+	local item = template:Clone()
 	item.Name = itemName
-	item.Size = UDim2.new(0, 90, 0, 90)
-	item.BackgroundColor3 = THEME.ForestDeep
-	item.BorderSizePixel = 0
+	item.Visible = true
 	
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 10)
-	corner.Parent = item
+	-- Update stroke color based on item type
+	local stroke = item:FindFirstChildOfClass("UIStroke")
+	if stroke then
+		stroke.Color = itemType == "Seed" and THEME.TealGem or THEME.GoldLeaf
+	end
 	
-	local stroke = Instance.new("UIStroke")
-	stroke.Color = itemType == "Seed" and THEME.TealGem or THEME.GoldLeaf
-	stroke.Thickness = 2
-	stroke.Transparency = 0.3
-	stroke.Parent = item
+	-- Update icon
+	local itemIcon = item:FindFirstChild("ItemIcon")
+	if itemIcon then
+		itemIcon.Text = getItemIcon(itemName, itemType)
+	end
 	
-	local icon = Instance.new("TextLabel")
-	icon.Name = "Icon"
-	icon.Size = UDim2.new(0, 45, 0, 45)
-	icon.Position = UDim2.new(0.5, 0, 0, 15)
-	icon.AnchorPoint = Vector2.new(0.5, 0)
-	icon.BackgroundTransparency = 1
-	icon.Text = getItemIcon(itemName, itemType)
-	icon.TextScaled = true
-	icon.Font = Enum.Font.GothamBold
-	icon.Parent = item
+	-- Update name
+	local nameLabel = item:FindFirstChild("ItemName")
+	if nameLabel then
+		nameLabel.Text = itemName
+	end
 	
-	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Name = "Name"
-	nameLabel.Size = UDim2.new(1, -10, 0, 15)
-	nameLabel.Position = UDim2.new(0, 5, 1, -28)
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.Text = itemName
-	nameLabel.TextColor3 = THEME.TextLight
-	nameLabel.Font = Enum.Font.Gotham
-	nameLabel.TextSize = 10
-	nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
-	nameLabel.Parent = item
+	-- Update count
+	local countBadge = item:FindFirstChild("CountBadge")
+	local countLabel = countBadge and countBadge:FindFirstChild("CountLabel")
+	if countLabel then
+		countLabel.Text = "x" .. tostring(itemCount)
+	end
 	
-	local countLabel = Instance.new("TextLabel")
-	countLabel.Name = "Count"
-	countLabel.Size = UDim2.new(0, 30, 0, 20)
-	countLabel.Position = UDim2.new(1, -32, 1, -22)
-	countLabel.BackgroundTransparency = 1
-	countLabel.Text = tostring(itemCount)
-	countLabel.TextColor3 = THEME.TextLight
-	countLabel.Font = Enum.Font.GothamBold
-	countLabel.TextSize = 14
-	countLabel.TextXAlignment = Enum.TextXAlignment.Right
-	countLabel.Parent = item
+	-- Connect click handler
+	local clickButton = item:FindFirstChild("ClickButton")
+	if clickButton then
+		clickButton.MouseButton1Click:Connect(function()
+			enforceToolSlots()
+			local targetSlot = selectedSlot
+			local notificationColor = THEME.TealGem
+			local notificationText = "Added " .. itemName .. " to Slot " .. targetSlot
+			local notificationIcon = getItemIcon(itemName, itemType)
+
+			if isLockedToolSlot(targetSlot) then
+				targetSlot = getFallbackHotbarSlot()
+				notificationColor = THEME.AmberGlow
+				notificationText = "Slots 1-2 are for tools. Added to Slot " .. targetSlot .. " instead"
+			end
+
+			hotbarData[targetSlot] = {type = itemType, name = itemName, count = itemCount}
+			selectHotbarSlot(targetSlot)
+			updateHotbar()
+			playSound("Click")
+			showNotification(notificationText, notificationColor, notificationIcon)
+		end)
+	end
 	
-	local countStroke = Instance.new("UIStroke")
-	countStroke.Color = THEME.ForestDark
-	countStroke.Thickness = 2
-	countStroke.Parent = countLabel
-	
-	-- Click to add to selected hotbar slot
-	local button = Instance.new("TextButton")
-	button.Name = "Button"
-	button.Size = UDim2.new(1, 0, 1, 0)
-	button.BackgroundTransparency = 1
-	button.Text = ""
-	button.Parent = item
-	
-	button.MouseButton1Click:Connect(function()
-		-- Add to currently selected hotbar slot
-		hotbarData[selectedSlot] = {type = itemType, name = itemName, count = itemCount}
-		updateHotbar()
-		playSound("Click")
-		showNotification("Added " .. itemName .. " to Slot " .. selectedSlot, THEME.TealGem, getItemIcon(itemName, itemType))
-	end)
-	
+	item.Parent = container
 	return item
 end
 
 local function updateFullInventory()
 	if not screenGui or not playerInventory then return end
-	local inventoryWindow = screenGui:FindFirstChild("InventoryWindow")
+	local inventoryWindow = windowGroup and windowGroup:FindFirstChild("InventoryWindow")
 	if not inventoryWindow or not inventoryWindow.Visible then return end
 	
 	local gridContainer = inventoryWindow:FindFirstChild("GridContainer")
 	if not gridContainer then return end
 	
-	-- Clear existing items
+	-- Clear existing items (preserve template)
 	for _, child in ipairs(gridContainer:GetChildren()) do
-		if child:IsA("Frame") then child:Destroy() end
+		if child:IsA("Frame") and not string.find(child.Name, "Template") then
+			child:Destroy()
+		end
 	end
 	
 	-- Add seeds
@@ -375,8 +463,7 @@ local function updateFullInventory()
 		if playerInventory.Seeds then
 			for seedName, count in pairs(playerInventory.Seeds) do
 				if count > 0 then
-					local item = createInventoryItem(seedName, count, "Seed")
-					item.Parent = gridContainer
+					createInventoryItem(seedName, count, "Seed", gridContainer)
 				end
 			end
 		end
@@ -387,8 +474,7 @@ local function updateFullInventory()
 		if playerInventory.Fruits then
 			for fruitName, count in pairs(playerInventory.Fruits) do
 				if count > 0 then
-					local item = createInventoryItem(fruitName, count, "Fruit")
-					item.Parent = gridContainer
+					createInventoryItem(fruitName, count, "Fruit", gridContainer)
 				end
 			end
 		end
@@ -441,7 +527,7 @@ end
 -- =============================================================================
 showNotification = function(message, color, icon)
 	if not screenGui then return end
-	local container = screenGui:FindFirstChild("NotificationContainer")
+	local container = hudGroup and hudGroup:FindFirstChild("NotificationContainer")
 	if not container then return end
 
 	local accentColor = color or THEME.Notification
@@ -519,7 +605,8 @@ end
 -- =============================================================================
 local function updateCurrencyDisplay(coins, isTotal)
 	if not screenGui then return end
-	local coinLabel = screenGui.CurrencyFrame:FindFirstChild("CoinLabel")
+	local currencyFrame = hudGroup and hudGroup:FindFirstChild("CurrencyFrame")
+	local coinLabel = currencyFrame and currencyFrame:FindFirstChild("CoinLabel")
 	if not coinLabel then return end
 	
 	if isTotal then
@@ -548,6 +635,7 @@ end
 -- =============================================================================
 local function updateInventoryDisplay(inventory)
 	if not screenGui then return end
+	enforceToolSlots()
 	playerInventory = inventory
 	
 	-- Update hotbar with new counts
@@ -561,29 +649,43 @@ local function updateInventoryDisplay(inventory)
 	updateHotbar()
 	
 	-- Update inventory window if it's open
-	local inventoryWindow = screenGui:FindFirstChild("InventoryWindow")
+	local inventoryWindow = windowGroup and windowGroup:FindFirstChild("InventoryWindow")
 	if inventoryWindow and inventoryWindow.Visible then
 		updateFullInventory()
 	end
 	
 	-- Update shop inventory grid if shop is open
-	local shopWindow = screenGui:FindFirstChild("ShopWindow")
+	local shopWindow = windowGroup and windowGroup:FindFirstChild("ShopWindow")
 	if shopWindow and shopWindow.Visible then
 		updateShopInventoryGrid()
 	end
 	
 	-- Update sell shop if it's open
-	local sellWindow = screenGui:FindFirstChild("SellWindow")
+	local sellWindow = windowGroup and windowGroup:FindFirstChild("SellWindow")
 	if sellWindow and sellWindow.Visible then
 		updateSellShop()
 		updateSellInventoryGrid()
 	end
 	
 	-- Update pets window if it's open
-	local petsWindow = screenGui:FindFirstChild("PetsWindow")
+	local petsWindow = windowGroup and windowGroup:FindFirstChild("PetsWindow")
 	if petsWindow and petsWindow.Visible then
 		updatePetsWindow()
 		updateEggShop()
+	end
+	
+	-- Update pet shop window if open
+	local petShopWindow = windowGroup and windowGroup:FindFirstChild("PetShopWindow")
+	if petShopWindow and petShopWindow.Visible then
+		if updatePetShopWindow then
+			updatePetShopWindow()
+		end
+	end
+	
+	-- Update gear shop window if open
+	local gearShopWindow = windowGroup and windowGroup:FindFirstChild("GearShopWindow")
+	if gearShopWindow and gearShopWindow.Visible then
+		updateGearShopWindow()
 	end
 end
 
@@ -593,7 +695,10 @@ end
 local function updateWeatherDisplay(weather)
 	if not screenGui then return end
 	currentWeather = weather
-	local weatherLabel = screenGui.WeatherFrame:WaitForChild("WeatherLabel")
+	local weatherFrame = findSideButton("WeatherFrame") or findSideButton("WeatherButton")
+	if not weatherFrame then return end
+	local weatherLabel = weatherFrame:FindFirstChild("WeatherLabel") or weatherFrame:FindFirstChild("Label")
+	if not weatherLabel then return end
 	
 	local weatherIcons = {
 		[Constants.WEATHER_TYPES.SUNNY] = "☀️",
@@ -624,6 +729,9 @@ end
 -- Shop inventory state (will be updated from server)
 local currentShopInventory = {}
 
+-- Forward declarations
+local populateShop
+
 local function createShopItem(itemName, itemType, config, container, stock)
 	if not config then 
 		warn("[UIHandler] No config for", itemType, itemName)
@@ -641,186 +749,131 @@ local function createShopItem(itemName, itemType, config, container, stock)
 	local rarity = Constants.PLANT_RARITIES and Constants.PLANT_RARITIES[itemName] or "Common"
 	local rarityColor = Constants.RARITY_COLORS and Constants.RARITY_COLORS[rarity] or THEME.TextMoss
 	
-	local itemFrame = Instance.new("Frame")
-	itemFrame.Name = itemName
-	itemFrame.Size = UDim2.new(1, 0, 0, 80)
-	itemFrame.BackgroundColor3 = soldOut and THEME.StonePanel or THEME.WoodPanel
-	itemFrame.BorderSizePixel = 0
-	itemFrame.ZIndex = 11
-	itemFrame.Parent = container
-	
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 12)
-	corner.Parent = itemFrame
-	
-	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new(soldOut and THEME.StonePanel or THEME.WoodPanel, soldOut and THEME.ForestDeep or THEME.WoodBark)
-	gradient.Rotation = 90
-	gradient.Parent = itemFrame
-
-	local stroke = Instance.new("UIStroke")
-	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	stroke.Thickness = 2
-	stroke.Color = rarityColor
-	stroke.Transparency = soldOut and 0.6 or 0.3
-	stroke.Parent = itemFrame
-	
-	-- Rarity badge
-	local rarityBadge = Instance.new("TextLabel")
-	rarityBadge.Size = UDim2.new(0, 60, 0, 16)
-	rarityBadge.Position = UDim2.new(0, 5, 0, 2)
-	rarityBadge.BackgroundColor3 = rarityColor
-	rarityBadge.BackgroundTransparency = 0.3
-	rarityBadge.Text = rarity
-	rarityBadge.TextColor3 = THEME.TextLight
-	rarityBadge.Font = Enum.Font.GothamBold
-	rarityBadge.TextSize = 10
-	rarityBadge.ZIndex = 13
-	rarityBadge.Parent = itemFrame
-	
-	local badgeCorner = Instance.new("UICorner")
-	badgeCorner.CornerRadius = UDim.new(0, 4)
-	badgeCorner.Parent = rarityBadge
-	
-	-- Icon
-	local icon = Instance.new("TextLabel")
-	icon.Size = UDim2.new(0, 60, 1, -25)
-	icon.Position = UDim2.new(0, 5, 0, 18)
-	icon.BackgroundTransparency = 1
-	icon.Text = itemType == "seed" and "🌱" or "🐾"
-	icon.TextScaled = true
-	icon.Font = Enum.Font.GothamBold
-	icon.TextColor3 = itemType == "seed" and (config.EmitsLight and THEME.TextGold or THEME.TextMoss) or THEME.TealGlow
-	icon.TextTransparency = soldOut and 0.5 or 0
-	icon.ZIndex = 12
-	icon.Parent = itemFrame
-	
-	-- Name
-	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Size = UDim2.new(0.35, 0, 0.4, 0)
-	nameLabel.Position = UDim2.new(0.15, 0, 0.15, 0)
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.Text = itemName
-	nameLabel.TextColor3 = soldOut and THEME.TextMoss or THEME.TextLight
-	nameLabel.Font = Enum.Font.GothamBold
-	nameLabel.TextScaled = true
-	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	nameLabel.ZIndex = 12
-	nameLabel.Parent = itemFrame
-	
-	-- Description
-	local descLabel = Instance.new("TextLabel")
-	descLabel.Size = UDim2.new(0.35, 0, 0.3, 0)
-	descLabel.Position = UDim2.new(0.15, 0, 0.55, 0)
-	descLabel.BackgroundTransparency = 1
-	descLabel.Text = itemType == "seed" and ("Grows in " .. (config.GrowthTime or "?") .. "s") or ("Boost: +" .. math.floor((1 - (config.WaterBoost or 1)) * 100) .. "%")
-	descLabel.TextColor3 = THEME.TextMoss
-	descLabel.Font = Enum.Font.Gotham
-	descLabel.TextScaled = true
-	descLabel.TextXAlignment = Enum.TextXAlignment.Left
-	descLabel.ZIndex = 12
-	descLabel.Parent = itemFrame
-	
-	-- Stock label
-	if stock ~= nil then
-		local stockLabel = Instance.new("TextLabel")
-		stockLabel.Size = UDim2.new(0.15, 0, 0.25, 0)
-		stockLabel.Position = UDim2.new(0.52, 0, 0.1, 0)
-		stockLabel.BackgroundTransparency = 1
-		stockLabel.Text = soldOut and "SOLD OUT" or ("Stock: " .. stock)
-		stockLabel.TextColor3 = soldOut and Color3.fromRGB(255, 100, 100) or THEME.TextMoss
-		stockLabel.Font = Enum.Font.GothamBold
-		stockLabel.TextSize = 11
-		stockLabel.TextXAlignment = Enum.TextXAlignment.Center
-		stockLabel.ZIndex = 12
-		stockLabel.Parent = itemFrame
+	-- Find and clone the template from the container
+	local template = container:FindFirstChild("ShopItemTemplate")
+	if not template then
+		warn("[UIHandler] ShopItemTemplate not found in container, falling back to old method")
+		-- Fallback: create from scratch (old method)
+		local itemFrame = Instance.new("Frame")
+		itemFrame.Name = itemName
+		itemFrame.Size = UDim2.new(1, 0, 0, 80)
+		itemFrame.BackgroundColor3 = soldOut and THEME.StonePanel or THEME.WoodPanel
+		itemFrame.BorderSizePixel = 0
+		itemFrame.ZIndex = 11
+		itemFrame.Parent = container
+		return
 	end
 	
-	-- Owned count
-	local ownedCount = 0
-	if itemType == "seed" then
-		ownedCount = playerInventory.Seeds and playerInventory.Seeds[itemName] or 0
-	elseif itemType == "pet" then
-		ownedCount = (playerInventory.Pets and playerInventory.Pets[itemName]) and 1 or 0
+	-- Clone the template
+	local itemCard = template:Clone()
+	itemCard.Name = itemName
+	itemCard.Visible = true
+	
+	-- Update sold out appearance
+	if soldOut then
+		itemCard.BackgroundColor3 = THEME.StonePanel
+		local stroke = itemCard:FindFirstChildOfClass("UIStroke")
+		if stroke then stroke.Transparency = 0.6 end
+	else
+		local stroke = itemCard:FindFirstChildOfClass("UIStroke")
+		if stroke then 
+			stroke.Color = rarityColor 
+			stroke.Transparency = 0.3
+		end
 	end
 	
-	local ownedLabel = Instance.new("TextLabel")
-	ownedLabel.Size = UDim2.new(0.15, 0, 0.25, 0)
-	ownedLabel.Position = UDim2.new(0.52, 0, 0.4, 0)
-	ownedLabel.BackgroundTransparency = 1
-	ownedLabel.Text = "Owned: " .. ownedCount
-	ownedLabel.TextColor3 = THEME.TextMoss
-	ownedLabel.Font = Enum.Font.Gotham
-	ownedLabel.TextSize = 11
-	ownedLabel.TextXAlignment = Enum.TextXAlignment.Center
-	ownedLabel.ZIndex = 12
-	ownedLabel.Parent = itemFrame
+	-- Update icon container
+	local iconContainer = itemCard:FindFirstChild("IconContainer")
+	if iconContainer then
+		local itemIcon = iconContainer:FindFirstChild("ItemIcon")
+		if itemIcon then
+			itemIcon.Text = itemType == "seed" and "🌱" or "🐾"
+			itemIcon.TextColor3 = itemType == "seed" and (config.EmitsLight and THEME.TextGold or THEME.TextMoss) or THEME.TealGlow
+			itemIcon.TextTransparency = soldOut and 0.5 or 0
+		end
+	end
 	
-	-- Price
-	local priceLabel = Instance.new("TextLabel")
-	priceLabel.Size = UDim2.new(0.15, 0, 0.3, 0)
-	priceLabel.Position = UDim2.new(0.52, 0, 0.65, 0)
-	priceLabel.BackgroundTransparency = 1
-	priceLabel.Text = "💰 " .. price
-	priceLabel.TextColor3 = THEME.TextGold
-	priceLabel.Font = Enum.Font.GothamBold
-	priceLabel.TextScaled = true
-	priceLabel.ZIndex = 12
-	priceLabel.Parent = itemFrame
-	
-	-- Buy button
-	local buyButton = Instance.new("TextButton")
-	buyButton.Size = UDim2.new(0.18, 0, 0.5, 0)
-	buyButton.Position = UDim2.new(0.8, 0, 0.25, 0)
-	buyButton.BackgroundColor3 = soldOut and THEME.StonePanel or THEME.TealGem
-	buyButton.Text = soldOut and "—" or "BUY"
-	buyButton.TextColor3 = THEME.TextLight
-	buyButton.Font = Enum.Font.GothamBold
-	buyButton.TextScaled = true
-	buyButton.ZIndex = 12
-	buyButton.Active = not soldOut
-	buyButton.Parent = itemFrame
-	
-	local buyCorner = Instance.new("UICorner")
-	buyCorner.CornerRadius = UDim.new(0, 10)
-	buyCorner.Parent = buyButton
-	
-	if not soldOut then
-		buyButton.MouseButton1Click:Connect(function()
-			playSound("ButtonClick")
-			if itemType == "seed" then
-				local buyEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.BUY_SEED)
-				if buyEvent then
-					buyEvent:FireServer(itemName, 1) -- Buy 1 seed
-					-- Optimistically update local stock so UI reflects purchase instantly
-					if currentShopInventory and currentShopInventory[itemName] and currentShopInventory[itemName].Stock then
-						currentShopInventory[itemName].Stock = math.max(0, currentShopInventory[itemName].Stock - 1)
-						updateShopInventoryGrid()
-					end
-					playSound("Purchase")
-				end
-			elseif itemType == "pet" then
-				local buyEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.BUY_PET)
-				if buyEvent then
-					buyEvent:FireServer(itemName)
-					playSound("Purchase")
-				end
-			end
-		end)
+	-- Update info container
+	local infoContainer = itemCard:FindFirstChild("InfoContainer")
+	if infoContainer then
+		local nameLabel = infoContainer:FindFirstChild("ItemName")
+		if nameLabel then
+			nameLabel.Text = itemName
+			nameLabel.TextColor3 = soldOut and THEME.TextMoss or THEME.TextLight
+		end
 		
-		-- Hover effect
-		buyButton.MouseEnter:Connect(function()
-			buyButton.BackgroundColor3 = THEME.TealGlow
-		end)
-		buyButton.MouseLeave:Connect(function()
-			buyButton.BackgroundColor3 = THEME.TealGem
-		end)
+		local rarityLabel = infoContainer:FindFirstChild("ItemRarity")
+		if rarityLabel then
+			rarityLabel.Text = rarity
+			rarityLabel.TextColor3 = rarityColor
+		end
+		
+		local stockLabel = infoContainer:FindFirstChild("ItemStock")
+		if stockLabel then
+			if stock ~= nil then
+				stockLabel.Text = soldOut and "SOLD OUT" or ("Stock: " .. stock)
+				stockLabel.TextColor3 = soldOut and Color3.fromRGB(255, 100, 100) or THEME.TextMoss
+			else
+				stockLabel.Text = itemType == "seed" and ("Grows in " .. (config.GrowthTime or "?") .. "s") or ""
+			end
+		end
 	end
+	
+	-- Update action container
+	local actionContainer = itemCard:FindFirstChild("ActionContainer")
+	if actionContainer then
+		local priceLabel = actionContainer:FindFirstChild("PriceLabel")
+		if priceLabel then
+			priceLabel.Text = "💰 " .. price
+		end
+		
+		local buyButton = actionContainer:FindFirstChild("BuyButton")
+		if buyButton then
+			buyButton.Text = soldOut and "—" or "🛒 BUY"
+			buyButton.BackgroundColor3 = soldOut and THEME.StonePanel or THEME.TealGem
+			buyButton.Active = not soldOut
+			
+			if not soldOut then
+				buyButton.MouseButton1Click:Connect(function()
+					playSound("ButtonClick")
+					if itemType == "seed" then
+						local buyEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.BUY_SEED)
+						if buyEvent then
+							buyEvent:FireServer(itemName, 1) -- Buy 1 seed
+							-- Optimistically update local stock
+							if currentShopInventory and currentShopInventory[itemName] and currentShopInventory[itemName].Stock then
+								currentShopInventory[itemName].Stock = math.max(0, currentShopInventory[itemName].Stock - 1)
+								populateShop()
+								updateShopInventoryGrid()
+							end
+							playSound("Purchase")
+						end
+					elseif itemType == "pet" then
+						local buyEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.BUY_PET)
+						if buyEvent then
+							buyEvent:FireServer(itemName)
+							playSound("Purchase")
+						end
+					end
+				end)
+				
+				-- Hover effect
+				buyButton.MouseEnter:Connect(function()
+					buyButton.BackgroundColor3 = THEME.TealGlow
+				end)
+				buyButton.MouseLeave:Connect(function()
+					buyButton.BackgroundColor3 = THEME.TealGem
+				end)
+			end
+		end
+	end
+	
+	itemCard.Parent = container
 end
 
-local function populateShop()
+populateShop = function()
 	if not screenGui then return end
-	local shopWindow = screenGui:FindFirstChild("ShopWindow")
+	local shopWindow = windowGroup and windowGroup:FindFirstChild("ShopWindow")
 	if not shopWindow then return end
 	
 	local leftPanel = shopWindow:FindFirstChild("LeftPanel")
@@ -830,9 +883,11 @@ local function populateShop()
 		return 
 	end
 	
-	-- Clear existing
+	-- Clear existing items (but preserve templates and layouts)
 	for _, child in ipairs(shopScroll:GetChildren()) do
-		if child:IsA("Frame") then child:Destroy() end
+		if child:IsA("Frame") and not child.Name:find("Template") then 
+			child:Destroy() 
+		end
 	end
 	
 	-- Check if we have rotating shop inventory
@@ -1033,7 +1088,7 @@ end
 -- Update egg shop display
 updateEggShop = function()
 	if not screenGui then return end
-	local petsWindow = screenGui:FindFirstChild("PetsWindow")
+	local petsWindow = windowGroup and windowGroup:FindFirstChild("PetsWindow")
 	if not petsWindow then return end
 	
 	-- Look for an egg shop section in the right panel or create in left panel
@@ -1070,7 +1125,7 @@ end
 -- =============================================================================
 updatePetShopWindow = function()
 	if not screenGui then return end
-	local petShopWindow = screenGui:FindFirstChild("PetShopWindow")
+	local petShopWindow = windowGroup and windowGroup:FindFirstChild("PetShopWindow")
 	if not petShopWindow then 
 		warn("[UIHandler] PetShopWindow not found")
 		return 
@@ -1137,6 +1192,241 @@ updatePetShopWindow = function()
 				noPetsLabel.ZIndex = 13
 				noPetsLabel.TextWrapped = true
 				noPetsLabel.Parent = noPetsFrame
+			end
+		end
+	end
+end
+
+-- =============================================================================
+-- GEAR SHOP WINDOW (Tools and Equipment)
+-- =============================================================================
+
+-- Create a gear shop item
+local function createGearShopItem(gearType, config, container)
+	if not config then return end
+	
+	local itemFrame = Instance.new("Frame")
+	itemFrame.Name = gearType
+	itemFrame.Size = UDim2.new(1, -10, 0, 110)
+	itemFrame.BackgroundColor3 = THEME.ForestDeep
+	itemFrame.BorderSizePixel = 0
+	itemFrame.Parent = container
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 12)
+	corner.Parent = itemFrame
+	
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = THEME.TealGem
+	stroke.Thickness = 2
+	stroke.Transparency = 0.4
+	stroke.Parent = itemFrame
+	
+	-- Icon
+	local iconLabel = Instance.new("TextLabel")
+	iconLabel.Name = "Icon"
+	iconLabel.Size = UDim2.new(0.2, 0, 0.7, 0)
+	iconLabel.Position = UDim2.new(0.02, 0, 0.15, 0)
+	iconLabel.BackgroundColor3 = THEME.ForestDark
+	iconLabel.Text = config.Icon or "🔧"
+	iconLabel.TextScaled = true
+	iconLabel.Font = Enum.Font.GothamBold
+	iconLabel.ZIndex = 13
+	iconLabel.Parent = itemFrame
+	
+	local iconCorner = Instance.new("UICorner")
+	iconCorner.CornerRadius = UDim.new(0, 8)
+	iconCorner.Parent = iconLabel
+	
+	-- Name
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Name = "ItemName"
+	nameLabel.Size = UDim2.new(0.5, 0, 0.3, 0)
+	nameLabel.Position = UDim2.new(0.25, 0, 0.05, 0)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = config.DisplayName or gearType
+	nameLabel.TextColor3 = THEME.TextLight
+	nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.TextScaled = true
+	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+	nameLabel.ZIndex = 13
+	nameLabel.Parent = itemFrame
+	
+	-- Description
+	local descLabel = Instance.new("TextLabel")
+	descLabel.Name = "Description"
+	descLabel.Size = UDim2.new(0.5, 0, 0.35, 0)
+	descLabel.Position = UDim2.new(0.25, 0, 0.35, 0)
+	descLabel.BackgroundTransparency = 1
+	descLabel.Text = config.Description or ""
+	descLabel.TextColor3 = THEME.TextMoss
+	descLabel.Font = Enum.Font.Gotham
+	descLabel.TextScaled = true
+	descLabel.TextWrapped = true
+	descLabel.TextXAlignment = Enum.TextXAlignment.Left
+	descLabel.ZIndex = 13
+	descLabel.Parent = itemFrame
+	
+	-- Price / Buy Button
+	local hasGear = playerInventory.Gear and playerInventory.Gear[gearType]
+	
+	local buyButton = Instance.new("TextButton")
+	buyButton.Name = "BuyButton"
+	buyButton.Size = UDim2.new(0.22, 0, 0.35, 0)
+	buyButton.Position = UDim2.new(0.76, 0, 0.55, 0)
+	buyButton.ZIndex = 14
+	buyButton.Parent = itemFrame
+	
+	local buyCorner = Instance.new("UICorner")
+	buyCorner.CornerRadius = UDim.new(0, 8)
+	buyCorner.Parent = buyButton
+	
+	if hasGear then
+		buyButton.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+		buyButton.Text = "OWNED"
+		buyButton.TextColor3 = THEME.TextMoss
+		buyButton.Font = Enum.Font.GothamBold
+		buyButton.TextScaled = true
+	else
+		buyButton.BackgroundColor3 = THEME.TealGem
+		buyButton.Text = "🪙 " .. tostring(config.Price or 0)
+		buyButton.TextColor3 = THEME.TextLight
+		buyButton.Font = Enum.Font.GothamBold
+		buyButton.TextScaled = true
+		
+		-- Buy functionality
+		buyButton.MouseButton1Click:Connect(function()
+			if playerCoins >= config.Price then
+				local buyGearEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.BUY_GEAR)
+				if buyGearEvent then
+					buyGearEvent:FireServer(gearType)
+					playSound("Purchase")
+					showNotification("Purchased " .. (config.DisplayName or gearType) .. "!", THEME.TealGem, config.Icon or "🔧")
+				end
+			else
+				showNotification("Not enough coins!", THEME.AmberGlow, "🪙")
+				playSound("Error")
+			end
+		end)
+	end
+end
+
+-- Create an owned gear item for the right panel
+local function createOwnedGearItem(gearType, config, container)
+	if not config then return end
+	
+	local itemFrame = Instance.new("Frame")
+	itemFrame.Name = gearType
+	itemFrame.Size = UDim2.new(0, 90, 0, 110)
+	itemFrame.BackgroundColor3 = THEME.ForestDeep
+	itemFrame.BorderSizePixel = 0
+	itemFrame.Parent = container
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = itemFrame
+	
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = THEME.GoldLeaf
+	stroke.Thickness = 2
+	stroke.Transparency = 0.3
+	stroke.Parent = itemFrame
+	
+	-- Icon
+	local iconLabel = Instance.new("TextLabel")
+	iconLabel.Name = "Icon"
+	iconLabel.Size = UDim2.new(0.8, 0, 0.5, 0)
+	iconLabel.Position = UDim2.new(0.1, 0, 0.05, 0)
+	iconLabel.BackgroundTransparency = 1
+	iconLabel.Text = config.Icon or "🔧"
+	iconLabel.TextScaled = true
+	iconLabel.Font = Enum.Font.GothamBold
+	iconLabel.ZIndex = 13
+	iconLabel.Parent = itemFrame
+	
+	-- Name
+	local nameLabel = Instance.new("TextLabel")
+	nameLabel.Name = "Name"
+	nameLabel.Size = UDim2.new(0.9, 0, 0.35, 0)
+	nameLabel.Position = UDim2.new(0.05, 0, 0.6, 0)
+	nameLabel.BackgroundTransparency = 1
+	nameLabel.Text = config.DisplayName or gearType
+	nameLabel.TextColor3 = THEME.TextLight
+	nameLabel.Font = Enum.Font.GothamBold
+	nameLabel.TextSize = 12
+	nameLabel.TextWrapped = true
+	nameLabel.ZIndex = 13
+	nameLabel.Parent = itemFrame
+end
+
+-- Update the gear shop window
+updateGearShopWindow = function()
+	if not screenGui then return end
+	local gearShopWindow = windowGroup and windowGroup:FindFirstChild("GearShopWindow")
+	if not gearShopWindow then return end
+	
+	-- LEFT PANEL - Gear Shop
+	local leftPanel = gearShopWindow:FindFirstChild("LeftPanel")
+	if leftPanel then
+		local gearShopScroll = leftPanel:FindFirstChild("GearShopScroll")
+		if gearShopScroll then
+			-- Clear existing (keep UIListLayout and UIPadding)
+			for _, child in ipairs(gearShopScroll:GetChildren()) do
+				if child:IsA("Frame") then child:Destroy() end
+			end
+			
+			-- Add gear items from Constants
+			if Constants.GEAR_CONFIG then
+				for gearType, config in pairs(Constants.GEAR_CONFIG) do
+					createGearShopItem(gearType, config, gearShopScroll)
+				end
+			end
+		end
+	end
+	
+	-- RIGHT PANEL - Player's Owned Gear
+	local rightPanel = gearShopWindow:FindFirstChild("RightPanel")
+	if rightPanel then
+		local gearInventoryScroll = rightPanel:FindFirstChild("GearInventoryScroll")
+		if gearInventoryScroll then
+			-- Clear existing
+			for _, child in ipairs(gearInventoryScroll:GetChildren()) do
+				if child:IsA("Frame") then child:Destroy() end
+			end
+			
+			-- Add owned gear
+			local hasAnyGear = false
+			if playerInventory.Gear and Constants.GEAR_CONFIG then
+				for gearType, owned in pairs(playerInventory.Gear) do
+					if owned then
+						local config = Constants.GEAR_CONFIG[gearType]
+						if config then
+							createOwnedGearItem(gearType, config, gearInventoryScroll)
+							hasAnyGear = true
+						end
+					end
+				end
+			end
+			
+			-- Show "no gear" message if empty
+			if not hasAnyGear then
+				local noGearFrame = Instance.new("Frame")
+				noGearFrame.Name = "NoGearFrame"
+				noGearFrame.Size = UDim2.new(1, 0, 0, 100)
+				noGearFrame.BackgroundTransparency = 1
+				noGearFrame.Parent = gearInventoryScroll
+				
+				local noGearLabel = Instance.new("TextLabel")
+				noGearLabel.Size = UDim2.new(1, -20, 1, 0)
+				noGearLabel.Position = UDim2.new(0, 10, 0, 0)
+				noGearLabel.BackgroundTransparency = 1
+				noGearLabel.Text = "No gear yet!\n\nPurchase tools from\nthe shop to start!"
+				noGearLabel.TextColor3 = THEME.TextMoss
+				noGearLabel.Font = Enum.Font.GothamBold
+				noGearLabel.TextSize = 16
+				noGearLabel.ZIndex = 13
+				noGearLabel.TextWrapped = true
+				noGearLabel.Parent = noGearFrame
 			end
 		end
 	end
@@ -1685,7 +1975,7 @@ end
 
 updatePetsWindow = function()
 	if not screenGui then return end
-	local petsWindow = screenGui:FindFirstChild("PetsWindow")
+	local petsWindow = windowGroup and windowGroup:FindFirstChild("PetsWindow")
 	if not petsWindow then return end
 	
 	local leftPanel = petsWindow:FindFirstChild("LeftPanel")
@@ -1795,152 +2085,104 @@ local function createSellItem(fruitName, count, container)
 	end
 	
 	local sellPrice = config.FruitSellPrice
+	local totalValue = sellPrice * count
+	local displayName = plantType:sub(1,1):upper() .. plantType:sub(2) .. " Fruit"
 	
-	local itemFrame = Instance.new("Frame")
-	itemFrame.Name = fruitName
-	itemFrame.Size = UDim2.new(1, 0, 0, 80)
-	itemFrame.BackgroundColor3 = THEME.WoodPanel
-	itemFrame.BorderSizePixel = 0
-	itemFrame.ZIndex = 11
-	itemFrame.Parent = container
+	-- Find and clone the template from the container
+	local template = container:FindFirstChild("SellItemTemplate")
+	if not template then
+		warn("[UIHandler] SellItemTemplate not found in container, falling back to old method")
+		-- Fallback: create basic frame
+		local itemFrame = Instance.new("Frame")
+		itemFrame.Name = fruitName
+		itemFrame.Size = UDim2.new(1, 0, 0, 80)
+		itemFrame.BackgroundColor3 = THEME.WoodPanel
+		itemFrame.BorderSizePixel = 0
+		itemFrame.ZIndex = 11
+		itemFrame.Parent = container
+		return
+	end
 	
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 12)
-	corner.Parent = itemFrame
+	-- Clone the template
+	local itemCard = template:Clone()
+	itemCard.Name = fruitName
+	itemCard.Visible = true
 	
-	local gradient = Instance.new("UIGradient")
-	gradient.Color = ColorSequence.new(THEME.WoodPanel, THEME.WoodBark)
-	gradient.Rotation = 90
-	gradient.Parent = itemFrame
-
-	local stroke = Instance.new("UIStroke")
-	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	stroke.Thickness = 2
-	stroke.Color = THEME.GoldLeaf
-	stroke.Transparency = 0.3
-	stroke.Parent = itemFrame
-	
-	-- Icon
-	local icon = Instance.new("TextLabel")
-	icon.Size = UDim2.new(0, 60, 1, -10)
-	icon.Position = UDim2.new(0, 5, 0, 5)
-	icon.BackgroundTransparency = 1
-	icon.Text = "🍎"
-	icon.TextScaled = true
-	icon.TextColor3 = THEME.TextLight
-	icon.Font = Enum.Font.GothamBold
-	icon.ZIndex = 12
-	icon.Parent = itemFrame
-	
-	-- Name
-	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Size = UDim2.new(0.35, 0, 0.4, 0)
-	nameLabel.Position = UDim2.new(0.15, 0, 0.1, 0)
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.Text = fruitName
-	nameLabel.TextColor3 = THEME.TextLight
-	nameLabel.Font = Enum.Font.GothamBold
-	nameLabel.TextScaled = true
-	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	nameLabel.ZIndex = 12
-	nameLabel.Parent = itemFrame
-	
-	-- Count
-	local countLabel = Instance.new("TextLabel")
-	countLabel.Size = UDim2.new(0.35, 0, 0.3, 0)
-	countLabel.Position = UDim2.new(0.15, 0, 0.55, 0)
-	countLabel.BackgroundTransparency = 1
-	countLabel.Text = "You have: " .. count
-	countLabel.TextColor3 = THEME.TextMoss
-	countLabel.Font = Enum.Font.Gotham
-	countLabel.TextScaled = true
-	countLabel.TextXAlignment = Enum.TextXAlignment.Left
-	countLabel.ZIndex = 12
-	countLabel.Parent = itemFrame
-	
-	-- Price per item
-	local priceLabel = Instance.new("TextLabel")
-	priceLabel.Size = UDim2.new(0.2, 0, 0.3, 0)
-	priceLabel.Position = UDim2.new(0.52, 0, 0.25, 0)
-	priceLabel.BackgroundTransparency = 1
-	priceLabel.Text = "💰 " .. sellPrice .. " each"
-	priceLabel.TextColor3 = THEME.TextGold
-	priceLabel.Font = Enum.Font.GothamBold
-	priceLabel.TextScaled = true
-	priceLabel.ZIndex = 12
-	priceLabel.Parent = itemFrame
-	
-	-- Sell 1 button
-	local sell1Button = Instance.new("TextButton")
-	sell1Button.Size = UDim2.new(0.12, 0, 0.5, 0)
-	sell1Button.Position = UDim2.new(0.75, 0, 0.25, 0)
-	sell1Button.BackgroundColor3 = THEME.TealGem
-	sell1Button.Text = "SELL 1"
-	sell1Button.TextColor3 = THEME.TextLight
-	sell1Button.Font = Enum.Font.GothamBold
-	sell1Button.TextScaled = true
-	sell1Button.ZIndex = 12
-	sell1Button.Parent = itemFrame
-	
-	local sell1Corner = Instance.new("UICorner")
-	sell1Corner.CornerRadius = UDim.new(0, 10)
-	sell1Corner.Parent = sell1Button
-	
-	sell1Button.MouseButton1Click:Connect(function()
-		playSound("ButtonClick")
-		local sellEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.SELL_FRUIT)
-		if sellEvent then
-			sellEvent:FireServer(fruitName, 1)
-			playSound("Sell")
-			-- Show selling notification
-			local plantType = fruitName:gsub("Fruit$", "")
-			showNotification("Sold 1x " .. plantType .. " for " .. sellPrice .. " coins", THEME.GoldLeaf, "💰")
+	-- Update icon container
+	local iconContainer = itemCard:FindFirstChild("IconContainer")
+	if iconContainer then
+		local fruitIcon = iconContainer:FindFirstChild("FruitIcon")
+		if fruitIcon then
+			fruitIcon.Text = config.Icon or "🍎"
 		end
-	end)
+	end
 	
-	-- Sell All button
-	local sellAllButton = Instance.new("TextButton")
-	sellAllButton.Size = UDim2.new(0.12, 0, 0.5, 0)
-	sellAllButton.Position = UDim2.new(0.875, 0, 0.25, 0)
-	sellAllButton.BackgroundColor3 = THEME.GoldLeaf
-	sellAllButton.Text = "SELL ALL"
-	sellAllButton.TextColor3 = THEME.ForestDark
-	sellAllButton.Font = Enum.Font.GothamBold
-	sellAllButton.TextScaled = true
-	sellAllButton.ZIndex = 12
-	sellAllButton.Parent = itemFrame
-	
-	local sellAllCorner = Instance.new("UICorner")
-	sellAllCorner.CornerRadius = UDim.new(0, 10)
-	sellAllCorner.Parent = sellAllButton
-	
-	sellAllButton.MouseButton1Click:Connect(function()
-		playSound("ButtonClick")
-		local sellEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.SELL_FRUIT)
-		if sellEvent then
-			sellEvent:FireServer(fruitName, count)
-			playSound("Sell")
-			-- Show selling notification
-			local plantType = fruitName:gsub("Fruit$", "")
-			local totalCoins = sellPrice * count
-			showNotification("Sold " .. count .. "x " .. plantType .. " for " .. totalCoins .. " coins", THEME.WarningGold, "💰")
+	-- Update info container
+	local infoContainer = itemCard:FindFirstChild("InfoContainer")
+	if infoContainer then
+		local nameLabel = infoContainer:FindFirstChild("FruitName")
+		if nameLabel then
+			nameLabel.Text = displayName
 		end
-	end)
+		
+		local countLabel = infoContainer:FindFirstChild("FruitCount")
+		if countLabel then
+			countLabel.Text = "Owned: " .. count
+		end
+	end
 	
-	-- Hover effects
-	sell1Button.MouseEnter:Connect(function()
-		sell1Button.BackgroundColor3 = THEME.SellButtonHover
-	end)
-	sell1Button.MouseLeave:Connect(function()
-		sell1Button.BackgroundColor3 = THEME.SellButton
-	end)
+	-- Update action container
+	local actionContainer = itemCard:FindFirstChild("ActionContainer")
+	if actionContainer then
+		local priceLabel = actionContainer:FindFirstChild("PriceLabel")
+		if priceLabel then
+			priceLabel.Text = "💰 " .. sellPrice .. " each"
+		end
+		
+		local sellButton = actionContainer:FindFirstChild("SellButton")
+		if sellButton then
+			sellButton.MouseButton1Click:Connect(function()
+				playSound("ButtonClick")
+				local sellEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.SELL_FRUIT)
+				if sellEvent then
+					sellEvent:FireServer(fruitName, 1)
+					playSound("Sell")
+					showNotification("Sold 1x " .. displayName .. " for " .. sellPrice .. " coins", THEME.GoldLeaf, "💰")
+				end
+			end)
+			
+			-- Hover effects
+			sellButton.MouseEnter:Connect(function()
+				sellButton.BackgroundColor3 = THEME.SellButtonHover or THEME.TealGlow
+			end)
+			sellButton.MouseLeave:Connect(function()
+				sellButton.BackgroundColor3 = THEME.GoldLeaf
+			end)
+		end
+		
+		local sellAllButton = actionContainer:FindFirstChild("SellAllButton")
+		if sellAllButton then
+			sellAllButton.MouseButton1Click:Connect(function()
+				playSound("ButtonClick")
+				local sellAllEvent = ReplicatedStorage:FindFirstChild("SellAllFruitsOfType")
+				if sellAllEvent then
+					sellAllEvent:FireServer(fruitName)
+					playSound("Sell")
+					showNotification("Sold " .. count .. "x " .. displayName .. " for " .. totalValue .. " coins", THEME.GoldLeaf, "💰")
+				end
+			end)
+			
+			-- Hover effects  
+			sellAllButton.MouseEnter:Connect(function()
+				sellAllButton.BackgroundColor3 = THEME.GoldAccent or THEME.TextGold
+			end)
+			sellAllButton.MouseLeave:Connect(function()
+				sellAllButton.BackgroundColor3 = THEME.AmberGlow or THEME.WarningGold
+			end)
+		end
+	end
 	
-	sellAllButton.MouseEnter:Connect(function()
-		sellAllButton.BackgroundColor3 = THEME.GoldAccent
-	end)
-	sellAllButton.MouseLeave:Connect(function()
-		sellAllButton.BackgroundColor3 = THEME.WarningGold
-	end)
+	itemCard.Parent = container
 end
 
 -- Create sell item for instance-based fruits (with individual weights)
@@ -2144,7 +2386,7 @@ end
 
 updateSellShop = function()
 	if not screenGui then return end
-	local sellWindow = screenGui:FindFirstChild("SellWindow")
+	local sellWindow = windowGroup and windowGroup:FindFirstChild("SellWindow")
 	if not sellWindow then return end
 	
 	local leftPanel = sellWindow:FindFirstChild("LeftPanel")
@@ -2190,16 +2432,18 @@ end
 -- Update shop right panel with grid inventory
 updateShopInventoryGrid = function()
 	if not screenGui then return end
-	local shopWindow = screenGui:FindFirstChild("ShopWindow")
+	local shopWindow = windowGroup and windowGroup:FindFirstChild("ShopWindow")
 	if not shopWindow then return end
 	
 	local rightPanel = shopWindow:FindFirstChild("RightPanel")
 	local inventoryScroll = rightPanel and rightPanel:FindFirstChild("InventoryScroll")
 	if not inventoryScroll then return end
 	
-	-- Clear existing items
+	-- Clear existing items (preserve template)
 	for _, child in ipairs(inventoryScroll:GetChildren()) do
-		if child:IsA("Frame") then child:Destroy() end
+		if child:IsA("Frame") and not string.find(child.Name, "Template") then
+			child:Destroy()
+		end
 	end
 	
 	-- Add seeds from inventory as grid items
@@ -2213,10 +2457,7 @@ updateShopInventoryGrid = function()
 				continue
 			end
 			if count > 0 then
-				local item = createInventoryItem(seedName, count, "Seed")
-				if item then
-					item.Parent = inventoryScroll
-				end
+				createInventoryItem(seedName, count, "Seed", inventoryScroll)
 			end
 		end
 	end
@@ -2225,16 +2466,18 @@ end
 -- Update sell right panel with grid inventory
 updateSellInventoryGrid = function()
 	if not screenGui then return end
-	local sellWindow = screenGui:FindFirstChild("SellWindow")
+	local sellWindow = windowGroup and windowGroup:FindFirstChild("SellWindow")
 	if not sellWindow then return end
 	
 	local rightPanel = sellWindow:FindFirstChild("RightPanel")
 	local inventoryScroll = rightPanel and rightPanel:FindFirstChild("InventoryScroll")
 	if not inventoryScroll then return end
 	
-	-- Clear existing items
+	-- Clear existing items (preserve template)
 	for _, child in ipairs(inventoryScroll:GetChildren()) do
-		if child:IsA("Frame") then child:Destroy() end
+		if child:IsA("Frame") and not string.find(child.Name, "Template") then
+			child:Destroy()
+		end
 	end
 	
 	-- Add fruits from inventory as grid items
@@ -2248,10 +2491,7 @@ updateSellInventoryGrid = function()
 				continue
 			end
 			if count > 0 then
-				local item = createInventoryItem(fruitName, count, "Fruit")
-				if item then
-					item.Parent = inventoryScroll
-				end
+				createInventoryItem(fruitName, count, "Fruit", inventoryScroll)
 			end
 		end
 	end
@@ -2264,6 +2504,7 @@ function UIHandler.Initialize()
 	-- Hide Roblox default backpack
 	local StarterGui = game:GetService("StarterGui")
 	StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false)
+	enforceToolSlots()
 	
 	-- Wait for UI to exist
 	screenGui = playerGui:WaitForChild("FeyGardenUI", 10)
@@ -2272,33 +2513,62 @@ function UIHandler.Initialize()
 		warn("[UIHandler] Run this in Studio Command Bar: require(game.ReplicatedStorage.Setup.UISetup).CreateUI()")
 		return
 	end
+
+	-- Root frame that contains grouped layers
+	uiRoot = screenGui:WaitForChild("UIRoot", 5)
+	if not uiRoot then
+		warn("[UIHandler] ❌ UIRoot missing under FeyGardenUI; ensure UISetup.CreateUI ran.")
+		return
+	end
 	
 	-- =============================================================================
 	-- WINDOW REFERENCES
 	-- =============================================================================
-	local shopWindow = screenGui:WaitForChild("ShopWindow", 5)
-	local sellWindow = screenGui:WaitForChild("SellWindow", 5)
-	local petsWindow = screenGui:WaitForChild("PetsWindow", 5)
-	local inventoryWindow = screenGui:WaitForChild("InventoryWindow", 5)
-	local petShopWindow = screenGui:WaitForChild("PetShopWindow", 5)
+	hudGroup = uiRoot:FindFirstChild("HUDGroup") or screenGui:FindFirstChild("HUDGroup")
+	windowGroup = uiRoot:FindFirstChild("WindowGroup") or screenGui:FindFirstChild("WindowGroup")
+	overlayGroup = uiRoot:FindFirstChild("OverlayGroup") or screenGui:FindFirstChild("OverlayGroup")
+
+	local shopWindow = windowGroup and windowGroup:WaitForChild("ShopWindow", 5)
+	local sellWindow = windowGroup and windowGroup:WaitForChild("SellWindow", 5)
+	local petsWindow = windowGroup and windowGroup:WaitForChild("PetsWindow", 5)
+	local inventoryWindow = windowGroup and windowGroup:WaitForChild("InventoryWindow", 5)
+	local petShopWindow = windowGroup and windowGroup:WaitForChild("PetShopWindow", 5)
 	
 	-- =============================================================================
 	-- NAVIGATION BUTTONS (Top Center)
 	-- =============================================================================
-	local navigationFrame = screenGui:WaitForChild("NavigationFrame", 5)
+	local navigationFrame = hudGroup and hudGroup:FindFirstChild("NavigationFrame") or (uiRoot and uiRoot:FindFirstChild("NavigationFrame")) or screenGui:WaitForChild("NavigationFrame", 5)
 	if navigationFrame then
-		-- SEEDS Button - Opens shop window
+		-- Helper function to teleport player to a camera part location
+		local function teleportToShop(cameraPartName)
+			local player = game.Players.LocalPlayer
+			local character = player.Character
+			if not character then return false end
+			
+			local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+			if not humanoidRootPart then return false end
+			
+			local cameraPart = workspace:FindFirstChild(cameraPartName)
+			if not cameraPart then
+				warn("[UIHandler] Camera part not found:", cameraPartName)
+				return false
+			end
+			
+			-- Teleport player slightly in front of camera position, on the ground
+			-- Camera usually looks at the shop, so we position player nearby
+			local teleportPosition = cameraPart.Position + cameraPart.CFrame.LookVector * 3
+			teleportPosition = Vector3.new(teleportPosition.X, cameraPart.Position.Y, teleportPosition.Z)
+			humanoidRootPart.CFrame = CFrame.new(teleportPosition)
+			
+			return true
+		end
+		
+		-- SEEDS Button - Teleports to shop
 		local seedsButton = navigationFrame:FindFirstChild("SeedsButton")
 		if seedsButton then
 			seedsButton.MouseButton1Click:Connect(function()
-				if shopWindow then
-					NPCUIHandler.MoveCameraToNPC("ShopCamera")
-					populateShop()
-					updateShopInventoryGrid()
-					shopWindow.Visible = true
-					hideHUD()
-					playSound("WindowOpen")
-				end
+				teleportToShop("ShopCamera")
+				playSound("Click")
 			end)
 		end
 		
@@ -2340,18 +2610,21 @@ function UIHandler.Initialize()
 			end)
 		end
 		
-		-- SELL Button - Opens sell window
+		-- SELL Button - Teleports to sell shop
 		local sellButton = navigationFrame:FindFirstChild("SellButton")
 		if sellButton then
 			sellButton.MouseButton1Click:Connect(function()
-				if sellWindow then
-					NPCUIHandler.MoveCameraToNPC("SellCamera")
-					updateSellShop()
-					updateSellInventoryGrid()
-					sellWindow.Visible = true
-					hideHUD()
-					playSound("WindowOpen")
-				end
+				teleportToShop("SellCamera")
+				playSound("Click")
+			end)
+		end
+		
+		-- PETS Button - Teleports to pet shop
+		local petsNavButton = navigationFrame:FindFirstChild("PetsButton")
+		if petsNavButton then
+			petsNavButton.MouseButton1Click:Connect(function()
+				teleportToShop("PetCamera")
+				playSound("Click")
 			end)
 		end
 	end
@@ -2418,13 +2691,18 @@ function UIHandler.Initialize()
 	end
 	
 	-- Setup pets button (opens inventory only)
-	local petsButton = screenGui:WaitForChild("PetsButton", 5)
+	local petsButton = findSideButton("PetsButton") or screenGui:WaitForChild("PetsButton", 5)
 	if petsButton then
 		petsButton.MouseButton1Click:Connect(function()
 			if petsWindow then
 				petsWindow.Visible = not petsWindow.Visible
 				if petsWindow.Visible then
 					updatePetsWindow()
+					hideHUD()
+					playSound("WindowOpen")
+				else
+					showHUD()
+					playSound("WindowClose")
 				end
 			end
 		end)
@@ -2446,11 +2724,7 @@ function UIHandler.Initialize()
 				end
 			end)
 -- -- print("[UIHandler] Shop ProximityPrompt connected")
-		else
-			warn("[UIHandler] No ProximityPrompt found on ShopPart")
 		end
-	else
-		warn("[UIHandler] ShopPart not found:", Config.World.ShopPartName)
 	end
 	
 	local sellPart = workspace:WaitForChild(Config.World.SellPartName, 10)
@@ -2467,11 +2741,7 @@ function UIHandler.Initialize()
 					playSound("WindowOpen")
 				end
 			end)
-		else
-			warn("[UIHandler] No ProximityPrompt found on SellPart")
 		end
-	else
-		warn("[UIHandler] SellPart not found:", Config.World.SellPartName)
 	end
 	
 	-- =============================================================================
@@ -2490,11 +2760,7 @@ function UIHandler.Initialize()
 					playSound("WindowOpen")
 				end
 			end)
-		else
-			warn("[UIHandler] No ProximityPrompt found on PetShopPart")
 		end
-	else
-		warn("[UIHandler] PetShopPart not found in workspace")
 	end
 	
 	-- =============================================================================
@@ -2505,6 +2771,7 @@ function UIHandler.Initialize()
 		if invCloseButton then
 			invCloseButton.MouseButton1Click:Connect(function()
 				inventoryWindow.Visible = false
+				showHUD()
 				playSound("WindowClose")
 			end)
 		end
@@ -2539,11 +2806,10 @@ function UIHandler.Initialize()
 	-- =============================================================================
 	-- TRADING SYSTEM SETUP
 	-- =============================================================================
-	local tradingWindow = screenGui:FindFirstChild("TradingWindow")
-	local tradeRequestPopup = screenGui:FindFirstChild("TradeRequestPopup")
-	local playerSelectWindow = screenGui:FindFirstChild("PlayerSelectWindow")
-	local hotbarFrameForTrade = screenGui:FindFirstChild("HotbarFrame")
-	local tradeButton = hotbarFrameForTrade and hotbarFrameForTrade:FindFirstChild("TradeButton")
+	local tradingWindow = windowGroup and windowGroup:FindFirstChild("TradingWindow")
+	local tradeRequestPopup = windowGroup and windowGroup:FindFirstChild("TradeRequestPopup")
+	local playerSelectWindow = windowGroup and windowGroup:FindFirstChild("PlayerSelectWindow")
+	local tradeButton = findSideButton("TradeButton")
 	
 	-- Trading state
 	local currentTradePartner = nil
@@ -2903,6 +3169,7 @@ function UIHandler.Initialize()
 			if playerSelectWindow then
 				populatePlayerList()
 				playerSelectWindow.Visible = true
+				hideHUD()
 			end
 		end)
 	end
@@ -2913,6 +3180,7 @@ function UIHandler.Initialize()
 		if closeBtn then
 			closeBtn.MouseButton1Click:Connect(function()
 				playerSelectWindow.Visible = false
+				showHUD()
 			end)
 		end
 	end
@@ -3098,9 +3366,10 @@ function UIHandler.Initialize()
 		shopInventoryUpdateEvent.OnClientEvent:Connect(function(data)
 			currentShopInventory = data.inventory or {}
 			shopNextRefresh = os.time() + (data.nextRefresh or 0)
-			-- If shop window is open, refresh it
+			-- If shop window is open, refresh both the shop items and player inventory
 			if shopWindow and shopWindow.Visible then
-				updateShopInventoryGrid()
+				populateShop() -- Refresh shop items with new stock
+				updateShopInventoryGrid() -- Refresh player's inventory display
 			end
 		end)
 	end
@@ -3112,6 +3381,9 @@ function UIHandler.Initialize()
 			if data then
 				currentShopInventory = data.inventory or {}
 				shopNextRefresh = os.time() + (data.nextRefresh or 0)
+				-- Ensure the live shop UI shows the rotating catalog instead of the fallback
+				populateShop()
+				updateShopInventoryGrid()
 			end
 		end)
 	end
@@ -3119,10 +3391,11 @@ function UIHandler.Initialize()
 	-- =============================================================================
 	-- HOTBAR SETUP - Click slots to select
 	-- =============================================================================
-	local hotbarFrame = screenGui:WaitForChild("HotbarFrame", 5)
+	local hotbarFrame = hudGroup and hudGroup:FindFirstChild("HotbarFrame") or (hudGroup and hudGroup:WaitForChild("HotbarFrame", 5))
 	if hotbarFrame then
+		local slotsContainer = hotbarFrame:FindFirstChild("Slots") or hotbarFrame
 		for i = 1, 6 do
-			local slot = hotbarFrame:FindFirstChild("Slot" .. i)
+			local slot = slotsContainer:FindFirstChild("Slot" .. i)
 			if slot then
 				local slotButton = slot:FindFirstChild("SlotButton")
 				if slotButton then
@@ -3134,6 +3407,38 @@ function UIHandler.Initialize()
 		end
 		-- Select slot 1 by default
 		selectHotbarSlot(1)
+	end
+	
+	-- =============================================================================
+	-- MOBILE BUTTONS (Root ScreenGui)
+	-- =============================================================================
+	-- Inventory button for mobile users and side panel
+	local inventoryButton = findSideButton("InventoryButton")
+	if not inventoryButton then
+		local inventoryButtonFrame = screenGui:FindFirstChild("InventoryButton")
+		if inventoryButtonFrame then
+			local buttonChild = inventoryButtonFrame:FindFirstChildWhichIsA("GuiButton")
+			if inventoryButtonFrame:IsA("GuiButton") then
+				inventoryButton = inventoryButtonFrame
+			else
+				inventoryButton = buttonChild
+			end
+		end
+	end
+
+	if inventoryButton and inventoryButton:IsA("GuiButton") and inventoryWindow then
+		inventoryButton.MouseButton1Click:Connect(function()
+			playSound("ButtonClick")
+			inventoryWindow.Visible = not inventoryWindow.Visible
+			if inventoryWindow.Visible then
+				updateFullInventory()
+				hideHUD()
+				playSound("WindowOpen")
+			else
+				showHUD()
+				playSound("WindowClose")
+			end
+		end)
 	end
 	
 	-- =============================================================================
@@ -3149,8 +3454,10 @@ function UIHandler.Initialize()
 			inventoryWindow.Visible = not inventoryWindow.Visible
 			if inventoryWindow.Visible then
 				updateFullInventory()
+				hideHUD()
 				playSound("WindowOpen")
 			else
+				showHUD()
 				playSound("WindowClose")
 			end
 		end
@@ -3198,6 +3505,10 @@ function UIHandler.Initialize()
 	if requestDataEvent then
 		requestDataEvent:FireServer()
 	end
+	
+	-- Signal that UI is fully ready
+	UIHandler.IsReady = true
+	UIHandler.ReadyEvent:Fire()
 end
 
 -- Export selected plant type getter (from hotbar)
@@ -3208,6 +3519,67 @@ function UIHandler.GetSelectedPlantType()
 		return slotData.name
 	end
 	return nil
+end
+
+-- Open specific UI windows (called by NPCDialogueHandler)
+function UIHandler.OpenShopWindow()
+	if not screenGui then return end
+	local shopWindow = windowGroup and windowGroup:FindFirstChild("ShopWindow")
+	if shopWindow then
+		NPCUIHandler.MoveCameraToNPC("ShopCamera")
+		populateShop() -- Populate shop items (left panel)
+		updateShopInventoryGrid() -- Update player inventory (right panel)
+		shopWindow.Visible = true
+		hideHUD()
+		playSound("WindowOpen")
+	end
+end
+
+function UIHandler.OpenSellWindow()
+	if not screenGui then return end
+	local sellWindow = windowGroup and windowGroup:FindFirstChild("SellWindow")
+	if sellWindow then
+		NPCUIHandler.MoveCameraToNPC("SellCamera")
+		updateSellShop() -- Populate sell shop items (left panel)
+		updateSellInventoryGrid() -- Update player inventory (right panel)
+		sellWindow.Visible = true
+		hideHUD()
+		playSound("WindowOpen")
+	end
+end
+
+function UIHandler.OpenPetShopWindow()
+	if not screenGui then return end
+	local petShopWindow = windowGroup and windowGroup:FindFirstChild("PetShopWindow")
+	if petShopWindow then
+		NPCUIHandler.MoveCameraToNPC("PetCamera")
+		petShopWindow.Visible = true
+		updatePetShopWindow()
+		hideHUD()
+		playSound("WindowOpen")
+	end
+end
+
+function UIHandler.OpenGearShopWindow()
+	if not screenGui then return end
+	local gearShopWindow = windowGroup and windowGroup:FindFirstChild("GearShopWindow")
+	if gearShopWindow then
+		NPCUIHandler.MoveCameraToNPC("GearCamera")
+		gearShopWindow.Visible = true
+		updateGearShopWindow()
+		hideHUD()
+		playSound("WindowOpen")
+	end
+end
+
+function UIHandler.OpenPetsWindow()
+	if not screenGui then return end
+	local petsWindow = windowGroup and windowGroup:FindFirstChild("PetsWindow")
+	if petsWindow then
+		petsWindow.Visible = true
+		updatePetsWindow()
+		hideHUD()
+	end
 end
 
 return UIHandler

@@ -19,8 +19,6 @@ do
 	AdminCommands = mod
 end
 
-print("🔧 Admin Commands System Loaded")
-
 -- Create RemoteEvent for admin commands
 local adminCommandEvent = Instance.new("RemoteEvent")
 adminCommandEvent.Name = "AdminCommand"

@@ -133,7 +133,6 @@ local function playSFX(soundName, position)
 	
 	local soundId = Config.Audio.SFX[soundName]
 	if not soundId then
-		warn("[AudioManager] SFX not found:", soundName)
 		return
 	end
 	

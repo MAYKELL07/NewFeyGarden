@@ -25,17 +25,20 @@ local NPCUIHandler = require(script.Parent.NPCUIHandler)
 local TutorialUI = require(script.Parent.TutorialUI)
 local EggOpeningUI = require(script.Parent.EggOpeningUI)
 local UIHandler = require(script.Parent.UIHandler)
+local NPCDialogueHandler = require(script.Parent.NPCDialogueHandler)
 
 -- Wait for character to load
 local player = game.Players.LocalPlayer
 player.CharacterAdded:Wait()
 
--- Initialize client systems
-task.wait(1) -- Give server time to set up
-
+-- Initialize client systems immediately (no delay for faster loading)
 UIHandler.Initialize()
 
+-- Connect PlantingHandler to UIHandler for selected seed
+PlantingHandler.SetSelectedPlantProvider(UIHandler.GetSelectedPlantType)
+
 NPCUIHandler.Initialize()
+NPCDialogueHandler.Initialize()
 TutorialUI.Initialize()
 PetController.Initialize()
 BuffParticles.Initialize()

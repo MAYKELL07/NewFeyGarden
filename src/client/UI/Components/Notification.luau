@@ -27,16 +27,25 @@ local function getNotificationColor(notifType: NotificationType): (Color3, Color
 end
 
 -- Show a notification toast
-function Notification.Show(screenGui: ScreenGui, message: string, notifType: NotificationType?, duration: number?)
+function Notification.Show(screenGui: GuiObject, message: string, notifType: NotificationType?, duration: number?)
+	local scale = Styles.GetDeviceScale()
+	local topPadding = Styles.GetTopPadding()
+
 	local container = screenGui:FindFirstChild("NotificationContainer")
 	if not container then
 		container = Instance.new("Frame")
 		container.Name = "NotificationContainer"
 		container.Size = UDim2.new(0, 320, 1, 0)
-		container.Position = UDim2.new(1, -20, 0, 100)
+		container.Position = UDim2.new(1, -20, 0, 100 + topPadding)
 		container.AnchorPoint = Vector2.new(1, 0)
 		container.BackgroundTransparency = 1
 		container.Parent = screenGui
+
+		if scale ~= 1 then
+			local uiScale = Instance.new("UIScale")
+			uiScale.Scale = scale
+			uiScale.Parent = container
+		end
 		
 		local layout = Instance.new("UIListLayout")
 		layout.Padding = UDim.new(0, 10)
@@ -117,7 +126,7 @@ function Notification.Show(screenGui: ScreenGui, message: string, notifType: Not
 end
 
 -- Clear all notifications
-function Notification.ClearAll(screenGui: ScreenGui)
+function Notification.ClearAll(screenGui: GuiObject)
 	local container = screenGui:FindFirstChild("NotificationContainer")
 	if container then
 		for _, child in container:GetChildren() do

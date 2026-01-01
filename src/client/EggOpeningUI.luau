@@ -480,12 +480,8 @@ function EggOpeningUI.Initialize()
 	eggOpenedEvent.OnClientEvent:Connect(function(success, resultData, errorMessage)
 		if success and resultData then
 			EggOpeningUI.PlayOpeningAnimation(resultData.EggType, resultData)
-		elseif errorMessage then
-			warn("[EggOpeningUI] Egg opening failed:", errorMessage)
 		end
 	end)
-	
-	print("🥚 EggOpeningUI initialized")
 end
 
 return EggOpeningUI

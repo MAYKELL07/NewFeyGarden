@@ -214,7 +214,6 @@ function ToolController.EquipTool(toolName)
 	equippedTool = toolName
 	equippedToolModel = toolClone
 	
-	print("[ToolController] Equipped:", toolName)
 	return true
 end
 
@@ -308,8 +307,6 @@ function ToolController.Initialize()
 	
 	-- Handle respawn
 	player.CharacterAdded:Connect(onCharacterAdded)
-	
-	print("[ToolController] ✓ Initialized")
 end
 
 -- Auto-initialize

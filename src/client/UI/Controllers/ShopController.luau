@@ -17,7 +17,7 @@ local ShopController = {}
 
 local shopWindow: Frame? = nil
 local shopGrid: ScrollingFrame? = nil
-local screenGui: ScreenGui? = nil
+local screenGui: GuiObject? = nil
 
 -- Remote events (initialized on setup)
 local buySeedEvent: RemoteEvent? = nil
@@ -102,7 +102,7 @@ function ShopController.RefreshShop()
 end
 
 -- Initialize the shop controller
-function ShopController.Initialize(gui: ScreenGui)
+function ShopController.Initialize(gui: GuiObject)
 	screenGui = gui
 	
 	-- Get remote references
