@@ -30,18 +30,13 @@ local function findPlantFolder(plantsFolder, plantType)
 	return plantFolder
 end
 
-local function clonePlantPart(instance: Instance): BasePart?
+local function clonePlantPart(instance: Instance): Instance?
 	if instance:IsA("BasePart") then
 		return instance:Clone()
 	end
 
 	if instance:IsA("Model") then
-		local primary = instance.PrimaryPart or instance:FindFirstChildWhichIsA("BasePart", true)
-		if primary then
-			local cloned = primary:Clone()
-			cloned.Name = instance.Name
-			return cloned
-		end
+		return instance:Clone()
 	end
 
 	return nil
@@ -65,6 +60,65 @@ local function addDirtPile(plantFolder: Folder, plantModel: Model, anchorPositio
 	local halfHeight = dirt.Size.Y * 0.5
 	dirt.CFrame = CFrame.new(anchorPosition + Vector3.new(0, halfHeight, 0))
 	dirt.Parent = plantModel
+end
+
+local function getPrimaryCFrame(instance: Instance): CFrame?
+	if instance:IsA("BasePart") then
+		return instance.CFrame
+	end
+
+	if instance:IsA("Model") then
+		local primary = instance.PrimaryPart or instance:FindFirstChildWhichIsA("BasePart", true)
+		if primary then
+			return primary.CFrame
+		end
+	end
+
+	return nil
+end
+
+local function getBoundingHeight(instance: Instance): number?
+	if instance:IsA("BasePart") then
+		return instance.Size.Y
+	end
+	if instance:IsA("Model") then
+		local _, size = instance:GetBoundingBox()
+		return size.Y
+	end
+	return nil
+end
+
+local function collectFruitTemplates(plantFolder: Instance, plantPart: Instance?)
+	local fruitTemplates = {}
+	local templateRootCFrame: CFrame? = nil
+
+	-- First, try fruits authored under the current plant model (runtime Plant instance)
+	if plantPart then
+		local rootCFrame = getPrimaryCFrame(plantPart)
+		if rootCFrame then
+			templateRootCFrame = rootCFrame
+			for _, desc in ipairs(plantPart:GetDescendants()) do
+				if desc:IsA("BasePart") and string.sub(desc.Name, 1, 5) == "Fruit" then
+					table.insert(fruitTemplates, desc)
+				end
+			end
+		end
+	end
+
+	-- Fallback: fruits under plant folder (content repo)
+	if #fruitTemplates == 0 then
+		local matureModel = plantFolder:FindFirstChild("Mature")
+		if matureModel and matureModel:IsA("Model") then
+			templateRootCFrame = getPrimaryCFrame(matureModel)
+			for _, child in ipairs(matureModel:GetDescendants()) do
+				if child:IsA("BasePart") and string.sub(child.Name, 1, 5) == "Fruit" then
+					table.insert(fruitTemplates, child)
+				end
+			end
+		end
+	end
+
+	return fruitTemplates, templateRootCFrame
 end
 
 -- Create a plant model
@@ -128,11 +182,34 @@ function PlantModule.CreatePlantModel(plantType, position, sizeMultiplier)
 		return nil
 	end
 	plantPart.Name = "Plant"
-	-- Dynamically position plant so bottom sits on anchor (use half of mesh height)
-	local meshHeight = plantPart.Size.Y
-	plantPart.Position = position + Vector3.new(0, meshHeight / 2, 0)
-	plantPart.Anchored = true
-	plantPart.Parent = plantModel
+
+	-- Position plant on top of the Base part (use mesh height so it sits on ground)
+	local stageOffset = Constants.STAGE_OFFSETS[Constants.GROWTH_STAGES.SEED] or Vector3.new()
+	if plantPart:IsA("BasePart") then
+		local height = getBoundingHeight(plantPart) or plantPart.Size.Y
+		local anchorCFrame = CFrame.new(position + stageOffset + Vector3.new(0, height * 0.5, 0))
+		plantPart.CFrame = anchorCFrame
+		plantPart.Anchored = true
+		plantPart.Parent = plantModel
+		plantPart:SetAttribute("PlantType", plantType)
+	elseif plantPart:IsA("Model") then
+		local primary = plantPart.PrimaryPart or plantPart:FindFirstChildWhichIsA("BasePart", true)
+		if primary then
+			for _, desc in ipairs(plantPart:GetDescendants()) do
+				if desc:IsA("BasePart") then
+					desc.Anchored = true
+				end
+			end
+			local _, size = plantPart:GetBoundingBox()
+			local anchorCFrame = CFrame.new(position + stageOffset + Vector3.new(0, size.Y * 0.5, 0))
+			plantPart:PivotTo(anchorCFrame)
+			plantPart.Parent = plantModel
+			plantPart:SetAttribute("PlantType", plantType)
+		else
+			warn("[PlantModule] Seed model missing PrimaryPart/BasePart:", plantType)
+			return nil
+		end
+	end
 	
 	-- Store references to mesh names
 	plantModel:SetAttribute("SeedMeshName", "Seed")
@@ -192,70 +269,87 @@ function PlantModule.UpdatePlantVisual(plantModel)
 	
 	-- Determine which mesh to use and scale based on stage
 	local newMesh
-	local scale = 1
+	local scale = 1 * sizeMultiplier
 	local transparency = 0
 	local lightBrightness = 0
-	
+
 	if stage == Constants.GROWTH_STAGES.SEED then
 		newMesh = seedMesh
-		scale = 1 * sizeMultiplier  -- Apply size multiplier
 		transparency = 0.3
 		lightBrightness = 0
-		
 	elseif stage == Constants.GROWTH_STAGES.SPROUT then
-		-- Use Sprout mesh if available, fallback to Seed
 		newMesh = sproutMesh or seedMesh
-		scale = 1 * sizeMultiplier  -- Apply size multiplier
 		transparency = 0
 		lightBrightness = 0.5
-		
 	elseif stage == Constants.GROWTH_STAGES.BLOOM then
-		-- Use Mature mesh for bloom stage
 		newMesh = matureMesh or sproutMesh or seedMesh
-		scale = 1 * sizeMultiplier  -- Apply size multiplier with a gentler bloom scale
 		transparency = 0
 		lightBrightness = 2
 	end
 	
 	-- Replace the plant part with the appropriate mesh
 	if newMesh then
-		local replacementPart = clonePlantPart(newMesh)
-		if not replacementPart then
-			warn("[PlantModule] Mesh has no BasePart for:", plantType)
+		local replacement = clonePlantPart(newMesh)
+		if not replacement then
+			warn("[PlantModule] Mesh has no cloneable instance for:", plantType)
 			return
 		end
-		replacementPart.Name = "Plant"
-		replacementPart.Anchored = true
+		replacement.Name = "Plant"
+		replacement:SetAttribute("PlantType", plantType)
 		
-		-- Apply scale to the cloned part (use the cloned part's size to avoid model Size errors)
-		if replacementPart:IsA("BasePart") then
-			replacementPart.Size = replacementPart.Size * scale
-		end
-		
-		-- Dynamically position plant so bottom sits on anchor (use half of scaled mesh height)
 		local basePart = plantModel:FindFirstChild("Base")
-		local anchorPos = basePart and basePart.Position or currentPosition
-		local meshHeight = replacementPart.Size.Y
-		replacementPart.Position = anchorPos + Vector3.new(0, meshHeight / 2, 0)
-		
-		replacementPart.Transparency = transparency
-		
-		-- Transfer or create light
-		if config.EmitsLight then
+		local anchorCFrame = basePart and basePart.CFrame or CFrame.new(currentPosition)
+		local stageOffset = Constants.STAGE_OFFSETS[stage] or Vector3.new()
+		local extraYOffset = 0
+		if stage == Constants.GROWTH_STAGES.SPROUT or stage == Constants.GROWTH_STAGES.BLOOM then
+			extraYOffset = -3
+		end
+
+		-- Transfer or create light later onto the primary/first part
+		local function applyLighting(targetPart: BasePart)
+			if not config.EmitsLight then
+				return
+			end
 			if light then
-				light.Parent = replacementPart
+				light.Parent = targetPart
 			else
 				light = Instance.new("PointLight")
 				light.Range = 10 * sizeMultiplier
 				light.Color = config.Color
-				light.Parent = replacementPart
+				light.Parent = targetPart
 			end
 			light.Brightness = lightBrightness
 		end
-		
-		-- Replace in model
+
+		if replacement:IsA("BasePart") then
+			replacement.Transparency = transparency
+			replacement.Anchored = true
+			replacement.Size = replacement.Size * scale
+			replacement.CFrame = anchorCFrame * CFrame.new(stageOffset + Vector3.new(0, extraYOffset, 0) + Vector3.new(0, replacement.Size.Y * 0.5, 0))
+			applyLighting(replacement)
+		elseif replacement:IsA("Model") then
+			local primary = replacement.PrimaryPart or replacement:FindFirstChildWhichIsA("BasePart", true)
+			if not primary then
+				warn("[PlantModule] Model missing PrimaryPart/BasePart for:", plantType)
+				return
+			end
+			replacement:ScaleTo(scale)
+			for _, desc in ipairs(replacement:GetDescendants()) do
+				if desc:IsA("BasePart") then
+					desc.Anchored = true
+					desc.Transparency = transparency
+				end
+			end
+			local _, size = replacement:GetBoundingBox()
+			replacement:PivotTo(anchorCFrame * CFrame.new(stageOffset + Vector3.new(0, extraYOffset, 0) + Vector3.new(0, size.Y * 0.5, 0)))
+			applyLighting(primary)
+		else
+			warn("[PlantModule] Unsupported replacement type for:", plantType)
+			return
+		end
+
 		currentPlantPart:Destroy()
-		replacementPart.Parent = plantModel
+		replacement.Parent = plantModel
 	end
 end
 
@@ -346,61 +440,54 @@ function PlantModule.SpawnFruits(plantModel)
 		return {}
 	end
 	
-	-- Count available fruit models (Fruit1, Fruit2, Fruit3, Fruit4)
-	local availableFruits = {}
-	for i = 1, 4 do
-		local fruitModel = plantFolder:FindFirstChild("Fruit" .. i)
-		if fruitModel then
-			table.insert(availableFruits, fruitModel)
+	local plantPart = plantModel:FindFirstChild("Plant")
+	local fruitTemplates, templateRoot = collectFruitTemplates(plantFolder, plantPart)
+	for _, template in ipairs(fruitTemplates) do
+		if plantPart and template:IsDescendantOf(plantPart) and template:IsA("BasePart") then
+			template.Transparency = 1
+			template.CanCollide = false
 		end
 	end
-	
-	-- If no fruit models found, use placeholder
-	local usePlaceholder = #availableFruits == 0
-	
-	-- Get plant part to position fruits relative to
-	local plantPart = plantModel:FindFirstChild("Plant")
-	if not plantPart or not plantPart:IsA("BasePart") then
-		warn("[PlantModule] No Plant part found for fruit spawning")
+	local usePlaceholder = #fruitTemplates == 0
+
+	local plantRootCFrame = plantPart and getPrimaryCFrame(plantPart)
+	if not plantRootCFrame then
+		warn("[PlantModule] No Plant root found for fruit spawning")
 		return {}
 	end
-	
-	-- Calculate number of fruits to spawn (limited by available fruit models if not using placeholder)
-	local minFruits = fruitConfig.MinFruitsPerPlant or 2
+
+	local minFruits = fruitConfig.MinFruitsPerPlant or 1
 	local maxFruits = fruitConfig.MaxFruitsPerPlant or 4
-	
-	-- If we have fruit models, limit to number of available models
+
 	if not usePlaceholder then
-		maxFruits = math.min(maxFruits, #availableFruits)
+		maxFruits = math.min(maxFruits, #fruitTemplates)
 		minFruits = math.min(minFruits, maxFruits)
 	end
-	
-	local numFruits = math.random(minFruits, math.max(minFruits, maxFruits))
-	
-	-- Get size multiplier from plant
+
+	local numFruits
+	if usePlaceholder then
+		numFruits = math.random(minFruits, math.max(minFruits, maxFruits))
+	else
+		numFruits = math.min(#fruitTemplates, maxFruits)
+	end
 	local sizeMultiplier = plantModel:GetAttribute("SizeMultiplier") or 1.0
-	local fruitScale = (fruitConfig.FruitScale or 0.4) * sizeMultiplier
-	
-	-- Create fruits container
+	-- Use 1.0 for authored fruits (already correct size), only scale placeholders
+	local fruitScale = usePlaceholder and ((fruitConfig.FruitScale or 0.4) * sizeMultiplier) or 1.0
+
 	local fruitsFolder = plantModel:FindFirstChild("Fruits")
 	if not fruitsFolder then
 		fruitsFolder = Instance.new("Folder")
 		fruitsFolder.Name = "Fruits"
 		fruitsFolder.Parent = plantModel
 	end
-	
+
 	local spawnedFruits = {}
 	local offsets = fruitConfig.SpawnOffsets or {}
 	local heightOffset = fruitConfig.HeightOffset or -0.3
-	
-	-- Get plant top position
-	local plantTop = plantPart.Position + Vector3.new(0, plantPart.Size.Y * 0.4, 0)
-	
+
 	for i = 1, numFruits do
 		local fruit
-		
 		if usePlaceholder then
-			-- Create placeholder fruit (colored sphere)
 			fruit = Instance.new("Part")
 			fruit.Name = plantType .. "Fruit" .. i
 			fruit.Shape = Enum.PartType.Ball
@@ -409,8 +496,6 @@ function PlantModule.SpawnFruits(plantModel)
 			fruit.Material = Enum.Material.SmoothPlastic
 			fruit.Anchored = true
 			fruit.CanCollide = false
-			
-			-- Add slight glow
 			if config.EmitsLight then
 				local light = Instance.new("PointLight")
 				light.Brightness = 0.5
@@ -418,21 +503,28 @@ function PlantModule.SpawnFruits(plantModel)
 				light.Color = config.Color
 				light.Parent = fruit
 			end
+			-- Legacy positional scatter
+			local offsetIndex = ((i - 1) % math.max(#offsets, 1)) + 1
+			local offset = offsets[offsetIndex] or Vector3.new(0, 0, 0)
+			local randomOffset = Vector3.new(
+				(math.random() - 0.5) * 0.3,
+				(math.random() - 0.5) * 0.2,
+				(math.random() - 0.5) * 0.3
+			)
+			offset = offset * sizeMultiplier + randomOffset + Vector3.new(0, heightOffset * sizeMultiplier, 0)
+			fruit.CFrame = plantRootCFrame * CFrame.new(offset)
 		else
-			-- Clone the specific fruit template (Fruit1, Fruit2, etc.)
-			local fruitTemplate = availableFruits[i]
-			fruit = fruitTemplate:Clone()
+			local template = fruitTemplates[i]
+			if not template then
+				break
+			end
+			fruit = template:Clone()
 			fruit.Name = plantType .. "Fruit" .. i
-			
 			if fruit:IsA("BasePart") then
-				fruit.Size = fruitTemplate.Size * fruitScale
 				fruit.Anchored = true
 				fruit.CanCollide = false
+				-- Keep original size for authored fruits
 			elseif fruit:IsA("Model") then
-				-- Scale model
-				if fruit.PrimaryPart then
-					fruit:ScaleTo(fruitScale)
-				end
 				for _, part in ipairs(fruit:GetDescendants()) do
 					if part:IsA("BasePart") then
 						part.Anchored = true
@@ -440,51 +532,30 @@ function PlantModule.SpawnFruits(plantModel)
 					end
 				end
 			end
-		end
-		
-		-- Calculate position with offset
-		local offsetIndex = ((i - 1) % #offsets) + 1
-		local offset = offsets[offsetIndex] or Vector3.new(0, 0, 0)
-		offset = offset * sizeMultiplier
-		
-		-- Add some randomness to offset
-		local randomOffset = Vector3.new(
-			(math.random() - 0.5) * 0.3,
-			(math.random() - 0.5) * 0.2,
-			(math.random() - 0.5) * 0.3
-		)
-		
-		local fruitPosition = plantTop + offset + randomOffset + Vector3.new(0, heightOffset * sizeMultiplier, 0)
-		
-		if fruit:IsA("BasePart") then
-			fruit.Position = fruitPosition
-		elseif fruit:IsA("Model") then
-			if fruit.PrimaryPart then
-				fruit:SetPrimaryPartCFrame(CFrame.new(fruitPosition))
+			local relCFrame
+			if templateRoot then
+				relCFrame = templateRoot:ToObjectSpace(template.CFrame)
 			else
-				-- Move first part
-				local firstPart = fruit:FindFirstChildWhichIsA("BasePart")
-				if firstPart then
-					local offset2 = fruitPosition - firstPart.Position
-					for _, part in ipairs(fruit:GetDescendants()) do
-						if part:IsA("BasePart") then
-							part.Position = part.Position + offset2
-						end
-					end
-				end
+				relCFrame = CFrame.new()
+			end
+			if fruit:IsA("BasePart") then
+				fruit.CFrame = plantRootCFrame * relCFrame
+			elseif fruit:IsA("Model") then
+				fruit:PivotTo(plantRootCFrame * relCFrame)
 			end
 		end
-		
-		-- Set fruit attributes
+
 		fruit:SetAttribute("FruitType", plantType .. "Fruit")
 		fruit:SetAttribute("PlantType", plantType)
 		fruit:SetAttribute("FruitIndex", i)
-		fruit:SetAttribute("Revealed", false) -- Fruit starts hidden
-		
-		-- Make fruit invisible initially (will be revealed over time)
+		fruit:SetAttribute("Revealed", false)
+		fruit:SetAttribute("UseScaleReveal", usePlaceholder)
+
 		if fruit:IsA("BasePart") then
 			fruit.Transparency = 1
-			fruit.Size = Vector3.new(0.01, 0.01, 0.01) -- Start tiny
+			if usePlaceholder then
+				fruit.Size = fruit.Size * 0.01
+			end
 		elseif fruit:IsA("Model") then
 			for _, part in ipairs(fruit:GetDescendants()) do
 				if part:IsA("BasePart") then
@@ -492,22 +563,21 @@ function PlantModule.SpawnFruits(plantModel)
 				end
 			end
 		end
-		
-		-- Calculate individual fruit weight
+
 		local plantWeight = plantModel:GetAttribute("Weight") or 1
 		local fruitWeight = (plantWeight / numFruits) * (0.9 + math.random() * 0.2)
 		fruitWeight = math.floor(fruitWeight * 100 + 0.5) / 100
 		fruit:SetAttribute("FruitWeight", fruitWeight)
-		
+
 		fruit.Parent = fruitsFolder
 		table.insert(spawnedFruits, fruit)
 	end
-	
-	plantModel:SetAttribute("FruitCount", numFruits)
-	plantModel:SetAttribute("FruitsRemaining", numFruits)
-	plantModel:SetAttribute("FruitsRevealed", 0) -- Track how many fruits have been revealed
-	plantModel:SetAttribute("NextFruitRevealTime", os.time()) -- First fruit reveals immediately on bloom
-	
+
+	plantModel:SetAttribute("FruitCount", #spawnedFruits)
+	plantModel:SetAttribute("FruitsRemaining", #spawnedFruits)
+	plantModel:SetAttribute("FruitsRevealed", 0)
+	plantModel:SetAttribute("NextFruitRevealTime", os.time())
+
 	return spawnedFruits
 end
 
@@ -520,7 +590,10 @@ function PlantModule.RevealFruit(fruit)
 	
 	local fruitConfig = Constants.FRUIT_CONFIG
 	local revealDuration = fruitConfig.FruitRevealDuration or 1.5
-	local useScale = fruitConfig.FruitRevealScale ~= false
+	local useScale = fruit:GetAttribute("UseScaleReveal")
+	if useScale == nil then
+		useScale = fruitConfig.FruitRevealScale ~= false
+	end
 	
 	local plantModel = fruit.Parent and fruit.Parent.Parent
 	local sizeMultiplier = plantModel and plantModel:GetAttribute("SizeMultiplier") or 1.0
@@ -703,32 +776,29 @@ function PlantModule.SpawnSingleFruit(plantModel, fruitIndex)
 	local plantFolder = findPlantFolder(plantsFolder, plantType)
 	if not plantFolder then return nil end
 	
-	-- Count available fruit models (Fruit1, Fruit2, Fruit3, Fruit4)
-	local availableFruits = {}
-	for i = 1, 4 do
-		local fruitModel = plantFolder:FindFirstChild("Fruit" .. i)
-		if fruitModel then
-			table.insert(availableFruits, fruitModel)
-		end
-	end
-	
-	local usePlaceholder = #availableFruits == 0
-	
+	local fruitTemplates, templateRoot = collectFruitTemplates(plantFolder)
+	local usePlaceholder = #fruitTemplates == 0
+
 	local plantPart = plantModel:FindFirstChild("Plant")
-	if not plantPart or not plantPart:IsA("BasePart") then return nil end
+	local plantRootCFrame = plantPart and getPrimaryCFrame(plantPart)
+	if not plantRootCFrame then return nil end
 	
 	-- Get or create fruits folder
 	local fruitsFolder = plantModel:FindFirstChild("Fruits")
 	if not fruitsFolder then
 		fruitsFolder = Instance.new("Folder")
+	local fruitTemplates, templateRoot = collectFruitTemplates(plantFolder, plantPart)
+	local usePlaceholder = #fruitTemplates == 0
 		fruitsFolder.Name = "Fruits"
 		fruitsFolder.Parent = plantModel
 	end
 	
 	local sizeMultiplier = plantModel:GetAttribute("SizeMultiplier") or 1.0
-	local fruitScale = (fruitConfig.FruitScale or 0.4) * sizeMultiplier
+	-- Use 1.0 for authored fruits (already correct size), only scale placeholders
+	local fruitScale = usePlaceholder and ((fruitConfig.FruitScale or 0.4) * sizeMultiplier) or 1.0
 	
 	local fruit
+	local templateIndex
 	if usePlaceholder then
 		fruit = Instance.new("Part")
 		fruit.Name = plantType .. "Fruit" .. fruitIndex
@@ -747,20 +817,16 @@ function PlantModule.SpawnSingleFruit(plantModel, fruitIndex)
 			light.Parent = fruit
 		end
 	else
-		-- Use modulo to cycle through available fruit templates
-		local templateIndex = ((fruitIndex - 1) % #availableFruits) + 1
-		local fruitTemplate = availableFruits[templateIndex]
+		templateIndex = ((fruitIndex - 1) % #fruitTemplates) + 1
+		local fruitTemplate = fruitTemplates[templateIndex]
 		fruit = fruitTemplate:Clone()
 		fruit.Name = plantType .. "Fruit" .. fruitIndex
 		
 		if fruit:IsA("BasePart") then
-			fruit.Size = fruitTemplate.Size * fruitScale
+			-- Keep original size for authored fruits
 			fruit.Anchored = true
 			fruit.CanCollide = false
 		elseif fruit:IsA("Model") then
-			if fruit.PrimaryPart then
-				fruit:ScaleTo(fruitScale)
-			end
 			for _, part in ipairs(fruit:GetDescendants()) do
 				if part:IsA("BasePart") then
 					part.Anchored = true
@@ -769,46 +835,39 @@ function PlantModule.SpawnSingleFruit(plantModel, fruitIndex)
 			end
 		end
 	end
-	
-	-- Position the fruit
+
 	local offsets = fruitConfig.SpawnOffsets or {}
 	local heightOffset = fruitConfig.HeightOffset or -0.3
-	local plantTop = plantPart.Position + Vector3.new(0, plantPart.Size.Y * 0.4, 0)
-	
-	local offsetIndex = ((fruitIndex - 1) % #offsets) + 1
-	local offset = offsets[offsetIndex] or Vector3.new(0, 0, 0)
-	offset = offset * sizeMultiplier
-	
-	local randomOffset = Vector3.new(
-		(math.random() - 0.5) * 0.3,
-		(math.random() - 0.5) * 0.2,
-		(math.random() - 0.5) * 0.3
-	)
-	
-	local fruitPosition = plantTop + offset + randomOffset + Vector3.new(0, heightOffset * sizeMultiplier, 0)
-	
-	if fruit:IsA("BasePart") then
-		fruit.Position = fruitPosition
-	elseif fruit:IsA("Model") then
-		if fruit.PrimaryPart then
-			fruit:SetPrimaryPartCFrame(CFrame.new(fruitPosition))
+	local relCFrame
+	if usePlaceholder then
+		local offsetIndex = ((fruitIndex - 1) % math.max(#offsets, 1)) + 1
+		local offset = offsets[offsetIndex] or Vector3.new(0, 0, 0)
+		local randomOffset = Vector3.new(
+			(math.random() - 0.5) * 0.3,
+			(math.random() - 0.5) * 0.2,
+			(math.random() - 0.5) * 0.3
+		)
+		offset = offset * sizeMultiplier + randomOffset + Vector3.new(0, heightOffset * sizeMultiplier, 0)
+		relCFrame = CFrame.new(offset)
+	else
+		if templateRoot then
+			relCFrame = templateRoot:ToObjectSpace(fruitTemplates[templateIndex].CFrame)
 		else
-			local firstPart = fruit:FindFirstChildWhichIsA("BasePart")
-			if firstPart then
-				local offset2 = fruitPosition - firstPart.Position
-				for _, part in ipairs(fruit:GetDescendants()) do
-					if part:IsA("BasePart") then
-						part.Position = part.Position + offset2
-					end
-				end
-			end
+			relCFrame = CFrame.new()
 		end
+	end
+
+	if fruit:IsA("BasePart") then
+		fruit.CFrame = plantRootCFrame * relCFrame
+	elseif fruit:IsA("Model") then
+		fruit:PivotTo(plantRootCFrame * relCFrame)
 	end
 	
 	-- Set fruit attributes
 	fruit:SetAttribute("FruitType", plantType .. "Fruit")
 	fruit:SetAttribute("PlantType", plantType)
 	fruit:SetAttribute("FruitIndex", fruitIndex)
+	fruit:SetAttribute("UseScaleReveal", usePlaceholder)
 	
 	local plantWeight = plantModel:GetAttribute("Weight") or 1
 	local fruitWeight = plantWeight * (0.9 + math.random() * 0.2)

@@ -372,25 +372,9 @@ end
 -- Unhold current item
 function ItemHoldController.UnholdItem()
 	if heldItemModel then
-		-- Fade out animation
-		local tweenInfo = TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-		for _, part in ipairs(heldItemModel:GetDescendants()) do
-			if part:IsA("BasePart") then
-				local tween = TweenService:Create(part, tweenInfo, {Transparency = 1})
-				tween:Play()
-			end
-		end
-		
-		task.delay(0.15, function()
-			if heldItemModel then
-				heldItemModel:Destroy()
-				heldItemModel = nil
-			end
-		end)
-	else
+		heldItemModel:Destroy()
 		heldItemModel = nil
 	end
-	
 	heldItemData = nil
 end
 
@@ -401,15 +385,25 @@ end
 function ItemHoldController.HoldItem(itemType: ItemType, itemName: string, weight: number?): boolean
 	debugPrint("============================================")
 	debugPrint("HoldItem called:", itemType, itemName, "weight:", weight)
-	
+
 	-- Validate item type
 	if itemType ~= "Seed" and itemType ~= "Fruit" then
 		warn("[ItemHoldController] Invalid item type:", itemType)
 		return false
 	end
-	
+
+	-- Normalize plant name (handle accidental suffixes like "dreamfruitFruit")
+	local canonicalName = itemName
+	if not Constants.PLANT_CONFIG[canonicalName] then
+		local lower = string.lower(itemName)
+		local stripped = lower:gsub("fruit$", "")
+		if Constants.PLANT_CONFIG[stripped] then
+			canonicalName = stripped
+		end
+	end
+
 	-- Validate plant type exists
-	local config = Constants.PLANT_CONFIG[itemName]
+	local config = Constants.PLANT_CONFIG[canonicalName]
 	if not config then
 		warn("[ItemHoldController] Unknown plant type:", itemName)
 		debugPrint("Available plant types in PLANT_CONFIG:")
@@ -418,8 +412,8 @@ function ItemHoldController.HoldItem(itemType: ItemType, itemName: string, weigh
 		end
 		return false
 	end
-	debugPrint("Plant config found for:", itemName)
-	
+	debugPrint("Plant config found for:", canonicalName)
+
 	-- Unhold current item first
 	ItemHoldController.UnholdItem()
 	
@@ -428,14 +422,14 @@ function ItemHoldController.HoldItem(itemType: ItemType, itemName: string, weigh
 	
 	-- Clone the item model
 	debugPrint("Cloning item model...")
-	local itemModel = cloneItemModel(itemType, itemName)
+	local itemModel = cloneItemModel(itemType, canonicalName)
 	if not itemModel then
 		debugPrint("cloneItemModel returned nil!")
 		return false
 	end
 	debugPrint("Model cloned successfully:", itemModel.Name)
-	
-	itemModel.Name = itemName .. "_Held"
+
+	itemModel.Name = canonicalName .. "_Held"
 	
 	-- Weld to hand
 	debugPrint("Welding to hand...")
@@ -447,24 +441,19 @@ function ItemHoldController.HoldItem(itemType: ItemType, itemName: string, weigh
 	end
 	debugPrint("Weld successful!")
 	
-	-- Fade in animation
-	debugPrint("Starting fade in animation...")
+	-- Ensure parts are visible
 	local partCount = 0
 	for _, part in ipairs(itemModel:GetDescendants()) do
 		if part:IsA("BasePart") then
 			partCount = partCount + 1
-			local originalTransparency = part.Transparency
-			part.Transparency = 1
-			local tweenInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-			local tween = TweenService:Create(part, tweenInfo, {Transparency = originalTransparency})
-			tween:Play()
+			part.Transparency = 0
 		end
 	end
-	debugPrint("Animating", partCount, "parts")
-	
+	debugPrint("Ensured visibility for", partCount, "parts")
+
 	heldItemData = {
 		itemType = itemType,
-		itemName = itemName,
+		itemName = canonicalName,
 		weight = itemWeight,
 	}
 	heldItemModel = itemModel

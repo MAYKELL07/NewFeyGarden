@@ -26,6 +26,7 @@ end
 local Constants = safeRequire("Constants")
 local Config = safeRequire("Config")
 local VFXModule = safeRequire("VFXModule")
+local BuffsModule = safeRequire("BuffsModule")
 
 if not Constants or not Config or not VFXModule then
 	warn("[WeatherEffects] Missing shared modules; aborting weather VFX")
@@ -152,6 +153,11 @@ if not weatherEvent then
 end
 
 weatherEvent.OnClientEvent:Connect(function(weatherType)
+	-- Sync BuffsModule on client so all systems get correct weather
+	if BuffsModule then
+		BuffsModule.SetWeather(weatherType)
+	end
+	
 	-- Apply smooth particle transition
 	applyWeatherEffects(weatherType)
 	

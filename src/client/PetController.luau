@@ -772,37 +772,32 @@ local function applyPetBoosts()
 		if garden:IsA("Folder") then
 			local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
 			if plotsFolder and plotsFolder:IsA("Folder") then
-				-- Check each PlantAnchor
-				for _, anchor in ipairs(plotsFolder:GetChildren()) do
-					if anchor:IsA("BasePart") then
-						-- Find plant model in anchor
-						for _, child in ipairs(anchor:GetChildren()) do
-							if child:IsA("Model") and child:GetAttribute("PlantType") then
-								local plantPos = child:GetBoundingBox().Position
-								local boosted = false
-								
-								-- Check if any pet is close enough
-								for _, petModel in ipairs(allPets) do
-									local petBody = petModel.PrimaryPart or petModel:FindFirstChildWhichIsA("BasePart")
-									if petBody then
-										local distance = (plantPos - petBody.Position).Magnitude
-										if distance <= PET_BOOST_RADIUS then
-											boosted = true
-											break
-										end
-									end
+				-- Check all children of plots folder for plant models
+				for _, child in ipairs(plotsFolder:GetChildren()) do
+					if child:IsA("Model") and child:GetAttribute("PlantType") then
+						local plantPos = child:GetBoundingBox().Position
+						local boosted = false
+						
+						-- Check if any pet is close enough
+						for _, petModel in ipairs(allPets) do
+							local petBody = petModel.PrimaryPart or petModel:FindFirstChildWhichIsA("BasePart")
+							if petBody then
+								local distance = (plantPos - petBody.Position).Magnitude
+								if distance <= PET_BOOST_RADIUS then
+									boosted = true
+									break
 								end
-								
-								-- Apply or remove boost
-								if boosted then
-									if not child:GetAttribute("PetBoost") then
-										child:SetAttribute("PetBoost", true)
-									end
-								else
-									if child:GetAttribute("PetBoost") then
-										child:SetAttribute("PetBoost", false)
-									end
-								end
+							end
+						end
+						
+						-- Apply or remove boost
+						if boosted then
+							if not child:GetAttribute("PetBoost") then
+								child:SetAttribute("PetBoost", true)
+							end
+						else
+							if child:GetAttribute("PetBoost") then
+								child:SetAttribute("PetBoost", false)
 							end
 						end
 					end

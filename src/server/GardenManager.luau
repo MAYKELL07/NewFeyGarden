@@ -180,12 +180,27 @@ function GardenManager.SetupPlantHarvestDetector(plantModel: Model, userId: numb
 	end
 	
 	local plantPart = plantModel:FindFirstChild("Plant")
-	if not plantPart or not plantPart:IsA("BasePart") then
+	if not plantPart then
+		return
+	end
+
+	local function findPrimary(partOrModel: Instance): BasePart?
+		if partOrModel:IsA("BasePart") then
+			return partOrModel
+		end
+		if partOrModel:IsA("Model") then
+			return partOrModel.PrimaryPart or partOrModel:FindFirstChildWhichIsA("BasePart", true)
+		end
+		return nil
+	end
+
+	local plantPrimary = findPrimary(plantPart)
+	if not plantPrimary then
 		return
 	end
 	
 	-- Remove old ClickDetector if present (legacy cleanup)
-	local existingCD = plantPart:FindFirstChildOfClass("ClickDetector")
+	local existingCD = plantPrimary:FindFirstChildOfClass("ClickDetector")
 	if existingCD then
 		existingCD:Destroy()
 	end

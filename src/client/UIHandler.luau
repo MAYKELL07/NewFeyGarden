@@ -41,6 +41,7 @@ end)
 
 local UIHandler = {}
 local playerInventory = {Seeds = {}, Pets = {}, Fruits = {}}
+local fruitCountCache: {[string]: number} = {}
 local playerCoins = 0
 local currentWeather = Constants.WEATHER_TYPES.SUNNY
 local screenGui = nil
@@ -102,6 +103,31 @@ local function getRarityColor(petType)
 		return Constants.RARITY_COLORS[rarity] or Color3.new(1, 1, 1)
 	end
 	return Color3.new(1, 1, 1)
+end
+
+local function computeFruitCounts(fruits): {[string]: number}
+	local counts: {[string]: number} = {}
+
+	if type(fruits) ~= "table" then
+		return counts
+	end
+
+	if #fruits > 0 and type(fruits[1]) == "table" and fruits[1].Type then
+		for _, fruit in ipairs(fruits) do
+			local fruitType = fruit.Type
+			if fruitType then
+				counts[fruitType] = (counts[fruitType] or 0) + 1
+			end
+		end
+	else
+		for fruitType, count in pairs(fruits) do
+			if type(count) == "number" then
+				counts[fruitType] = count
+			end
+		end
+	end
+
+	return counts
 end
 
 -- Forward declarations
@@ -250,6 +276,10 @@ end
 
 local function selectHotbarSlot(slotNumber)
 	enforceToolSlots()
+	-- If selecting the same slot, keep current hold
+	if slotNumber == selectedSlot then
+		return
+	end
 	if not screenGui then return end
 	local hotbarFrame = hudGroup and hudGroup:FindFirstChild("HotbarFrame")
 	if not hotbarFrame then return end
@@ -347,8 +377,8 @@ local function updateHotbar()
 					local actualCount = 0
 					if data.type == "Seed" and playerInventory.Seeds then
 						actualCount = playerInventory.Seeds[data.name] or 0
-					elseif data.type == "Fruit" and playerInventory.Fruits then
-						actualCount = playerInventory.Fruits[data.name] or 0
+					elseif data.type == "Fruit" then
+						actualCount = fruitCountCache[data.name] or 0
 					end
 					
 					-- Clear slot if item count is 0
@@ -445,6 +475,7 @@ end
 
 local function updateFullInventory()
 	if not screenGui or not playerInventory then return end
+	fruitCountCache = computeFruitCounts(playerInventory.Fruits)
 	local inventoryWindow = windowGroup and windowGroup:FindFirstChild("InventoryWindow")
 	if not inventoryWindow or not inventoryWindow.Visible then return end
 	
@@ -471,11 +502,9 @@ local function updateFullInventory()
 	
 	-- Add fruits
 	if currentInventoryFilter == "All" or currentInventoryFilter == "Fruits" then
-		if playerInventory.Fruits then
-			for fruitName, count in pairs(playerInventory.Fruits) do
-				if count > 0 then
-					createInventoryItem(fruitName, count, "Fruit", gridContainer)
-				end
+		for fruitName, count in pairs(fruitCountCache) do
+			if count > 0 then
+				createInventoryItem(fruitName, count, "Fruit", gridContainer)
 			end
 		end
 	end
@@ -636,14 +665,15 @@ end
 local function updateInventoryDisplay(inventory)
 	if not screenGui then return end
 	enforceToolSlots()
+	fruitCountCache = computeFruitCounts(inventory.Fruits)
 	playerInventory = inventory
 	
 	-- Update hotbar with new counts
 	for slot, data in pairs(hotbarData) do
 		if data.type == "Seed" and inventory.Seeds then
 			data.count = inventory.Seeds[data.name] or 0
-		elseif data.type == "Fruit" and inventory.Fruits then
-			data.count = inventory.Fruits[data.name] or 0
+		elseif data.type == "Fruit" then
+			data.count = fruitCountCache[data.name] or 0
 		end
 	end
 	updateHotbar()
@@ -2482,14 +2512,8 @@ updateSellInventoryGrid = function()
 	
 	-- Add fruits from inventory as grid items
 	if playerInventory.Fruits then
-		for fruitName, fruitData in pairs(playerInventory.Fruits) do
-			local count = fruitData
-			-- Handle both number counts and array of instances
-			if type(fruitData) == "table" then
-				count = #fruitData
-			elseif type(fruitData) ~= "number" then
-				continue
-			end
+		fruitCountCache = computeFruitCounts(playerInventory.Fruits)
+		for fruitName, count in pairs(fruitCountCache) do
 			if count > 0 then
 				createInventoryItem(fruitName, count, "Fruit", inventoryScroll)
 			end

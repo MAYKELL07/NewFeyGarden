@@ -9,6 +9,10 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
+local BuffsModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("BuffsModule"))
+
+-- Import ClientState for synced weather
+local ClientState = require(script.Parent:WaitForChild("UI"):WaitForChild("ClientState"))
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
@@ -21,6 +25,7 @@ local plantNameLabel = nil
 local stageLabel = nil
 local countdownLabel = nil
 local fruitCountdownLabel = nil  -- New label for fruit reveal countdown
+local boostLabel = nil -- Buff info
 
 -- State
 local currentHoveredPlant = nil
@@ -123,6 +128,19 @@ local function createInfoUI()
 	fruitCountdownLabel.LayoutOrder = 4
 	fruitCountdownLabel.Visible = false  -- Only shown during bloom
 	fruitCountdownLabel.Parent = infoFrame
+
+	-- Boost label
+	boostLabel = Instance.new("TextLabel")
+	boostLabel.Name = "BoostLabel"
+	boostLabel.Size = UDim2.new(1, 0, 0, 18)
+	boostLabel.BackgroundTransparency = 1
+	boostLabel.Font = Enum.Font.Gotham
+	boostLabel.TextSize = 13
+	boostLabel.TextColor3 = Color3.fromRGB(120, 210, 255)
+	boostLabel.TextXAlignment = Enum.TextXAlignment.Center
+	boostLabel.LayoutOrder = 5
+	boostLabel.Visible = false
+	boostLabel.Parent = infoFrame
 end
 
 -- ============================================================================
@@ -230,6 +248,36 @@ local function updateInfoPosition(mousePosition: Vector2)
 	infoFrame.Visible = true
 end
 
+-- Compute accurate buff status using ClientState's synced weather
+local function getAccurateBuffStatus(plantModel)
+	-- Get weather from ClientState (synced from server)
+	local currentWeather = ClientState.CurrentWeather or "Sunny"
+	local weatherMult = Config.Buffs.Weather[currentWeather] or 1.0
+	
+	-- Check watered status
+	local now = os.time()
+	local wateredUntil = plantModel:GetAttribute("WateredUntil")
+	local isWatered = wateredUntil and wateredUntil > now
+	local wateredMult = isWatered and (Config.Buffs.Watered or 1.5) or 1.0
+	
+	-- Check pet boost (set by PetController when pet is nearby)
+	local hasPetBoost = plantModel:GetAttribute("PetBoost") or false
+	local petMult = hasPetBoost and (Config.Buffs.PetBoost or 1.5) or 1.0
+	
+	-- Calculate total multiplier
+	local totalMult = weatherMult * wateredMult * petMult
+	
+	return {
+		Weather = currentWeather,
+		WeatherMult = weatherMult,
+		Watered = isWatered,
+		WateredMult = wateredMult,
+		PetBoost = hasPetBoost,
+		PetMult = petMult,
+		TotalMultiplier = totalMult
+	}
+end
+
 local function showPlantInfo(plantModel, mousePosition: Vector2)
 	if not infoFrame then return end
 	
@@ -237,41 +285,48 @@ local function showPlantInfo(plantModel, mousePosition: Vector2)
 	
 	local plantType = plantModel:GetAttribute("PlantType")
 	local stage = plantModel:GetAttribute("Stage")
+	local buffStatus = getAccurateBuffStatus(plantModel)
 	
 	-- Update plant name
 	plantNameLabel.Text = getPlantDisplayName(plantType)
 	
-	-- Update stage
-	stageLabel.Text = "Stage: " .. (stage or "Unknown")
-	stageLabel.TextColor3 = getStageColor(stage)
+	-- Update stage with fallback
+	local stageDisplay = stage
+	if not stageDisplay or stageDisplay == "" then
+		-- Try to detect stage from visual (fallback)
+		local harvestable = plantModel:GetAttribute("Harvestable")
+		if harvestable then
+			stageDisplay = Constants.GROWTH_STAGES.BLOOM
+		else
+			stageDisplay = Constants.GROWTH_STAGES.SEED
+		end
+	end
+	stageLabel.Text = "Stage: " .. stageDisplay
+	stageLabel.TextColor3 = getStageColor(stageDisplay)
 	
-	-- Update countdown
+	-- Update countdown using stageDisplay (which has fallback logic)
 	local timeRemaining, nextStageText = calculateTimeToNextStage(plantModel)
-	if stage == Constants.GROWTH_STAGES.BLOOM then
-		-- Show fruit info instead of harvest ready
+	if stageDisplay == Constants.GROWTH_STAGES.BLOOM then
 		local fruitsRevealed = plantModel:GetAttribute("FruitsRevealed") or 0
 		local totalFruits = plantModel:GetAttribute("FruitCount") or 0
 		local fruitsRemaining = plantModel:GetAttribute("FruitsRemaining") or 0
 		local harvestRemovesPlant = plantModel:GetAttribute("HarvestRemovesPlant")
+		local nextRevealTime = plantModel:GetAttribute("NextFruitRevealTime") or 0
 		
-		if harvestRemovesPlant then
-			-- Single fruit plant - harvest removes the whole plant
-			countdownLabel.Text = "🍎 Ready to Harvest!"
+		if harvestRemovesPlant or totalFruits <= 1 then
+			countdownLabel.Text = "🍎 Single fruit: Ready"
 			countdownLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-			fruitCountdownLabel.Visible = false
+			fruitCountdownLabel.Text = "Harvest removes plant"
+			fruitCountdownLabel.Visible = true
 		else
-			-- Multi-fruit plant - show fruit status
-			countdownLabel.Text = string.format("🍎 Fruits: %d/%d ready", fruitsRevealed, totalFruits)
+			countdownLabel.Text = string.format("🍎 Fruits ready: %d/%d (left %d)", fruitsRevealed, totalFruits, fruitsRemaining)
 			countdownLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-			
-			-- Show next fruit reveal countdown
-			local nextRevealTime = plantModel:GetAttribute("NextFruitRevealTime") or 0
 			if nextRevealTime > 0 and fruitsRevealed < totalFruits then
 				local timeToNextFruit = math.max(0, nextRevealTime - os.time())
 				fruitCountdownLabel.Text = "⏱ Next fruit: " .. formatTime(timeToNextFruit)
 				fruitCountdownLabel.Visible = true
 			elseif fruitsRemaining > 0 then
-				fruitCountdownLabel.Text = "✨ All fruits ready!"
+				fruitCountdownLabel.Text = "✨ All fruits ready"
 				fruitCountdownLabel.Visible = true
 			else
 				fruitCountdownLabel.Text = "🔄 Regrowing..."
@@ -283,6 +338,30 @@ local function showPlantInfo(plantModel, mousePosition: Vector2)
 		countdownLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
 		fruitCountdownLabel.Visible = false
 	end
+
+	-- Boost info with detailed breakdown
+	local mult = buffStatus.TotalMultiplier or 1
+	local boostParts = {}
+	
+	-- Weather info
+	local weatherText = buffStatus.Weather or "Sunny"
+	if buffStatus.WeatherMult and buffStatus.WeatherMult ~= 1.0 then
+		weatherText = weatherText .. string.format(" x%.1f", buffStatus.WeatherMult)
+	end
+	table.insert(boostParts, weatherText)
+	
+	-- Watered buff
+	if buffStatus.Watered then
+		table.insert(boostParts, "💧Watered")
+	end
+	
+	-- Pet buff
+	if buffStatus.PetBoost then
+		table.insert(boostParts, "🐾Pet")
+	end
+	
+	boostLabel.Text = string.format("⚡ x%.2f (%s)", mult, table.concat(boostParts, " "))
+	boostLabel.Visible = true
 	
 	updateInfoPosition(mousePosition)
 end
@@ -372,14 +451,36 @@ end
 local function findPlantFromPart(part)
 	if not part then return nil end
 	
-	-- Check if part itself has PlantType
-	if part:GetAttribute("PlantType") then
+	-- Always try to find the root plantModel (which has Stage attribute)
+	-- First, check ancestors for a Model with PlantType AND Stage
+	local model = part:FindFirstAncestorOfClass("Model")
+	while model do
+		if model:GetAttribute("PlantType") and model:GetAttribute("Stage") then
+			return model
+		end
+		-- If model has PlantType but no Stage, check its parent
+		if model:GetAttribute("PlantType") and not model:GetAttribute("Stage") then
+			local parentModel = model.Parent
+			if parentModel and parentModel:IsA("Model") and parentModel:GetAttribute("PlantType") then
+				return parentModel
+			end
+		end
+		model = model.Parent and model.Parent:FindFirstAncestorOfClass("Model")
+	end
+	
+	-- Fallback: Check if part itself is the plantModel
+	if part:IsA("Model") and part:GetAttribute("PlantType") and part:GetAttribute("Stage") then
 		return part
 	end
 	
-	-- Check parent model
-	local model = part:FindFirstAncestorOfClass("Model")
+	-- Check parent model for PlantType (simpler fallback)
+	model = part:FindFirstAncestorOfClass("Model")
 	if model and model:GetAttribute("PlantType") then
+		-- Check if this model's parent also has PlantType (meaning this is the Plant child)
+		local parentModel = model.Parent
+		if parentModel and parentModel:IsA("Model") and parentModel:GetAttribute("PlantType") then
+			return parentModel
+		end
 		return model
 	end
 	
@@ -417,8 +518,13 @@ local function onUpdate()
 				-- Update position and countdown
 				updateInfoPosition(mousePosition)
 				
-				-- Update countdown timer
+				-- Update countdown timer - get stage with fallback
 				local stage = plant:GetAttribute("Stage")
+				if not stage or stage == "" then
+					local harvestable = plant:GetAttribute("Harvestable")
+					stage = harvestable and Constants.GROWTH_STAGES.BLOOM or Constants.GROWTH_STAGES.SEED
+				end
+				
 				if stage == Constants.GROWTH_STAGES.BLOOM then
 					-- Update fruit countdown during bloom
 					local fruitsRevealed = plant:GetAttribute("FruitsRevealed") or 0

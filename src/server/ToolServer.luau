@@ -56,14 +56,38 @@ end
 local function getPlantFromTarget(target)
 	if not target then return nil end
 	
-	-- Check if target itself is a plant model
-	if target:IsA("Model") and target:GetAttribute("PlantType") then
-		return target
+	-- Find the root plantModel (which has Stage attribute)
+	-- Check ancestors for a Model with PlantType AND Stage
+	local model = target
+	if target:IsA("BasePart") then
+		model = target:FindFirstAncestorOfClass("Model")
 	end
 	
-	-- Check if target is part of a plant model
-	local model = target:FindFirstAncestorOfClass("Model")
+	while model do
+		if model:GetAttribute("PlantType") and model:GetAttribute("Stage") then
+			return model
+		end
+		-- Check parent model
+		local parentModel = model.Parent
+		if parentModel and parentModel:IsA("Model") and parentModel:GetAttribute("PlantType") then
+			return parentModel
+		end
+		-- Keep searching up
+		if model.Parent then
+			model = model.Parent:FindFirstAncestorOfClass("Model")
+		else
+			break
+		end
+	end
+	
+	-- Fallback: simple ancestor check
+	model = target:FindFirstAncestorOfClass("Model")
 	if model and model:GetAttribute("PlantType") then
+		-- Check if this model's parent also has PlantType (meaning this is the Plant child)
+		local parentModel = model.Parent
+		if parentModel and parentModel:IsA("Model") and parentModel:GetAttribute("PlantType") then
+			return parentModel
+		end
 		return model
 	end
 	
@@ -119,7 +143,15 @@ local function handleShovel(player, target, position)
 	if plant then
 		local plantPosition = plant:GetBoundingBox().Position
 		
-		-- Destroy the plant
+		-- Ensure we destroy the entire plant model including all children
+		-- First, destroy all descendants explicitly to handle any edge cases
+		for _, descendant in ipairs(plant:GetDescendants()) do
+			if descendant:IsA("BasePart") or descendant:IsA("Model") then
+				descendant:Destroy()
+			end
+		end
+		
+		-- Then destroy the plant model itself
 		plant:Destroy()
 		
 		-- Show VFX

@@ -197,15 +197,16 @@ end
 
 -- Scan for fruits
 local function findAllFruits()
-	-- Fruits are typically in garden plots
+	-- Fruits are typically in garden plots or under plant models
 	local gardensFolder = workspace:FindFirstChild(Config.World.GardensFolder)
 	if not gardensFolder then return end
 	
 	for _, garden in ipairs(gardensFolder:GetChildren()) do
-		if garden:IsA("Folder") then
+		if garden:IsA("Folder") or garden:IsA("Model") then
 			-- Find Fruits folders inside plants
 			for _, descendant in ipairs(garden:GetDescendants()) do
-				if descendant:GetAttribute("FruitType") then
+				-- Check for FruitType attribute and ensure fruit is revealed
+				if descendant:GetAttribute("FruitType") and descendant:GetAttribute("Revealed") then
 					registerInteractable(descendant, "Fruit")
 				end
 			end
@@ -331,7 +332,19 @@ task.spawn(function()
 	if gardensFolder then
 		gardensFolder.DescendantAdded:Connect(function(descendant)
 			if descendant:GetAttribute("FruitType") then
-				registerInteractable(descendant, "Fruit")
+				-- Wait for reveal attribute to be set
+				if descendant:GetAttribute("Revealed") then
+					registerInteractable(descendant, "Fruit")
+				else
+					-- Listen for reveal
+					local conn
+					conn = descendant:GetAttributeChangedSignal("Revealed"):Connect(function()
+						if descendant:GetAttribute("Revealed") then
+							registerInteractable(descendant, "Fruit")
+							conn:Disconnect()
+						end
+					end)
+				end
 			end
 		end)
 		
