@@ -110,14 +110,6 @@ Constants.PLANT_CONFIG = {
 		EmitsLight = false,
 		Tier = 1
 	},
-	[Constants.PLANT_TYPES.GLOWBUD] = {
-		SeedPrice = 25,           -- Still affordable
-		FruitSellPrice = 55,      -- Profit: 30 coins (120% ROI)
-		GrowthTime = 45,          -- 0.67 coins/second (best T1 efficiency!)
-		Color = Color3.fromRGB(255, 255, 100),
-		EmitsLight = true,
-		Tier = 1
-	},
 	
 	-- === TIER 2: MID-GAME PLANTS (Better profits, longer commitment) ===
 	
@@ -527,7 +519,8 @@ Constants.RARITIES = {
 	UNCOMMON = "Uncommon",
 	RARE = "Rare",
 	EPIC = "Epic",
-	LEGENDARY = "Legendary"
+	LEGENDARY = "Legendary",
+	MYTHIC = "Mythic"
 }
 
 -- Rarity colors for UI
@@ -536,8 +529,86 @@ Constants.RARITY_COLORS = {
 	[Constants.RARITIES.UNCOMMON] = Color3.fromRGB(100, 200, 100),    -- Green
 	[Constants.RARITIES.RARE] = Color3.fromRGB(50, 150, 255),         -- Blue
 	[Constants.RARITIES.EPIC] = Color3.fromRGB(180, 100, 255),        -- Purple
-	[Constants.RARITIES.LEGENDARY] = Color3.fromRGB(255, 200, 50)     -- Yellow/Gold
+	[Constants.RARITIES.LEGENDARY] = Color3.fromRGB(255, 200, 50),    -- Yellow/Gold
+	[Constants.RARITIES.MYTHIC] = Color3.fromRGB(180, 100, 255)       -- Reuse Epic color (avoid introducing new palette)
 }
+
+-- Rarity growth timing (total time from Seed -> Bloom, in seconds)
+-- NOTE: The growth system progresses through 2 timed transitions (Seed->Sprout, Sprout->Bloom),
+-- so per-stage base time is typically total/2, before buffs.
+Constants.RARITY_GROWTH_TOTAL_SECONDS = {
+	[Constants.RARITIES.COMMON] = {Min = 2 * 60, Max = 4 * 60},
+	[Constants.RARITIES.UNCOMMON] = {Min = 6 * 60, Max = 8 * 60},
+	[Constants.RARITIES.RARE] = {Min = 14 * 60, Max = 18 * 60},
+	[Constants.RARITIES.EPIC] = {Min = 28 * 60, Max = 36 * 60},
+	[Constants.RARITIES.LEGENDARY] = {Min = 55 * 60, Max = 60 * 60},
+	[Constants.RARITIES.MYTHIC] = {Min = 2 * 60 * 60, Max = 4 * 60 * 60},
+}
+
+local function formatDurationShort(seconds: number): string
+	seconds = math.max(0, math.floor(seconds + 0.5))
+	if seconds >= 60 * 60 then
+		local hours = seconds / (60 * 60)
+		-- Prefer whole hours when possible
+		if math.abs(hours - math.floor(hours + 0.5)) < 1e-6 then
+			return string.format("%dh", math.floor(hours + 0.5))
+		end
+		return string.format("%.1fh", hours)
+	end
+	if seconds >= 60 then
+		local mins = seconds / 60
+		if math.abs(mins - math.floor(mins + 0.5)) < 1e-6 then
+			return string.format("%dm", math.floor(mins + 0.5))
+		end
+		return string.format("%.1fm", mins)
+	end
+	return string.format("%ds", seconds)
+end
+
+function Constants.GetPlantRarity(plantType: string): string
+	return Constants.PLANT_RARITIES[plantType] or Constants.RARITIES.COMMON
+end
+
+function Constants.GetRarityTotalGrowthRangeSeconds(rarity: string): (number, number)
+	local range = Constants.RARITY_GROWTH_TOTAL_SECONDS[rarity]
+	if range then
+		return range.Min, range.Max
+	end
+	-- Safe fallback: treat unknown rarity as common
+	local commonRange = Constants.RARITY_GROWTH_TOTAL_SECONDS[Constants.RARITIES.COMMON]
+	return commonRange.Min, commonRange.Max
+end
+
+function Constants.RollTotalGrowthSecondsForPlant(plantType: string): number
+	local rarity = Constants.GetPlantRarity(plantType)
+	local minSeconds, maxSeconds = Constants.GetRarityTotalGrowthRangeSeconds(rarity)
+	if maxSeconds < minSeconds then
+		minSeconds, maxSeconds = maxSeconds, minSeconds
+	end
+	return math.random(minSeconds, maxSeconds)
+end
+
+function Constants.GetDefaultTotalGrowthSecondsForPlant(plantType: string): number
+	local rarity = Constants.GetPlantRarity(plantType)
+	local minSeconds, maxSeconds = Constants.GetRarityTotalGrowthRangeSeconds(rarity)
+	return (minSeconds + maxSeconds) * 0.5
+end
+
+function Constants.RollBaseStageGrowthSecondsForPlant(plantType: string): number
+	local totalSeconds = Constants.RollTotalGrowthSecondsForPlant(plantType)
+	return math.max(totalSeconds * 0.5, 0.1)
+end
+
+function Constants.GetDefaultBaseStageGrowthSecondsForPlant(plantType: string): number
+	local totalSeconds = Constants.GetDefaultTotalGrowthSecondsForPlant(plantType)
+	return math.max(totalSeconds * 0.5, 0.1)
+end
+
+function Constants.GetGrowthRangeTextForPlant(plantType: string): string
+	local rarity = Constants.GetPlantRarity(plantType)
+	local minSeconds, maxSeconds = Constants.GetRarityTotalGrowthRangeSeconds(rarity)
+	return string.format("%s-%s", formatDurationShort(minSeconds), formatDurationShort(maxSeconds))
+end
 
 -- ============================================================================
 -- EGG SYSTEM
@@ -559,6 +630,7 @@ Constants.EGG_CONFIG = {
 		Price = 100,
 		ImageId = "rbxassetid://105531210825045", -- White egg
 		Rarity = Constants.RARITIES.COMMON,
+		HatchTimeSeconds = 60,
 		-- Only drops common pets (100% common)
 		DropChances = {
 			[Constants.RARITIES.COMMON] = 100
@@ -569,6 +641,7 @@ Constants.EGG_CONFIG = {
 		Price = 250,
 		ImageId = "rbxassetid://79842537952035", -- Green egg
 		Rarity = Constants.RARITIES.UNCOMMON,
+		HatchTimeSeconds = 60,
 		-- Drops common or uncommon
 		DropChances = {
 			[Constants.RARITIES.COMMON] = 60,
@@ -580,6 +653,7 @@ Constants.EGG_CONFIG = {
 		Price = 500,
 		ImageId = "rbxassetid://75691996912194", -- Blue egg
 		Rarity = Constants.RARITIES.RARE,
+		HatchTimeSeconds = 60,
 		-- Drops common, uncommon, or rare
 		DropChances = {
 			[Constants.RARITIES.COMMON] = 50,
@@ -592,6 +666,7 @@ Constants.EGG_CONFIG = {
 		Price = 1000,
 		ImageId = "rbxassetid://130581371031598", -- Purple egg
 		Rarity = Constants.RARITIES.EPIC,
+		HatchTimeSeconds = 60,
 		-- Drops uncommon, rare, or epic (no common!)
 		DropChances = {
 			[Constants.RARITIES.UNCOMMON] = 45,
@@ -604,6 +679,7 @@ Constants.EGG_CONFIG = {
 		Price = 2500,
 		ImageId = "rbxassetid://121874536453561", -- Yellow/Gold egg
 		Rarity = Constants.RARITIES.LEGENDARY,
+		HatchTimeSeconds = 60,
 		-- Drops rare, epic, or legendary (no common/uncommon!)
 		DropChances = {
 			[Constants.RARITIES.RARE] = 50,

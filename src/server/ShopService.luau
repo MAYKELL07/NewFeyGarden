@@ -1,5 +1,5 @@
 -- ShopService.luau
--- Manages the rotating seed shop with stock limits
+-- Manages the seed shop with stock limits + timed restocks
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
@@ -10,7 +10,7 @@ local Constants = require(sharedFolder:WaitForChild("Constants"))
 local ShopService = {}
 
 -- Current shop inventory (shared across all players)
--- Format: { [seedType] = { Stock = number, Rarity = string } }
+-- Format: { [seedType] = { Stock = number, MaxStock = number, Rarity = string } }
 local currentShopInventory = {}
 local lastRefreshTime = 0
 local shopInitialized = false
@@ -43,40 +43,21 @@ local function shuffleArray(arr)
 	return shuffled
 end
 
--- Generate a new shop inventory
+-- Generate a new shop inventory (all seeds always visible; only stock is limited)
 local function generateShopInventory()
 	local newInventory = {}
 	local shopConfig = Constants.SEED_SHOP_CONFIG
-	
-	-- Rarity order for consistent display
-	local rarityOrder = {
-		Constants.RARITIES.COMMON,
-		Constants.RARITIES.UNCOMMON,
-		Constants.RARITIES.RARE,
-		Constants.RARITIES.EPIC,
-		Constants.RARITIES.LEGENDARY
-	}
-	
-	for _, rarity in ipairs(rarityOrder) do
-		local slots = shopConfig.SlotsPerRarity[rarity] or 1
-		local appearanceChance = shopConfig.AppearanceChance[rarity] or 1.0
+
+	-- Use PLANT_CONFIG as the source of truth for which seeds exist.
+	-- This ensures any seed shown in shop also has pricing config.
+	for plantType, _plantConfig in pairs(Constants.PLANT_CONFIG) do
+		local rarity = Constants.PLANT_RARITIES[plantType] or Constants.RARITIES.COMMON
 		local stockAmount = shopConfig.StockPerRarity[rarity] or 10
-		
-		-- Check if this rarity appears this rotation
-		if math.random() <= appearanceChance then
-			local plantsOfRarity = getPlantsOfRarity(rarity)
-			local shuffledPlants = shuffleArray(plantsOfRarity)
-			
-			-- Add up to 'slots' number of plants
-			for i = 1, math.min(slots, #shuffledPlants) do
-				local plantType = shuffledPlants[i]
-				newInventory[plantType] = {
-					Stock = stockAmount,
-					MaxStock = stockAmount,
-					Rarity = rarity
-				}
-			end
-		end
+		newInventory[plantType] = {
+			Stock = stockAmount,
+			MaxStock = stockAmount,
+			Rarity = rarity,
+		}
 	end
 	
 	return newInventory

@@ -410,6 +410,23 @@ function UISetup.CreateUI()
 		return bg
 	end
 
+	-- PetsWindow-style background (exact look + placement), used for all WindowGroup windows.
+	local function applyPetsWindowBackground(parent)
+		local bg = Instance.new("ImageLabel")
+		bg.Name = "Background"
+		bg.BackgroundTransparency = 1
+		bg.Image = BOX_BIG_SQUARE -- same asset as PetsWindow
+		bg.Size = UDim2.new(2, 0, 1.6, 0)
+		bg.Position = UDim2.new(0.49, 0, 0.5, 30)
+		bg.AnchorPoint = Vector2.new(0.5, 0.5)
+		bg.ScaleType = Enum.ScaleType.Stretch
+		-- Keep the exact look, but ensure it sits just behind the window's contents.
+		bg.ZIndex = (parent.ZIndex or 1) - 1
+		bg.Parent = parent
+		parent.BackgroundTransparency = 1
+		return bg
+	end
+
 	local function applyFrameImage(parent, assetId, sliceRect, zOffset)
 		local bg = Instance.new("ImageLabel")
 		bg.Name = "FrameArt"
@@ -1057,7 +1074,10 @@ function UISetup.CreateUI()
 	end
 
 	-- Keeps scrolling frames sized to their content so scrollbars always appear
-	local function bindCanvasSize(scrollFrame: ScrollingFrame, layout: UIGridLayout | UIListLayout, padding: UIPadding?)
+	-- If minYScale is provided, the canvas will be at least minYScale * frameHeight,
+	-- and will grow further only if content exceeds that baseline.
+	-- If minYScale is nil, preserves legacy behavior.
+	local function bindCanvasSize(scrollFrame: ScrollingFrame, layout: UIGridLayout | UIListLayout, padding: UIPadding?, minYScale: number?)
 		local function updateCanvas()
 			local contentSize = layout.AbsoluteContentSize
 			local paddingX = 0
@@ -1067,7 +1087,16 @@ function UISetup.CreateUI()
 				paddingY = (padding.PaddingTop.Offset or 0) + (padding.PaddingBottom.Offset or 0)
 			end
 			local currentCanvas = scrollFrame.CanvasSize
-			scrollFrame.CanvasSize = UDim2.new(currentCanvas.X.Scale, contentSize.X + paddingX, 2, contentSize.Y + paddingY)
+			if minYScale == nil then
+				-- Legacy: always includes content + extra baseline scroll space.
+				scrollFrame.CanvasSize = UDim2.new(currentCanvas.X.Scale, contentSize.X + paddingX, 2, contentSize.Y + paddingY)
+				return
+			end
+
+			local baselinePixels = minYScale * scrollFrame.AbsoluteSize.Y
+			local contentPixels = contentSize.Y + paddingY
+			local extraPixels = math.max(0, contentPixels - baselinePixels)
+			scrollFrame.CanvasSize = UDim2.new(currentCanvas.X.Scale, contentSize.X + paddingX, minYScale, extraPixels)
 		end
 
 		layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateCanvas)
@@ -1322,7 +1351,8 @@ function UISetup.CreateUI()
 	local hotbarFrame = Instance.new("Frame")
 	hotbarFrame.Name = "HotbarFrame"
 	hotbarFrame.Size = UDim2.new(0.34, 0, 0.09, 0)
-	hotbarFrame.Position = UDim2.new(0.5, 0, 0.9, 0)
+	-- Bottom padding via scale (roughly 5-10px depending on resolution)
+	hotbarFrame.Position = UDim2.new(0.5, 0, 0.99, 0)
 	hotbarFrame.AnchorPoint = Vector2.new(0.5, 1)
 	hotbarFrame.BackgroundTransparency = 1
 	hotbarFrame.ZIndex = HOTBAR_BASE_ZINDEX
@@ -1450,14 +1480,15 @@ function UISetup.CreateUI()
 	-- =============================================================================
 	local inventoryWindow = Instance.new("Frame")
 	inventoryWindow.Name = "InventoryWindow"
-	inventoryWindow.Size = UDim2.new(0.62, 0, 0.65, 0)
-	inventoryWindow.Position = UDim2.new(0.5, 0, 0.48, 0)
+	-- Match PetsWindow centered modal layout
+	inventoryWindow.Size = UDim2.new(0.7, 0, 0.75, 0)
+	inventoryWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
 	inventoryWindow.AnchorPoint = Vector2.new(0.5, 0.5)
 	inventoryWindow.BackgroundTransparency = 1
 	inventoryWindow.Visible = false
 	inventoryWindow.Parent = windowGroup
 
-	applyBoxImage(inventoryWindow, BOX_BIG_SQUARE)
+	applyPetsWindowBackground(inventoryWindow)
 	
 	-- Title bar
 	local invTitleBar = Instance.new("Frame")
@@ -1570,31 +1601,33 @@ function UISetup.CreateUI()
 	-- =============================================================================
 	local shopWindow = Instance.new("Frame")
 	shopWindow.Name = "ShopWindow"
-	shopWindow.Size = UDim2.new(1, 0, 1, 0)
-	shopWindow.Position = UDim2.new(0, 0, 0, 0)
+	-- Match PetsWindow centered modal layout
+	shopWindow.Size = UDim2.new(0.7, 0, 0.75, 0)
+	shopWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
+	shopWindow.AnchorPoint = Vector2.new(0.5, 0.5)
 	shopWindow.BackgroundTransparency = 1
 	shopWindow.Visible = false
 	shopWindow.ZIndex = 10
 	shopWindow.Parent = screenGui
 
+	applyPetsWindowBackground(shopWindow)
+
 	local shopPadding = Instance.new("UIPadding")
-	shopPadding.PaddingTop = UDim.new(0.04, 0)
-	shopPadding.PaddingBottom = UDim.new(0.04, 0)
+	shopPadding.PaddingTop = UDim.new(0, 0)
+	shopPadding.PaddingBottom = UDim.new(0, 0)
 	shopPadding.Parent = shopWindow
 	
-	-- LEFT PANEL - Store Items (30% width with 5% safe zone)
+	-- Single centered window: keep store list, remove right inventory panel
 	local shopLeftPanel = Instance.new("Frame")
 	shopLeftPanel.Name = "LeftPanel"
-	shopLeftPanel.Size = UDim2.new(0.30, 0, 1, -100)
-	shopLeftPanel.Position = UDim2.new(0.05, 0, 0, 50) -- 5% safe zone
+	shopLeftPanel.Size = UDim2.new(0.96, 0, 0.9, 0)
+	shopLeftPanel.Position = UDim2.new(0.02, 0, 0.08, 0)
 	shopLeftPanel.BackgroundTransparency = 1
 	shopLeftPanel.BorderSizePixel = 0
 	shopLeftPanel.ZIndex = 11
 	shopLeftPanel.Parent = shopWindow
 
-	local shopLeftArt = applyBoxImage(shopLeftPanel, BOX_PORTRAIT_PAGE)
-	shopLeftArt.Size = UDim2.new(1.2, 0, 1.2, 0)
-	shopLeftArt.Position = UDim2.new(0.47, 0, 0.5, 0)
+	-- No per-panel box art; window uses PetsWindow-style background.
 	
 	local shopLeftTitle = Instance.new("TextLabel")
 	shopLeftTitle.Name = "PanelTitle"
@@ -1644,23 +1677,13 @@ function UISetup.CreateUI()
 	
 	-- Add template for cloning (invisible)
 	addTemplateToScrollFrame(shopScroll, "ShopItem")
-	bindCanvasSize(shopScroll, shopLayout, shopPadding)
+	bindCanvasSize(shopScroll, shopLayout, shopPadding, 5)
 	
-	-- MIDDLE PANEL - NPC Display (30%) - INVISIBLE SPACER
-	local shopMiddlePanel = Instance.new("Frame")
-	shopMiddlePanel.Name = "MiddlePanel"
-	shopMiddlePanel.Size = UDim2.new(0.3, 0, 1, 0)
-	shopMiddlePanel.Position = UDim2.new(0.35, 0, 0, 0)
-	shopMiddlePanel.BackgroundTransparency = 1
-	shopMiddlePanel.BorderSizePixel = 0
-	shopMiddlePanel.ZIndex = 11
-	shopMiddlePanel.Parent = shopWindow
-	
-	-- Close button (top-right corner in spacing area) - DESTRUCTIVE ACTION: isolated position
+	-- Close button (top-right corner)
 	local shopCloseButton = Instance.new("TextButton")
 	shopCloseButton.Name = "CloseButton"
 	shopCloseButton.Size = UDim2.new(0, 120, 0, 40)
-	shopCloseButton.Position = UDim2.new(0.95, 0, 0.05, 0) -- Safe zone
+	shopCloseButton.Position = UDim2.new(0.98, 0, 0.02, 0)
 	shopCloseButton.AnchorPoint = Vector2.new(1, 0)
 	shopCloseButton.BackgroundColor3 = Color3.fromRGB(120, 50, 50) -- Muted red for close
 	shopCloseButton.ZIndex = 13
@@ -1682,106 +1705,38 @@ function UISetup.CreateUI()
 	shopCloseStroke.Thickness = 1
 	shopCloseStroke.Parent = shopCloseButton
 	
-	-- RIGHT PANEL - Player Inventory (30% width with 5% safe zone)
-	local shopRightPanel = Instance.new("Frame")
-	shopRightPanel.Name = "RightPanel"
-	shopRightPanel.Size = UDim2.new(0.30, 0, 1, -100)
-	shopRightPanel.Position = UDim2.new(0.65, 0, 0, 50) -- 5% safe zone from right
-	shopRightPanel.BackgroundTransparency = 1
-	shopRightPanel.BorderSizePixel = 0
-	shopRightPanel.ZIndex = 11
-	shopRightPanel.Parent = shopWindow
-
-	local shopRightArt = applyBoxImage(shopRightPanel, BOX_PORTRAIT_PAGE)
-	shopRightArt.Size = UDim2.new(1.2, 0, 1.2, 0)
-	shopRightArt.Position = UDim2.new(0.47, 0, 0.5, 0)
-	
-	local shopRightTitle = Instance.new("TextLabel")
-	shopRightTitle.Name = "PanelTitle"
-	shopRightTitle.Size = UDim2.new(0.9, 0, 0.05, 0)
-	shopRightTitle.Position = UDim2.new(0.05, 0, 0.015, 0)
-	shopRightTitle.BackgroundTransparency = 1
-	shopRightTitle.Text = "🎒 My Seeds"
-	shopRightTitle.TextColor3 = theme.textMoss
-	shopRightTitle.Font = Enum.Font.GothamBold
-	shopRightTitle.TextScaled = true
-	shopRightTitle.TextXAlignment = Enum.TextXAlignment.Left
-	shopRightTitle.ZIndex = 12
-	shopRightTitle.Parent = shopRightPanel
-	
-	local shopRightTitleStroke = Instance.new("UIStroke")
-	shopRightTitleStroke.Color = theme.forestDark
-	shopRightTitleStroke.Thickness = 2
-	shopRightTitleStroke.Parent = shopRightTitle
-	
-	-- Grid container for seeds inventory (like hotbar style)
-	local shopInventoryScroll = Instance.new("ScrollingFrame")
-	shopInventoryScroll.Name = "InventoryScroll"
-	shopInventoryScroll.Size = UDim2.new(0.94, 0, 0.88, 0)
-	shopInventoryScroll.Position = UDim2.new(0.03, 0, 0.11, 0)
-	shopInventoryScroll.BackgroundColor3 = theme.forestDark
-	shopInventoryScroll.BackgroundTransparency = 0.3
-	shopInventoryScroll.BorderSizePixel = 0
-	shopInventoryScroll.Active = true
-	shopInventoryScroll.ScrollingEnabled = true
-	shopInventoryScroll.ScrollBarThickness = 8
-	shopInventoryScroll.ScrollBarImageColor3 = theme.tealGem
-	shopInventoryScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	shopInventoryScroll.CanvasSize = UDim2.new(0, 0, 2, 0)
-	shopInventoryScroll.ZIndex = 12
-	shopInventoryScroll.Parent = shopRightPanel
-	
-	-- Use Grid Layout - Compact cell sizes for better visibility
-	local inventoryGrid = Instance.new("UIGridLayout")
-	inventoryGrid.Name = "GridLayout"
-	inventoryGrid.CellSize = UDim2.new(0, 85, 0, 85) -- Compact size
-	inventoryGrid.CellPadding = UDim2.new(0, 8, 0, 8)
-	inventoryGrid.SortOrder = Enum.SortOrder.Name
-	inventoryGrid.FillDirection = Enum.FillDirection.Horizontal
-	inventoryGrid.FillDirectionMaxCells = 0 -- Auto-fit
-	inventoryGrid.Parent = shopInventoryScroll
-	
-	local inventoryPadding = Instance.new("UIPadding")
-	inventoryPadding.PaddingTop = UDim.new(0, 8)
-	inventoryPadding.PaddingBottom = UDim.new(0, 8)
-	inventoryPadding.PaddingLeft = UDim.new(0, 4)
-	inventoryPadding.PaddingRight = UDim.new(0, 4)
-	inventoryPadding.Parent = shopInventoryScroll
-	
-	-- Add template for cloning (invisible)
-	addTemplateToScrollFrame(shopInventoryScroll, "InventoryItem")
-	bindCanvasSize(shopInventoryScroll, inventoryGrid, inventoryPadding)
-	
 	-- =============================================================================
 	-- SELL WINDOW (Modal) - 3 Column Fullscreen: Sellable | NPC | Fruits Owned
 	-- =============================================================================
 	local sellWindow = Instance.new("Frame")
 	sellWindow.Name = "SellWindow"
-	sellWindow.Size = UDim2.new(1, 0, 1, 0)
-	sellWindow.Position = UDim2.new(0, 0, 0, 0)
+	-- Match PetsWindow centered modal layout
+	sellWindow.Size = UDim2.new(0.7, 0, 0.75, 0)
+	sellWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
+	sellWindow.AnchorPoint = Vector2.new(0.5, 0.5)
 	sellWindow.BackgroundTransparency = 1
 	sellWindow.Visible = false
 	sellWindow.ZIndex = 10
 	sellWindow.Parent = screenGui
 
+	applyPetsWindowBackground(sellWindow)
+
 	local sellPadding = Instance.new("UIPadding")
-	sellPadding.PaddingTop = UDim.new(0.04, 0)
-	sellPadding.PaddingBottom = UDim.new(0.04, 0)
+	sellPadding.PaddingTop = UDim.new(0, 0)
+	sellPadding.PaddingBottom = UDim.new(0, 0)
 	sellPadding.Parent = sellWindow
 	
-	-- LEFT PANEL - Sellable Fruits (30% width with 5% safe zone)
+	-- Single centered window: keep sell list, remove right inventory panel
 	local sellLeftPanel = Instance.new("Frame")
 	sellLeftPanel.Name = "LeftPanel"
-	sellLeftPanel.Size = UDim2.new(0.30, 0, 1, -100)
-	sellLeftPanel.Position = UDim2.new(0.05, 0, 0, 50) -- 5% safe zone
+	sellLeftPanel.Size = UDim2.new(0.96, 0, 0.9, 0)
+	sellLeftPanel.Position = UDim2.new(0.02, 0, 0.08, 0)
 	sellLeftPanel.BackgroundTransparency = 1
 	sellLeftPanel.BorderSizePixel = 0
 	sellLeftPanel.ZIndex = 11
 	sellLeftPanel.Parent = sellWindow
 
-	local sellLeftArt = applyBoxImage(sellLeftPanel, BOX_PORTRAIT_PAGE)
-	sellLeftArt.Size = UDim2.new(1.2, 0, 1.2, 0)
-	sellLeftArt.Position = UDim2.new(0.47, 0, 0.5, 0)
+	-- No per-panel box art; window uses PetsWindow-style background.
 	
 	local sellLeftTitle = Instance.new("TextLabel")
 	sellLeftTitle.Name = "PanelTitle"
@@ -1833,21 +1788,11 @@ function UISetup.CreateUI()
 	addTemplateToScrollFrame(sellScroll, "SellItem")
 	bindCanvasSize(sellScroll, sellLayout, sellPadding)
 	
-	-- MIDDLE PANEL - NPC Merchant (30%) - INVISIBLE SPACER
-	local sellMiddlePanel = Instance.new("Frame")
-	sellMiddlePanel.Name = "MiddlePanel"
-	sellMiddlePanel.Size = UDim2.new(0.3, 0, 1, 0)
-	sellMiddlePanel.Position = UDim2.new(0.35, 0, 0, 0)
-	sellMiddlePanel.BackgroundTransparency = 1
-	sellMiddlePanel.BorderSizePixel = 0
-	sellMiddlePanel.ZIndex = 11
-	sellMiddlePanel.Parent = sellWindow
-	
-	-- Close button (top-right corner) - DESTRUCTIVE ACTION: isolated
+	-- Close button (top-right corner)
 	local sellCloseButton = Instance.new("TextButton")
 	sellCloseButton.Name = "CloseButton"
 	sellCloseButton.Size = UDim2.new(0, 120, 0, 40)
-	sellCloseButton.Position = UDim2.new(0.95, 0, 0.05, 0) -- Safe zone
+	sellCloseButton.Position = UDim2.new(0.98, 0, 0.02, 0)
 	sellCloseButton.AnchorPoint = Vector2.new(1, 0)
 	sellCloseButton.BackgroundColor3 = Color3.fromRGB(120, 50, 50) -- Muted red
 	sellCloseButton.ZIndex = 13
@@ -1869,76 +1814,6 @@ function UISetup.CreateUI()
 	sellCloseStroke.Thickness = 1
 	sellCloseStroke.Parent = sellCloseButton
 	
-	-- RIGHT PANEL - Player's Fruits (30% width with 5% safe zone)
-	local sellRightPanel = Instance.new("Frame")
-	sellRightPanel.Name = "RightPanel"
-	sellRightPanel.Size = UDim2.new(0.30, 0, 1, -100)
-	sellRightPanel.Position = UDim2.new(0.65, 0, 0, 50) -- 5% safe zone from right
-	sellRightPanel.BackgroundTransparency = 1
-	sellRightPanel.BorderSizePixel = 0
-	sellRightPanel.ZIndex = 11
-	sellRightPanel.Parent = sellWindow
-
-	local sellRightArt = applyBoxImage(sellRightPanel, BOX_PORTRAIT_PAGE)
-	sellRightArt.Size = UDim2.new(1.2, 0, 1.2, 0)
-	sellRightArt.Position = UDim2.new(0.47, 0, 0.5, 0)
-	
-	local sellRightTitle = Instance.new("TextLabel")
-	sellRightTitle.Name = "PanelTitle"
-	sellRightTitle.Size = UDim2.new(0.9, 0, 0.05, 0)
-	sellRightTitle.Position = UDim2.new(0.05, 0, 0.015, 0)
-	sellRightTitle.BackgroundTransparency = 1
-	sellRightTitle.Text = "🍎 My Fruits"
-	sellRightTitle.TextColor3 = theme.textMoss
-	sellRightTitle.Font = Enum.Font.GothamBold
-	sellRightTitle.TextScaled = true
-	sellRightTitle.TextXAlignment = Enum.TextXAlignment.Left
-	sellRightTitle.ZIndex = 12
-	sellRightTitle.Parent = sellRightPanel
-	
-	local sellRightTitleStroke = Instance.new("UIStroke")
-	sellRightTitleStroke.Color = theme.forestDark
-	sellRightTitleStroke.Thickness = 2
-	sellRightTitleStroke.Parent = sellRightTitle
-	
-	-- Fruit inventory display with grid layout
-	local sellInventoryScroll = Instance.new("ScrollingFrame")
-	sellInventoryScroll.Name = "InventoryScroll"
-	sellInventoryScroll.Size = UDim2.new(0.94, 0, 0.88, 0)
-	sellInventoryScroll.Position = UDim2.new(0.03, 0, 0.11, 0)
-	sellInventoryScroll.BackgroundColor3 = theme.forestDark
-	sellInventoryScroll.BackgroundTransparency = 0.3
-	sellInventoryScroll.BorderSizePixel = 0
-	sellInventoryScroll.Active = true
-	sellInventoryScroll.ScrollingEnabled = true
-	sellInventoryScroll.ScrollBarThickness = 8
-	sellInventoryScroll.ScrollBarImageColor3 = theme.goldLeaf
-	sellInventoryScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	sellInventoryScroll.CanvasSize = UDim2.new(0, 0, 2, 0)
-	sellInventoryScroll.ZIndex = 12
-	sellInventoryScroll.Parent = sellRightPanel
-	
-	-- Use Grid Layout for fruits - Compact size
-	local sellInventoryGrid = Instance.new("UIGridLayout")
-	sellInventoryGrid.Name = "GridLayout"
-	sellInventoryGrid.CellSize = UDim2.new(0, 85, 0, 85) -- Compact size
-	sellInventoryGrid.CellPadding = UDim2.new(0, 8, 0, 8)
-	sellInventoryGrid.SortOrder = Enum.SortOrder.Name
-	sellInventoryGrid.FillDirection = Enum.FillDirection.Horizontal
-	sellInventoryGrid.FillDirectionMaxCells = 0 -- Auto-fit
-	sellInventoryGrid.Parent = sellInventoryScroll
-	
-	local sellInventoryPadding = Instance.new("UIPadding")
-	sellInventoryPadding.PaddingTop = UDim.new(0, 8)
-	sellInventoryPadding.PaddingBottom = UDim.new(0, 8)
-	sellInventoryPadding.PaddingLeft = UDim.new(0, 4)
-	sellInventoryPadding.PaddingRight = UDim.new(0, 4)
-	sellInventoryPadding.Parent = sellInventoryScroll
-	
-	-- Add template for cloning (invisible)
-	addTemplateToScrollFrame(sellInventoryScroll, "InventoryItem")
-	bindCanvasSize(sellInventoryScroll, sellInventoryGrid, sellInventoryPadding)
-	
 	-- =============================================================================
 	-- PETS WINDOW (Modal) - 2 Column Layout: Available Pets | Equipped Pet
 	-- =============================================================================
@@ -1952,17 +1827,7 @@ function UISetup.CreateUI()
 	petsWindow.ZIndex = 10
 	petsWindow.Parent = screenGui
 
-	-- Custom box art for PetsWindow
-	local petsWindowBg = Instance.new("ImageLabel")
-	petsWindowBg.Name = "Background"
-	petsWindowBg.Image = "rbxassetid://127057870020428"
-	petsWindowBg.Size = UDim2.new(2, 0, 1.6, 0)
-	petsWindowBg.Position = UDim2.new(0.49, 0, 0.5, 30)
-	petsWindowBg.AnchorPoint = Vector2.new(0.5, 0.5)
-	petsWindowBg.ScaleType = Enum.ScaleType.Stretch
-	petsWindowBg.BackgroundTransparency = 1
-	petsWindowBg.ZIndex = 0
-	petsWindowBg.Parent = petsWindow
+	applyPetsWindowBackground(petsWindow)
 	
 	-- Pets title bar - simple themed style, no custom image
 	local petsTitleBar = Instance.new("Frame")
@@ -2124,31 +1989,33 @@ function UISetup.CreateUI()
 	-- =============================================================================
 	local petShopWindow = Instance.new("Frame")
 	petShopWindow.Name = "PetShopWindow"
-	petShopWindow.Size = UDim2.new(1, 0, 1, 0)
-	petShopWindow.Position = UDim2.new(0, 0, 0, 0)
+	-- Match PetsWindow centered modal layout
+	petShopWindow.Size = UDim2.new(0.7, 0, 0.75, 0)
+	petShopWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
+	petShopWindow.AnchorPoint = Vector2.new(0.5, 0.5)
 	petShopWindow.BackgroundTransparency = 1
 	petShopWindow.Visible = false
 	petShopWindow.ZIndex = 10
 	petShopWindow.Parent = screenGui
 
+	applyPetsWindowBackground(petShopWindow)
+
 	local petShopPadding = Instance.new("UIPadding")
-	petShopPadding.PaddingTop = UDim.new(0.04, 0)
-	petShopPadding.PaddingBottom = UDim.new(0.04, 0)
+	petShopPadding.PaddingTop = UDim.new(0, 0)
+	petShopPadding.PaddingBottom = UDim.new(0, 0)
 	petShopPadding.Parent = petShopWindow
 	
-	-- LEFT PANEL - Egg Shop (30% width with 5% safe zone)
+	-- 2-panel centered layout (like PetsWindow)
 	local shopLeftPanel = Instance.new("Frame")
 	shopLeftPanel.Name = "LeftPanel"
-	shopLeftPanel.Size = UDim2.new(0.30, 0, 1, -100)
-	shopLeftPanel.Position = UDim2.new(0.05, 0, 0, 50) -- 5% safe zone
+	shopLeftPanel.Size = UDim2.new(0.48, 0, 0.88, 0)
+	shopLeftPanel.Position = UDim2.new(0.01, 0, 0.1, 0)
 	shopLeftPanel.BackgroundTransparency = 1
 	shopLeftPanel.BorderSizePixel = 0
 	shopLeftPanel.ZIndex = 11
 	shopLeftPanel.Parent = petShopWindow
 
-	local petShopLeftArt = applyBoxImage(shopLeftPanel, BOX_PORTRAIT_PAGE)
-	petShopLeftArt.Size = UDim2.new(1.2, 0, 1.2, 0)
-	petShopLeftArt.Position = UDim2.new(0.47, 0, 0.5, 0)
+	-- No per-panel box art; window uses PetsWindow-style background.
 	
 	local shopLeftTitle = Instance.new("TextLabel")
 	shopLeftTitle.Name = "PanelTitle"
@@ -2200,21 +2067,11 @@ function UISetup.CreateUI()
 	addTemplateToScrollFrame(eggShopScroll, "EggItem")
 	bindCanvasSize(eggShopScroll, eggShopLayout, eggShopPadding)
 	
-	-- MIDDLE PANEL - NPC Display (30%) - INVISIBLE SPACER
-	local shopMiddlePanel = Instance.new("Frame")
-	shopMiddlePanel.Name = "MiddlePanel"
-	shopMiddlePanel.Size = UDim2.new(0.3, 0, 1, 0)
-	shopMiddlePanel.Position = UDim2.new(0.35, 0, 0, 0)
-	shopMiddlePanel.BackgroundTransparency = 1
-	shopMiddlePanel.BorderSizePixel = 0
-	shopMiddlePanel.ZIndex = 11
-	shopMiddlePanel.Parent = petShopWindow
-	
-	-- Close button (top-right corner) - DESTRUCTIVE ACTION: isolated
+	-- Close button (top-right corner)
 	local petShopCloseButton = Instance.new("TextButton")
 	petShopCloseButton.Name = "CloseButton"
 	petShopCloseButton.Size = UDim2.new(0, 120, 0, 40)
-	petShopCloseButton.Position = UDim2.new(0.95, 0, 0.05, 0) -- Safe zone
+	petShopCloseButton.Position = UDim2.new(0.98, 0, 0.02, 0)
 	petShopCloseButton.AnchorPoint = Vector2.new(1, 0)
 	petShopCloseButton.BackgroundColor3 = Color3.fromRGB(120, 50, 50) -- Muted red
 	petShopCloseButton.ZIndex = 13
@@ -2236,19 +2093,17 @@ function UISetup.CreateUI()
 	petShopCloseStroke.Thickness = 1
 	petShopCloseStroke.Parent = petShopCloseButton
 	
-	-- RIGHT PANEL - Player's Pets Preview (30% width with 5% safe zone)
+	-- RIGHT PANEL - Player's Pets Preview
 	local shopRightPanel = Instance.new("Frame")
 	shopRightPanel.Name = "RightPanel"
-	shopRightPanel.Size = UDim2.new(0.30, 0, 1, -100)
-	shopRightPanel.Position = UDim2.new(0.65, 0, 0, 50) -- 5% safe zone from right
+	shopRightPanel.Size = UDim2.new(0.48, 0, 0.88, 0)
+	shopRightPanel.Position = UDim2.new(0.51, 0, 0.1, 0)
 	shopRightPanel.BackgroundTransparency = 1
 	shopRightPanel.BorderSizePixel = 0
 	shopRightPanel.ZIndex = 11
 	shopRightPanel.Parent = petShopWindow
 
-	local petShopRightArt = applyBoxImage(shopRightPanel, BOX_PORTRAIT_PAGE)
-	petShopRightArt.Size = UDim2.new(1.2, 0, 1.2, 0)
-	petShopRightArt.Position = UDim2.new(0.47, 0, 0.5, 0)
+	-- No per-panel box art; window uses PetsWindow-style background.
 	
 	local shopRightTitle = Instance.new("TextLabel")
 	shopRightTitle.Name = "PanelTitle"
@@ -2305,10 +2160,10 @@ function UISetup.CreateUI()
 	bindCanvasSize(petPreviewScroll, petPreviewGrid, petPreviewPadding)
 	
 	-- Build trading UI in a separate scope to reduce local count
-	UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, addStroke, addButtonFeedback, ensureMinTouchSize, applyBoxImage, applyFrameImage, BOX_BIG_SQUARE, FRAME_IMAGE_PANEL_SQUARE, FRAME_SLICE_SQUARE, BOX_TEXT_RECT_2)
+	UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, addStroke, addButtonFeedback, ensureMinTouchSize, applyPetsWindowBackground, applyFrameImage, FRAME_IMAGE_PANEL_SQUARE, FRAME_SLICE_SQUARE, BOX_TEXT_RECT_2)
 
 	-- Build gear shop UI in a separate scope
-	UIBuilders.CreateGearShopUI(screenGui, theme, addCorner, addStroke, addButtonFeedback, ensureMinTouchSize, applyBoxImage, BOX_PORTRAIT_PAGE, addTemplateToScrollFrame)
+	UIBuilders.CreateGearShopUI(screenGui, theme, addCorner, addStroke, addButtonFeedback, ensureMinTouchSize, applyPetsWindowBackground, addTemplateToScrollFrame)
 
 	-- Final grouping pass to keep root tidy
 	local hudNames = {
@@ -2357,28 +2212,29 @@ end
 -- =============================================================================
 -- TRADING UI BUILDER (Separate function to avoid local variable limit)
 -- =============================================================================
-function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, addStroke, addButtonFeedback, ensureMinTouchSize, applyBoxImage, applyFrameImage, BOX_BIG_SQUARE, FRAME_IMAGE_PANEL_SQUARE, FRAME_SLICE_SQUARE, BOX_TEXT_RECT_2)
+function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, addStroke, addButtonFeedback, ensureMinTouchSize, applyPetsWindowBackground, applyFrameImage, FRAME_IMAGE_PANEL_SQUARE, FRAME_SLICE_SQUARE, BOX_TEXT_RECT_2)
 	-- TRADING WINDOW - Player to Player Trading
 	local tradingWindow = Instance.new("Frame")
 	tradingWindow.Name = "TradingWindow"
-	tradingWindow.Size = UDim2.new(1, 0, 1, 0)
-	tradingWindow.Position = UDim2.new(0, 0, 0, 0)
-	tradingWindow.BackgroundTransparency = 0.3
+	tradingWindow.Size = UDim2.new(0.7, 0, 0.75, 0)
+	tradingWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
+	tradingWindow.AnchorPoint = Vector2.new(0.5, 0.5)
+	tradingWindow.BackgroundTransparency = 1
 	tradingWindow.Visible = false
-	tradingWindow.ZIndex = 100
+	tradingWindow.ZIndex = 10
 	tradingWindow.Parent = screenGui
+
+	applyPetsWindowBackground(tradingWindow)
 	
 	-- Main trade panel (centered)
 	local tradePanel = Instance.new("Frame")
 	tradePanel.Name = "TradePanel"
-	tradePanel.Size = UDim2.new(0.8, 0, 0.75, 0)
-	tradePanel.Position = UDim2.new(0.5, 0, 0.5, 0)
-	tradePanel.AnchorPoint = Vector2.new(0.5, 0.5)
+	tradePanel.Size = UDim2.new(0.96, 0, 0.9, 0)
+	tradePanel.Position = UDim2.new(0.02, 0, 0.08, 0)
+	tradePanel.AnchorPoint = Vector2.new(0, 0)
 	tradePanel.BackgroundTransparency = 1
-	tradePanel.ZIndex = 101
+	tradePanel.ZIndex = 11
 	tradePanel.Parent = tradingWindow
-
-	applyBoxImage(tradePanel, BOX_BIG_SQUARE)
 	
 	-- Trade title
 	local tradeTitle = Instance.new("TextLabel")
@@ -2390,7 +2246,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	tradeTitle.TextColor3 = theme.goldLeaf
 	tradeTitle.Font = Enum.Font.GothamBold
 	tradeTitle.TextScaled = true
-	tradeTitle.ZIndex = 102
+	tradeTitle.ZIndex = 12
 	tradeTitle.Parent = tradePanel
 	
 	local tradeTitleStroke = Instance.new("UIStroke")
@@ -2408,7 +2264,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	partnerLabel.TextColor3 = theme.textLight
 	partnerLabel.Font = Enum.Font.Gotham
 	partnerLabel.TextScaled = true
-	partnerLabel.ZIndex = 102
+	partnerLabel.ZIndex = 12
 	partnerLabel.Parent = tradePanel
 	
 	-- Your offer panel (left side)
@@ -2418,7 +2274,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	yourOfferPanel.Position = UDim2.new(0.025, 0, 0.14, 0)
 	yourOfferPanel.BackgroundColor3 = theme.forestDeep
 	yourOfferPanel.BorderSizePixel = 0
-	yourOfferPanel.ZIndex = 102
+	yourOfferPanel.ZIndex = 12
 	yourOfferPanel.Parent = tradePanel
 	
 	local yourOfferCorner = Instance.new("UICorner")
@@ -2434,7 +2290,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	yourOfferTitle.TextColor3 = theme.mossGreen
 	yourOfferTitle.Font = Enum.Font.GothamBold
 	yourOfferTitle.TextScaled = true
-	yourOfferTitle.ZIndex = 103
+	yourOfferTitle.ZIndex = 13
 	yourOfferTitle.Parent = yourOfferPanel
 	
 	-- Your offer items scroll
@@ -2448,7 +2304,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	yourOfferScroll.ScrollBarImageColor3 = theme.tealGem
 	yourOfferScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	yourOfferScroll.CanvasSize = UDim2.new(0, 0, 2, 0)
-	yourOfferScroll.ZIndex = 103
+	yourOfferScroll.ZIndex = 13
 	yourOfferScroll.Parent = yourOfferPanel
 	
 	local yourOfferGrid = Instance.new("UIGridLayout")
@@ -2465,7 +2321,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	yourCoinsFrame.Position = UDim2.new(0.03, 0, 0.77, 0)
 	yourCoinsFrame.BackgroundColor3 = theme.forestDark
 	yourCoinsFrame.BorderSizePixel = 0
-	yourCoinsFrame.ZIndex = 103
+	yourCoinsFrame.ZIndex = 13
 	yourCoinsFrame.Parent = yourOfferPanel
 	
 	local yourCoinsCorner = Instance.new("UICorner")
@@ -2481,7 +2337,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	yourCoinsLabel.TextColor3 = theme.goldLeaf
 	yourCoinsLabel.Font = Enum.Font.GothamBold
 	yourCoinsLabel.TextScaled = true
-	yourCoinsLabel.ZIndex = 104
+	yourCoinsLabel.ZIndex = 14
 	yourCoinsLabel.Parent = yourCoinsFrame
 	
 	local yourCoinsInput = Instance.new("TextBox")
@@ -2495,7 +2351,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	yourCoinsInput.Font = Enum.Font.GothamBold
 	yourCoinsInput.TextScaled = true
 	yourCoinsInput.ClearTextOnFocus = false
-	yourCoinsInput.ZIndex = 104
+	yourCoinsInput.ZIndex = 14
 	yourCoinsInput.Parent = yourCoinsFrame
 	
 	local yourCoinsInputCorner = Instance.new("UICorner")
@@ -2512,7 +2368,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	yourConfirmedLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
 	yourConfirmedLabel.Font = Enum.Font.GothamBold
 	yourConfirmedLabel.TextScaled = true
-	yourConfirmedLabel.ZIndex = 103
+	yourConfirmedLabel.ZIndex = 13
 	yourConfirmedLabel.Parent = yourOfferPanel
 	
 	-- Their offer panel (right side)
@@ -2522,7 +2378,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	theirOfferPanel.Position = UDim2.new(0.525, 0, 0.14, 0)
 	theirOfferPanel.BackgroundColor3 = theme.forestDeep
 	theirOfferPanel.BorderSizePixel = 0
-	theirOfferPanel.ZIndex = 102
+	theirOfferPanel.ZIndex = 12
 	theirOfferPanel.Parent = tradePanel
 	
 	local theirOfferCorner = Instance.new("UICorner")
@@ -2538,7 +2394,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	theirOfferTitle.TextColor3 = theme.amberGlow
 	theirOfferTitle.Font = Enum.Font.GothamBold
 	theirOfferTitle.TextScaled = true
-	theirOfferTitle.ZIndex = 103
+	theirOfferTitle.ZIndex = 13
 	theirOfferTitle.Parent = theirOfferPanel
 	
 	-- Their offer items scroll
@@ -2552,7 +2408,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	theirOfferScroll.ScrollBarImageColor3 = theme.tealGem
 	theirOfferScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	theirOfferScroll.CanvasSize = UDim2.new(0, 0, 2, 0)
-	theirOfferScroll.ZIndex = 103
+	theirOfferScroll.ZIndex = 13
 	theirOfferScroll.Parent = theirOfferPanel
 	
 	local theirOfferGrid = Instance.new("UIGridLayout")
@@ -2572,7 +2428,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	theirCoinsLabel.TextColor3 = theme.goldLeaf
 	theirCoinsLabel.Font = Enum.Font.GothamBold
 	theirCoinsLabel.TextScaled = true
-	theirCoinsLabel.ZIndex = 103
+	theirCoinsLabel.ZIndex = 13
 	theirCoinsLabel.Parent = theirOfferPanel
 	
 	-- Confirmed indicator for their side
@@ -2585,7 +2441,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	theirConfirmedLabel.TextColor3 = Color3.fromRGB(255, 100, 100)
 	theirConfirmedLabel.Font = Enum.Font.GothamBold
 	theirConfirmedLabel.TextScaled = true
-	theirConfirmedLabel.ZIndex = 103
+	theirConfirmedLabel.ZIndex = 13
 	theirConfirmedLabel.Parent = theirOfferPanel
 	
 	-- Your inventory panel (bottom left)
@@ -2595,7 +2451,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	yourInventoryPanel.Position = UDim2.new(0.025, 0, 0.76, 0)
 	yourInventoryPanel.BackgroundColor3 = theme.forestDark
 	yourInventoryPanel.BorderSizePixel = 0
-	yourInventoryPanel.ZIndex = 102
+	yourInventoryPanel.ZIndex = 12
 	yourInventoryPanel.Parent = tradePanel
 	
 	local yourInvCorner = Instance.new("UICorner")
@@ -2611,7 +2467,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	yourInvTitle.TextColor3 = theme.textMoss
 	yourInvTitle.Font = Enum.Font.Gotham
 	yourInvTitle.TextScaled = true
-	yourInvTitle.ZIndex = 103
+	yourInvTitle.ZIndex = 13
 	yourInvTitle.Parent = yourInventoryPanel
 	
 	local yourInvScroll = Instance.new("ScrollingFrame")
@@ -2624,7 +2480,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	yourInvScroll.ScrollBarImageColor3 = theme.tealGem
 	yourInvScroll.AutomaticCanvasSize = Enum.AutomaticSize.X
 	yourInvScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-	yourInvScroll.ZIndex = 103
+	yourInvScroll.ZIndex = 13
 	yourInvScroll.Parent = yourInventoryPanel
 	
 	local yourInvLayout = Instance.new("UIListLayout")
@@ -2640,7 +2496,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	actionButtonsPanel.Position = UDim2.new(0.525, 0, 0.76, 0)
 	actionButtonsPanel.BackgroundTransparency = 1
 	actionButtonsPanel.BorderSizePixel = 0
-	actionButtonsPanel.ZIndex = 102
+	actionButtonsPanel.ZIndex = 12
 	actionButtonsPanel.Parent = tradePanel
 	
 	-- Confirm button (PRIMARY ACTION - largest/brightest)
@@ -2653,7 +2509,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	confirmButton.TextColor3 = theme.textLight
 	confirmButton.Font = Enum.Font.GothamBold
 	confirmButton.TextScaled = true
-	confirmButton.ZIndex = 103
+	confirmButton.ZIndex = 13
 	confirmButton.Parent = actionButtonsPanel
 	
 	local confirmButtonCorner = Instance.new("UICorner")
@@ -2678,7 +2534,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	cancelButton.TextColor3 = theme.textLight
 	cancelButton.Font = Enum.Font.GothamBold
 	cancelButton.TextScaled = true
-	cancelButton.ZIndex = 103
+	cancelButton.ZIndex = 13
 	cancelButton.Parent = actionButtonsPanel
 	
 	local cancelButtonCorner = Instance.new("UICorner")
@@ -2698,7 +2554,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	tradeStatusLabel.TextColor3 = theme.textMoss
 	tradeStatusLabel.Font = Enum.Font.Gotham
 	tradeStatusLabel.TextScaled = true
-	tradeStatusLabel.ZIndex = 103
+	tradeStatusLabel.ZIndex = 13
 	tradeStatusLabel.Parent = actionButtonsPanel
 	
 	-- =============================================================================
@@ -2709,11 +2565,13 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	tradeRequestPopup.Size = UDim2.new(0.35, 0, 0.18, 0)
 	tradeRequestPopup.Position = UDim2.new(0.5, 0, 0.35, 0)
 	tradeRequestPopup.AnchorPoint = Vector2.new(0.5, 0.5)
-	tradeRequestPopup.BackgroundColor3 = theme.forestDark
+	tradeRequestPopup.BackgroundTransparency = 1
 	tradeRequestPopup.BorderSizePixel = 0
 	tradeRequestPopup.Visible = false
-	tradeRequestPopup.ZIndex = 200
+	tradeRequestPopup.ZIndex = 10
 	tradeRequestPopup.Parent = screenGui
+
+	applyPetsWindowBackground(tradeRequestPopup)
 	
 	local tradePopupCorner = Instance.new("UICorner")
 	tradePopupCorner.CornerRadius = UDim.new(0, 16)
@@ -2733,7 +2591,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	tradePopupTitle.TextColor3 = theme.goldLeaf
 	tradePopupTitle.Font = Enum.Font.GothamBold
 	tradePopupTitle.TextScaled = true
-	tradePopupTitle.ZIndex = 201
+	tradePopupTitle.ZIndex = 12
 	tradePopupTitle.Parent = tradeRequestPopup
 	
 	local tradePopupMessage = Instance.new("TextLabel")
@@ -2745,7 +2603,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	tradePopupMessage.TextColor3 = theme.textLight
 	tradePopupMessage.Font = Enum.Font.Gotham
 	tradePopupMessage.TextScaled = true
-	tradePopupMessage.ZIndex = 201
+	tradePopupMessage.ZIndex = 12
 	tradePopupMessage.Parent = tradeRequestPopup
 	
 	-- Accept button (PRIMARY ACTION)
@@ -2758,7 +2616,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	acceptTradeButton.TextColor3 = theme.textLight
 	acceptTradeButton.Font = Enum.Font.GothamBold
 	acceptTradeButton.TextScaled = true
-	acceptTradeButton.ZIndex = 201
+	acceptTradeButton.ZIndex = 12
 	acceptTradeButton.Parent = tradeRequestPopup
 	
 	local acceptTradeCorner = Instance.new("UICorner")
@@ -2778,7 +2636,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 	declineTradeButton.TextColor3 = theme.textLight
 	declineTradeButton.Font = Enum.Font.GothamBold
 	declineTradeButton.TextScaled = true
-	declineTradeButton.ZIndex = 201
+	declineTradeButton.ZIndex = 12
 	declineTradeButton.Parent = tradeRequestPopup
 	
 	local declineTradeCorner = Instance.new("UICorner")
@@ -2805,11 +2663,13 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 		psWindow.Size = UDim2.new(0.3, 0, 0.5, 0)
 		psWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
 		psWindow.AnchorPoint = Vector2.new(0.5, 0.5)
-		psWindow.BackgroundColor3 = theme.forestDark
+		psWindow.BackgroundTransparency = 1
 		psWindow.BorderSizePixel = 0
 		psWindow.Visible = false
-		psWindow.ZIndex = 150
+		psWindow.ZIndex = 10
 		psWindow.Parent = screenGui
+
+		applyPetsWindowBackground(psWindow)
 		
 		addCorner(psWindow, 16)
 		addStroke(psWindow, theme.tealGem, 3, 0)
@@ -2823,7 +2683,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 		psTitle.TextColor3 = theme.goldLeaf
 		psTitle.Font = Enum.Font.GothamBold
 		psTitle.TextScaled = true
-		psTitle.ZIndex = 151
+		psTitle.ZIndex = 12
 		psTitle.Parent = psWindow
 		
 		local psScroll = Instance.new("ScrollingFrame")
@@ -2836,7 +2696,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 		psScroll.ScrollBarImageColor3 = theme.tealGem
 		psScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
 		psScroll.CanvasSize = UDim2.new(0, 0, 2, 0)
-		psScroll.ZIndex = 151
+		psScroll.ZIndex = 12
 		psScroll.Parent = psWindow
 		
 		local psLayout = Instance.new("UIListLayout")
@@ -2853,7 +2713,7 @@ function UIBuilders.CreateTradingUI(screenGui, shopWindow, theme, addCorner, add
 		psClose.TextColor3 = theme.textLight
 		psClose.Font = Enum.Font.GothamBold
 		psClose.TextScaled = true
-		psClose.ZIndex = 151
+		psClose.ZIndex = 12
 		psClose.Parent = psWindow
 		
 		addCorner(psClose, 8)
@@ -2972,34 +2832,36 @@ end
 -- =============================================================================
 -- GEAR SHOP UI BUILDER (Tools and Equipment)
 -- =============================================================================
-function UIBuilders.CreateGearShopUI(screenGui, theme, addCorner, addStroke, addButtonFeedback, ensureMinTouchSize, applyBoxImage, BOX_PORTRAIT_PAGE, addTemplateToScrollFrame)
+function UIBuilders.CreateGearShopUI(screenGui, theme, addCorner, addStroke, addButtonFeedback, ensureMinTouchSize, applyPetsWindowBackground, addTemplateToScrollFrame)
 	local gearShopWindow = Instance.new("Frame")
 	gearShopWindow.Name = "GearShopWindow"
-	gearShopWindow.Size = UDim2.new(1, 0, 1, 0)
-	gearShopWindow.Position = UDim2.new(0, 0, 0, 0)
+	-- Match PetsWindow centered modal layout
+	gearShopWindow.Size = UDim2.new(0.7, 0, 0.75, 0)
+	gearShopWindow.Position = UDim2.new(0.5, 0, 0.5, 0)
+	gearShopWindow.AnchorPoint = Vector2.new(0.5, 0.5)
 	gearShopWindow.BackgroundTransparency = 1
 	gearShopWindow.Visible = false
 	gearShopWindow.ZIndex = 10
 	gearShopWindow.Parent = screenGui
 
+	applyPetsWindowBackground(gearShopWindow)
+
 	local gearShopPadding = Instance.new("UIPadding")
-	gearShopPadding.PaddingTop = UDim.new(0.04, 0)
-	gearShopPadding.PaddingBottom = UDim.new(0.04, 0)
+	gearShopPadding.PaddingTop = UDim.new(0, 0)
+	gearShopPadding.PaddingBottom = UDim.new(0, 0)
 	gearShopPadding.Parent = gearShopWindow
 	
-	-- LEFT PANEL - Gear Shop (30% width with 5% safe zone)
+	-- 2-panel centered layout (like PetsWindow)
 	local gearLeftPanel = Instance.new("Frame")
 	gearLeftPanel.Name = "LeftPanel"
-	gearLeftPanel.Size = UDim2.new(0.30, 0, 1, -100)
-	gearLeftPanel.Position = UDim2.new(0.05, 0, 0, 50)
+	gearLeftPanel.Size = UDim2.new(0.48, 0, 0.88, 0)
+	gearLeftPanel.Position = UDim2.new(0.01, 0, 0.1, 0)
 	gearLeftPanel.BackgroundTransparency = 1
 	gearLeftPanel.BorderSizePixel = 0
 	gearLeftPanel.ZIndex = 11
 	gearLeftPanel.Parent = gearShopWindow
 
-	local gearLeftArt = applyBoxImage(gearLeftPanel, BOX_PORTRAIT_PAGE)
-	gearLeftArt.Size = UDim2.new(1.2, 0, 1.2, 0)
-	gearLeftArt.Position = UDim2.new(0.47, 0, 0.5, 0)
+	-- No per-panel box art; window uses PetsWindow-style background.
 	
 	local gearLeftTitle = Instance.new("TextLabel")
 	gearLeftTitle.Name = "PanelTitle"
@@ -3050,21 +2912,11 @@ function UIBuilders.CreateGearShopUI(screenGui, theme, addCorner, addStroke, add
 	-- Add template for cloning
 	addTemplateToScrollFrame(gearShopScroll, "GearItem")
 	
-	-- MIDDLE PANEL - NPC Display (30%) - INVISIBLE SPACER
-	local gearMiddlePanel = Instance.new("Frame")
-	gearMiddlePanel.Name = "MiddlePanel"
-	gearMiddlePanel.Size = UDim2.new(0.3, 0, 1, 0)
-	gearMiddlePanel.Position = UDim2.new(0.35, 0, 0, 0)
-	gearMiddlePanel.BackgroundTransparency = 1
-	gearMiddlePanel.BorderSizePixel = 0
-	gearMiddlePanel.ZIndex = 11
-	gearMiddlePanel.Parent = gearShopWindow
-	
 	-- Close button (top-right corner)
 	local gearCloseButton = Instance.new("TextButton")
 	gearCloseButton.Name = "CloseButton"
 	gearCloseButton.Size = UDim2.new(0, 120, 0, 40)
-	gearCloseButton.Position = UDim2.new(0.95, 0, 0.05, 0)
+	gearCloseButton.Position = UDim2.new(0.98, 0, 0.02, 0)
 	gearCloseButton.AnchorPoint = Vector2.new(1, 0)
 	gearCloseButton.BackgroundColor3 = Color3.fromRGB(120, 50, 50)
 	gearCloseButton.ZIndex = 13
@@ -3085,19 +2937,17 @@ function UIBuilders.CreateGearShopUI(screenGui, theme, addCorner, addStroke, add
 	gearCloseStroke.Thickness = 1
 	gearCloseStroke.Parent = gearCloseButton
 	
-	-- RIGHT PANEL - Player's Owned Gear (30% width with 5% safe zone)
+	-- RIGHT PANEL - Player's Owned Gear
 	local gearRightPanel = Instance.new("Frame")
 	gearRightPanel.Name = "RightPanel"
-	gearRightPanel.Size = UDim2.new(0.30, 0, 1, -100)
-	gearRightPanel.Position = UDim2.new(0.65, 0, 0, 50)
+	gearRightPanel.Size = UDim2.new(0.48, 0, 0.88, 0)
+	gearRightPanel.Position = UDim2.new(0.51, 0, 0.1, 0)
 	gearRightPanel.BackgroundTransparency = 1
 	gearRightPanel.BorderSizePixel = 0
 	gearRightPanel.ZIndex = 11
 	gearRightPanel.Parent = gearShopWindow
 
-	local gearRightArt = applyBoxImage(gearRightPanel, BOX_PORTRAIT_PAGE)
-	gearRightArt.Size = UDim2.new(1.2, 0, 1.2, 0)
-	gearRightArt.Position = UDim2.new(0.47, 0, 0.5, 0)
+	-- No per-panel box art; window uses PetsWindow-style background.
 	
 	local gearRightTitle = Instance.new("TextLabel")
 	gearRightTitle.Name = "PanelTitle"

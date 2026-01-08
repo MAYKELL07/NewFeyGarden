@@ -40,12 +40,63 @@ pcall(function()
 end)
 
 local UIHandler = {}
-local playerInventory = {Seeds = {}, Pets = {}, Fruits = {}}
+local playerInventory = {Seeds = {}, Pets = {}, Fruits = {}, Eggs = {}}
 local fruitCountCache: {[string]: number} = {}
 local playerCoins = 0
 local currentWeather = Constants.WEATHER_TYPES.SUNNY
 local screenGui = nil
 local uiRoot: Instance? = nil
+
+local PETS_BACKGROUND_ASSET = "rbxassetid://127057870020428"
+
+local function bringWindowToFront(window: Instance?)
+	if not window then
+		return
+	end
+	local parent = window.Parent
+	if not parent then
+		return
+	end
+	window.Parent = nil
+	window.Parent = parent
+end
+
+local function ensurePetsWindowBackground(window: Instance?)
+	if not window or not window:IsA("GuiObject") then
+		return
+	end
+
+	local gui = window :: GuiObject
+
+	for _, descendant in gui:GetDescendants() do
+		if descendant:IsA("ImageLabel") and descendant.Name == "BoxArt" then
+			descendant:Destroy()
+		end
+	end
+
+	local bg = gui:FindFirstChild("Background")
+	if bg and bg:IsA("ImageLabel") then
+		bg.Image = PETS_BACKGROUND_ASSET
+		bg.Size = UDim2.new(2, 0, 1.6, 0)
+		bg.Position = UDim2.new(0.49, 0, 0.5, 30)
+		bg.AnchorPoint = Vector2.new(0.5, 0.5)
+		bg.ScaleType = Enum.ScaleType.Stretch
+		bg.BackgroundTransparency = 1
+		bg.ZIndex = math.max(0, gui.ZIndex - 1)
+		return
+	end
+
+	local newBg = Instance.new("ImageLabel")
+	newBg.Name = "Background"
+	newBg.Image = PETS_BACKGROUND_ASSET
+	newBg.Size = UDim2.new(2, 0, 1.6, 0)
+	newBg.Position = UDim2.new(0.49, 0, 0.5, 30)
+	newBg.AnchorPoint = Vector2.new(0.5, 0.5)
+	newBg.ScaleType = Enum.ScaleType.Stretch
+	newBg.BackgroundTransparency = 1
+	newBg.ZIndex = math.max(0, gui.ZIndex - 1)
+	newBg.Parent = gui
+end
 
 -- Ready state for LoadingScreen synchronization
 UIHandler.IsReady = false
@@ -267,6 +318,8 @@ local function getItemIcon(itemName, itemType)
 	-- Default icons based on type
 	if itemType == "Fruit" then
 		return "🍎"
+	elseif itemType == "Egg" then
+		return "🥚"
 	elseif itemType == "Seed" then
 		return "🌱"
 	end
@@ -508,6 +561,17 @@ local function updateFullInventory()
 			end
 		end
 	end
+
+	-- Add eggs
+	if currentInventoryFilter == "All" or currentInventoryFilter == "Eggs" then
+		if playerInventory.Eggs then
+			for eggType, count in pairs(playerInventory.Eggs) do
+				if count > 0 then
+					createInventoryItem(eggType, count, "Egg", gridContainer)
+				end
+			end
+		end
+	end
 end
 
 local function filterInventory(filterType)
@@ -672,6 +736,8 @@ local function updateInventoryDisplay(inventory)
 	for slot, data in pairs(hotbarData) do
 		if data.type == "Seed" and inventory.Seeds then
 			data.count = inventory.Seeds[data.name] or 0
+		elseif data.type == "Egg" and inventory.Eggs then
+			data.count = inventory.Eggs[data.name] or 0
 		elseif data.type == "Fruit" then
 			data.count = fruitCountCache[data.name] or 0
 		end
@@ -844,7 +910,7 @@ local function createShopItem(itemName, itemType, config, container, stock)
 				stockLabel.Text = soldOut and "SOLD OUT" or ("Stock: " .. stock)
 				stockLabel.TextColor3 = soldOut and Color3.fromRGB(255, 100, 100) or THEME.TextMoss
 			else
-				stockLabel.Text = itemType == "seed" and ("Grows in " .. (config.GrowthTime or "?") .. "s") or ""
+				stockLabel.Text = itemType == "seed" and ("Grows in " .. Constants.GetGrowthRangeTextForPlant(itemName)) or ""
 			end
 		end
 	end
@@ -2557,6 +2623,74 @@ function UIHandler.Initialize()
 	local petsWindow = windowGroup and windowGroup:WaitForChild("PetsWindow", 5)
 	local inventoryWindow = windowGroup and windowGroup:WaitForChild("InventoryWindow", 5)
 	local petShopWindow = windowGroup and windowGroup:WaitForChild("PetShopWindow", 5)
+	local gearShopWindow = windowGroup and windowGroup:WaitForChild("GearShopWindow", 5)
+	local tradingWindow = windowGroup and windowGroup:FindFirstChild("TradingWindow")
+	local tradeRequestPopup = windowGroup and windowGroup:FindFirstChild("TradeRequestPopup")
+	local playerSelectWindow = windowGroup and windowGroup:FindFirstChild("PlayerSelectWindow")
+
+	ensurePetsWindowBackground(shopWindow)
+	ensurePetsWindowBackground(sellWindow)
+	ensurePetsWindowBackground(petsWindow)
+	ensurePetsWindowBackground(inventoryWindow)
+	ensurePetsWindowBackground(petShopWindow)
+	ensurePetsWindowBackground(gearShopWindow)
+	ensurePetsWindowBackground(tradingWindow)
+	ensurePetsWindowBackground(tradeRequestPopup)
+	ensurePetsWindowBackground(playerSelectWindow)
+
+	-- =============================================================================
+	-- WINDOW GROUP LAYOUT NORMALIZATION
+	-- Center primary windows like PetsWindow, and remove/hide right inventory panels.
+	-- =============================================================================
+	local function applyCenteredLikePets(target: Instance?)
+		if not target then return end
+		if not petsWindow then return end
+		if not target:IsA("GuiObject") then return end
+		if not petsWindow:IsA("GuiObject") then return end
+		local petsGui = petsWindow :: GuiObject
+		local guiTarget = target :: GuiObject
+		guiTarget.AnchorPoint = petsGui.AnchorPoint
+		guiTarget.Position = petsGui.Position
+		guiTarget.Size = petsGui.Size
+
+		-- Neutralize any old fullscreen padding on this window.
+		for _, child in guiTarget:GetChildren() do
+			if child:IsA("UIPadding") then
+				child.PaddingTop = UDim.new(0, 0)
+				child.PaddingBottom = UDim.new(0, 0)
+				child.PaddingLeft = UDim.new(0, 0)
+				child.PaddingRight = UDim.new(0, 0)
+			end
+		end
+	end
+
+	applyCenteredLikePets(shopWindow)
+	applyCenteredLikePets(sellWindow)
+	applyCenteredLikePets(inventoryWindow)
+	applyCenteredLikePets(petShopWindow)
+	applyCenteredLikePets(gearShopWindow)
+
+	local function collapseToSinglePanel(window: Instance?)
+		if not window or not window:IsA("GuiObject") then return end
+		local middlePanel = window:FindFirstChild("MiddlePanel")
+		if middlePanel then
+			middlePanel.Visible = false
+		end
+
+		local rightPanel = window:FindFirstChild("RightPanel")
+		if rightPanel then
+			rightPanel.Visible = false
+		end
+
+		local leftPanel = window:FindFirstChild("LeftPanel")
+		if leftPanel and leftPanel:IsA("GuiObject") then
+			leftPanel.Size = UDim2.new(0.96, 0, 0.9, 0)
+			leftPanel.Position = UDim2.new(0.02, 0, 0.08, 0)
+		end
+	end
+
+	collapseToSinglePanel(shopWindow)
+	collapseToSinglePanel(sellWindow)
 	
 	-- =============================================================================
 	-- NAVIGATION BUTTONS (Top Center)
@@ -2805,6 +2939,7 @@ function UIHandler.Initialize()
 		if tabContainer then
 			local seedsTab = tabContainer:FindFirstChild("SeedsTab")
 			local fruitsTab = tabContainer:FindFirstChild("FruitsTab")
+			local eggsTab = tabContainer:FindFirstChild("EggsTab")
 			local allTab = tabContainer:FindFirstChild("AllTab")
 			
 			if seedsTab then
@@ -2815,6 +2950,11 @@ function UIHandler.Initialize()
 			if fruitsTab then
 				fruitsTab.MouseButton1Click:Connect(function()
 					filterInventory("Fruits")
+				end)
+			end
+			if eggsTab then
+				eggsTab.MouseButton1Click:Connect(function()
+					filterInventory("Eggs")
 				end)
 			end
 			if allTab then
@@ -3169,6 +3309,8 @@ function UIHandler.Initialize()
 		theirConfirmed = false
 		
 		if tradingWindow then
+			ensurePetsWindowBackground(tradingWindow)
+			bringWindowToFront(tradingWindow)
 			updateTradeDisplay()
 			tradingWindow.Visible = true
 			hideHUD()
@@ -3191,6 +3333,8 @@ function UIHandler.Initialize()
 	if tradeButton then
 		tradeButton.MouseButton1Click:Connect(function()
 			if playerSelectWindow then
+				ensurePetsWindowBackground(playerSelectWindow)
+				bringWindowToFront(playerSelectWindow)
 				populatePlayerList()
 				playerSelectWindow.Visible = true
 				hideHUD()
@@ -3296,6 +3440,8 @@ function UIHandler.Initialize()
 					messageLabel.Text = data.requesterName .. " wants to trade with you!"
 				end
 				
+				ensurePetsWindowBackground(tradeRequestPopup)
+				bringWindowToFront(tradeRequestPopup)
 				tradeRequestPopup.Visible = true
 				playSound("WindowOpen")
 			end
@@ -3417,6 +3563,11 @@ function UIHandler.Initialize()
 	-- =============================================================================
 	local hotbarFrame = hudGroup and hudGroup:FindFirstChild("HotbarFrame") or (hudGroup and hudGroup:WaitForChild("HotbarFrame", 5))
 	if hotbarFrame then
+		-- Bottom padding via scale (roughly 5-10px depending on resolution)
+		if hotbarFrame:IsA("GuiObject") then
+			hotbarFrame.AnchorPoint = Vector2.new(0.5, 1)
+			hotbarFrame.Position = UDim2.new(0.5, 0, 0.99, 0)
+		end
 		local slotsContainer = hotbarFrame:FindFirstChild("Slots") or hotbarFrame
 		for i = 1, 6 do
 			local slot = slotsContainer:FindFirstChild("Slot" .. i)
@@ -3477,6 +3628,8 @@ function UIHandler.Initialize()
 		if input.KeyCode == Enum.KeyCode.B and inventoryWindow then
 			inventoryWindow.Visible = not inventoryWindow.Visible
 			if inventoryWindow.Visible then
+				ensurePetsWindowBackground(inventoryWindow)
+				bringWindowToFront(inventoryWindow)
 				updateFullInventory()
 				hideHUD()
 				playSound("WindowOpen")
@@ -3539,7 +3692,7 @@ end
 function UIHandler.GetSelectedPlantType()
 	-- Get the item in the currently selected hotbar slot
 	local slotData = hotbarData[selectedSlot]
-	if slotData and slotData.type == "Seed" and slotData.count > 0 then
+	if slotData and (slotData.type == "Seed" or slotData.type == "Egg") and slotData.count > 0 then
 		return slotData.name
 	end
 	return nil
@@ -3550,6 +3703,8 @@ function UIHandler.OpenShopWindow()
 	if not screenGui then return end
 	local shopWindow = windowGroup and windowGroup:FindFirstChild("ShopWindow")
 	if shopWindow then
+		ensurePetsWindowBackground(shopWindow)
+		bringWindowToFront(shopWindow)
 		NPCUIHandler.MoveCameraToNPC("ShopCamera")
 		populateShop() -- Populate shop items (left panel)
 		updateShopInventoryGrid() -- Update player inventory (right panel)
@@ -3563,6 +3718,8 @@ function UIHandler.OpenSellWindow()
 	if not screenGui then return end
 	local sellWindow = windowGroup and windowGroup:FindFirstChild("SellWindow")
 	if sellWindow then
+		ensurePetsWindowBackground(sellWindow)
+		bringWindowToFront(sellWindow)
 		NPCUIHandler.MoveCameraToNPC("SellCamera")
 		updateSellShop() -- Populate sell shop items (left panel)
 		updateSellInventoryGrid() -- Update player inventory (right panel)
@@ -3576,6 +3733,8 @@ function UIHandler.OpenPetShopWindow()
 	if not screenGui then return end
 	local petShopWindow = windowGroup and windowGroup:FindFirstChild("PetShopWindow")
 	if petShopWindow then
+		ensurePetsWindowBackground(petShopWindow)
+		bringWindowToFront(petShopWindow)
 		NPCUIHandler.MoveCameraToNPC("PetCamera")
 		petShopWindow.Visible = true
 		updatePetShopWindow()
@@ -3588,6 +3747,8 @@ function UIHandler.OpenGearShopWindow()
 	if not screenGui then return end
 	local gearShopWindow = windowGroup and windowGroup:FindFirstChild("GearShopWindow")
 	if gearShopWindow then
+		ensurePetsWindowBackground(gearShopWindow)
+		bringWindowToFront(gearShopWindow)
 		NPCUIHandler.MoveCameraToNPC("GearCamera")
 		gearShopWindow.Visible = true
 		updateGearShopWindow()
@@ -3600,6 +3761,8 @@ function UIHandler.OpenPetsWindow()
 	if not screenGui then return end
 	local petsWindow = windowGroup and windowGroup:FindFirstChild("PetsWindow")
 	if petsWindow then
+		ensurePetsWindowBackground(petsWindow)
+		bringWindowToFront(petsWindow)
 		petsWindow.Visible = true
 		updatePetsWindow()
 		hideHUD()

@@ -359,6 +359,12 @@ function PlantModule.GrowPlant(plantModel)
 	local config = Constants.PLANT_CONFIG[plantType]
 	
 	if not config then return end
+
+	local baseStageTime = plantModel:GetAttribute("BaseStageTime")
+	if type(baseStageTime) ~= "number" then
+		baseStageTime = Constants.GetDefaultBaseStageGrowthSecondsForPlant(plantType)
+		plantModel:SetAttribute("BaseStageTime", baseStageTime)
+	end
 	
 	local stages = {
 		Constants.GROWTH_STAGES.SEED,
@@ -372,7 +378,7 @@ function PlantModule.GrowPlant(plantModel)
 			local buffMultiplier = BuffsModule.GetGrowthMultiplier(plantModel)
 			
 			-- Calculate growth time with buffs
-			local growthTime = config.GrowthTime * buffMultiplier
+			local growthTime = math.max(baseStageTime * buffMultiplier, 0.1)
 			
 			-- Update stage and track timing for countdown display
 			plantModel:SetAttribute("Stage", stage)

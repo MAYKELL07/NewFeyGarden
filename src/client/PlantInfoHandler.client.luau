@@ -46,7 +46,8 @@ local function createInfoUI()
 	-- Create info frame
 	infoFrame = Instance.new("Frame")
 	infoFrame.Name = "InfoFrame"
-	infoFrame.Size = UDim2.new(0, 200, 0, 110)  -- Slightly larger to fit fruit info
+	infoFrame.Size = UDim2.fromOffset(300, 0)
+	infoFrame.AutomaticSize = Enum.AutomaticSize.Y
 	infoFrame.Position = UDim2.new(0, 0, 0, 0)
 	infoFrame.AnchorPoint = Vector2.new(0, 0)
 	infoFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
@@ -54,6 +55,11 @@ local function createInfoUI()
 	infoFrame.BorderSizePixel = 0
 	infoFrame.Visible = false
 	infoFrame.Parent = infoGui
+
+	local sizeConstraint = Instance.new("UISizeConstraint")
+	sizeConstraint.MinSize = Vector2.new(260, 0)
+	sizeConstraint.MaxSize = Vector2.new(420, 1000)
+	sizeConstraint.Parent = infoFrame
 	
 	-- Corner rounding
 	local corner = Instance.new("UICorner")
@@ -68,8 +74,8 @@ local function createInfoUI()
 	
 	-- Padding
 	local padding = Instance.new("UIPadding")
-	padding.PaddingTop = UDim.new(0, 8)
-	padding.PaddingBottom = UDim.new(0, 8)
+	padding.PaddingTop = UDim.new(0, 10)
+	padding.PaddingBottom = UDim.new(0, 10)
 	padding.PaddingLeft = UDim.new(0, 10)
 	padding.PaddingRight = UDim.new(0, 10)
 	padding.Parent = infoFrame
@@ -77,16 +83,18 @@ local function createInfoUI()
 	-- Layout
 	local layout = Instance.new("UIListLayout")
 	layout.SortOrder = Enum.SortOrder.LayoutOrder
-	layout.Padding = UDim.new(0, 4)
+	layout.Padding = UDim.new(0, 6)
 	layout.Parent = infoFrame
 	
 	-- Plant name label
 	plantNameLabel = Instance.new("TextLabel")
 	plantNameLabel.Name = "PlantName"
-	plantNameLabel.Size = UDim2.new(1, 0, 0, 22)
+	plantNameLabel.Size = UDim2.new(1, 0, 0, 0)
+	plantNameLabel.AutomaticSize = Enum.AutomaticSize.Y
+	plantNameLabel.TextWrapped = true
 	plantNameLabel.BackgroundTransparency = 1
 	plantNameLabel.Font = Enum.Font.GothamBold
-	plantNameLabel.TextSize = 16
+	plantNameLabel.TextSize = 18
 	plantNameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 	plantNameLabel.TextXAlignment = Enum.TextXAlignment.Center
 	plantNameLabel.LayoutOrder = 1
@@ -95,10 +103,12 @@ local function createInfoUI()
 	-- Stage label
 	stageLabel = Instance.new("TextLabel")
 	stageLabel.Name = "Stage"
-	stageLabel.Size = UDim2.new(1, 0, 0, 18)
+	stageLabel.Size = UDim2.new(1, 0, 0, 0)
+	stageLabel.AutomaticSize = Enum.AutomaticSize.Y
+	stageLabel.TextWrapped = true
 	stageLabel.BackgroundTransparency = 1
 	stageLabel.Font = Enum.Font.Gotham
-	stageLabel.TextSize = 14
+	stageLabel.TextSize = 15
 	stageLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
 	stageLabel.TextXAlignment = Enum.TextXAlignment.Center
 	stageLabel.LayoutOrder = 2
@@ -107,10 +117,12 @@ local function createInfoUI()
 	-- Countdown label (for growth stages)
 	countdownLabel = Instance.new("TextLabel")
 	countdownLabel.Name = "Countdown"
-	countdownLabel.Size = UDim2.new(1, 0, 0, 18)
+	countdownLabel.Size = UDim2.new(1, 0, 0, 0)
+	countdownLabel.AutomaticSize = Enum.AutomaticSize.Y
+	countdownLabel.TextWrapped = true
 	countdownLabel.BackgroundTransparency = 1
 	countdownLabel.Font = Enum.Font.Gotham
-	countdownLabel.TextSize = 14
+	countdownLabel.TextSize = 15
 	countdownLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
 	countdownLabel.TextXAlignment = Enum.TextXAlignment.Center
 	countdownLabel.LayoutOrder = 3
@@ -119,10 +131,12 @@ local function createInfoUI()
 	-- Fruit countdown label (for bloom stage fruit reveals)
 	fruitCountdownLabel = Instance.new("TextLabel")
 	fruitCountdownLabel.Name = "FruitCountdown"
-	fruitCountdownLabel.Size = UDim2.new(1, 0, 0, 18)
+	fruitCountdownLabel.Size = UDim2.new(1, 0, 0, 0)
+	fruitCountdownLabel.AutomaticSize = Enum.AutomaticSize.Y
+	fruitCountdownLabel.TextWrapped = true
 	fruitCountdownLabel.BackgroundTransparency = 1
 	fruitCountdownLabel.Font = Enum.Font.Gotham
-	fruitCountdownLabel.TextSize = 14
+	fruitCountdownLabel.TextSize = 15
 	fruitCountdownLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
 	fruitCountdownLabel.TextXAlignment = Enum.TextXAlignment.Center
 	fruitCountdownLabel.LayoutOrder = 4
@@ -132,10 +146,12 @@ local function createInfoUI()
 	-- Boost label
 	boostLabel = Instance.new("TextLabel")
 	boostLabel.Name = "BoostLabel"
-	boostLabel.Size = UDim2.new(1, 0, 0, 18)
+	boostLabel.Size = UDim2.new(1, 0, 0, 0)
+	boostLabel.AutomaticSize = Enum.AutomaticSize.Y
+	boostLabel.TextWrapped = true
 	boostLabel.BackgroundTransparency = 1
 	boostLabel.Font = Enum.Font.Gotham
-	boostLabel.TextSize = 13
+	boostLabel.TextSize = 14
 	boostLabel.TextColor3 = Color3.fromRGB(120, 210, 255)
 	boostLabel.TextXAlignment = Enum.TextXAlignment.Center
 	boostLabel.LayoutOrder = 5
@@ -208,12 +224,10 @@ local function calculateTimeToNextStage(plantModel)
 	
 	-- Fallback to plant time calculation
 	local plantTime = plantModel:GetAttribute("PlantTime") or os.time()
-	local config = Constants.PLANT_CONFIG[plantType]
-	if not config then
-		return 0, "Unknown"
+	local growthTime = plantModel:GetAttribute("BaseStageTime")
+	if type(growthTime) ~= "number" then
+		growthTime = Constants.GetDefaultBaseStageGrowthSecondsForPlant(plantType)
 	end
-	
-	local growthTime = config.GrowthTime or 60
 	local elapsed = os.time() - plantTime
 	
 	if stage == Constants.GROWTH_STAGES.SEED then
@@ -309,27 +323,31 @@ local function showPlantInfo(plantModel, mousePosition: Vector2)
 	if stageDisplay == Constants.GROWTH_STAGES.BLOOM then
 		local fruitsRevealed = plantModel:GetAttribute("FruitsRevealed") or 0
 		local totalFruits = plantModel:GetAttribute("FruitCount") or 0
-		local fruitsRemaining = plantModel:GetAttribute("FruitsRemaining") or 0
 		local harvestRemovesPlant = plantModel:GetAttribute("HarvestRemovesPlant")
 		local nextRevealTime = plantModel:GetAttribute("NextFruitRevealTime") or 0
-		
-		if harvestRemovesPlant or totalFruits <= 1 then
-			countdownLabel.Text = "🍎 Single fruit: Ready"
-			countdownLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-			fruitCountdownLabel.Text = "Harvest removes plant"
-			fruitCountdownLabel.Visible = true
+
+		countdownLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
+		if totalFruits <= 0 then
+			countdownLabel.Text = "🍎 Fruits: 0/0"
+			fruitCountdownLabel.Visible = false
 		else
-			countdownLabel.Text = string.format("🍎 Fruits ready: %d/%d (left %d)", fruitsRevealed, totalFruits, fruitsRemaining)
-			countdownLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-			if nextRevealTime > 0 and fruitsRevealed < totalFruits then
-				local timeToNextFruit = math.max(0, nextRevealTime - os.time())
+			-- Simple progress indicator only (no "left")
+			countdownLabel.Text = string.format("🍎 Fruits: %d/%d", fruitsRevealed, totalFruits)
+
+			-- Keep showing countdown until all fruit is revealed
+			if fruitsRevealed < totalFruits then
+				local timeToNextFruit = 0
+				if nextRevealTime > 0 then
+					timeToNextFruit = math.max(0, nextRevealTime - os.time())
+				end
 				fruitCountdownLabel.Text = "⏱ Next fruit: " .. formatTime(timeToNextFruit)
 				fruitCountdownLabel.Visible = true
-			elseif fruitsRemaining > 0 then
-				fruitCountdownLabel.Text = "✨ All fruits ready"
-				fruitCountdownLabel.Visible = true
 			else
-				fruitCountdownLabel.Text = "🔄 Regrowing..."
+				if harvestRemovesPlant then
+					fruitCountdownLabel.Text = "✨ All fruit grown • Harvest removes plant"
+				else
+					fruitCountdownLabel.Text = "✨ All fruit grown"
+				end
 				fruitCountdownLabel.Visible = true
 			end
 		end
@@ -339,28 +357,28 @@ local function showPlantInfo(plantModel, mousePosition: Vector2)
 		fruitCountdownLabel.Visible = false
 	end
 
-	-- Boost info with detailed breakdown
+	-- Boost info with compact "badge row" style
 	local mult = buffStatus.TotalMultiplier or 1
-	local boostParts = {}
+	local boostBadges = {}
 	
-	-- Weather info
-	local weatherText = buffStatus.Weather or "Sunny"
+	-- Weather badge (always)
+	local weatherText = "☀️ " .. (buffStatus.Weather or "Sunny")
 	if buffStatus.WeatherMult and buffStatus.WeatherMult ~= 1.0 then
 		weatherText = weatherText .. string.format(" x%.1f", buffStatus.WeatherMult)
 	end
-	table.insert(boostParts, weatherText)
+	table.insert(boostBadges, weatherText)
 	
-	-- Watered buff
+	-- Watered badge
 	if buffStatus.Watered then
-		table.insert(boostParts, "💧Watered")
+		table.insert(boostBadges, "💧 Watered")
 	end
 	
-	-- Pet buff
+	-- Pet badge
 	if buffStatus.PetBoost then
-		table.insert(boostParts, "🐾Pet")
+		table.insert(boostBadges, "🐾 Pet")
 	end
-	
-	boostLabel.Text = string.format("⚡ x%.2f (%s)", mult, table.concat(boostParts, " "))
+
+	boostLabel.Text = string.format("⚡ x%.2f\n%s", mult, table.concat(boostBadges, "  "))
 	boostLabel.Visible = true
 	
 	updateInfoPosition(mousePosition)
@@ -515,44 +533,8 @@ local function onUpdate()
 			if plant ~= currentHoveredPlant then
 				showPlantInfo(plant, mousePosition)
 			else
-				-- Update position and countdown
-				updateInfoPosition(mousePosition)
-				
-				-- Update countdown timer - get stage with fallback
-				local stage = plant:GetAttribute("Stage")
-				if not stage or stage == "" then
-					local harvestable = plant:GetAttribute("Harvestable")
-					stage = harvestable and Constants.GROWTH_STAGES.BLOOM or Constants.GROWTH_STAGES.SEED
-				end
-				
-				if stage == Constants.GROWTH_STAGES.BLOOM then
-					-- Update fruit countdown during bloom
-					local fruitsRevealed = plant:GetAttribute("FruitsRevealed") or 0
-					local totalFruits = plant:GetAttribute("FruitCount") or 0
-					local fruitsRemaining = plant:GetAttribute("FruitsRemaining") or 0
-					local harvestRemovesPlant = plant:GetAttribute("HarvestRemovesPlant")
-					
-					if not harvestRemovesPlant then
-						countdownLabel.Text = string.format("🍎 Fruits: %d/%d ready", fruitsRevealed, totalFruits)
-						
-						local nextRevealTime = plant:GetAttribute("NextFruitRevealTime") or 0
-						if nextRevealTime > 0 and fruitsRevealed < totalFruits then
-							local timeToNextFruit = math.max(0, nextRevealTime - os.time())
-							fruitCountdownLabel.Text = "⏱ Next fruit: " .. formatTime(timeToNextFruit)
-							fruitCountdownLabel.Visible = true
-						elseif fruitsRemaining > 0 then
-							fruitCountdownLabel.Text = "✨ All fruits ready!"
-							fruitCountdownLabel.Visible = true
-						else
-							fruitCountdownLabel.Text = "🔄 Regrowing..."
-							fruitCountdownLabel.Visible = true
-						end
-					end
-				else
-					local timeRemaining, nextStageText = calculateTimeToNextStage(plant)
-					countdownLabel.Text = "⏱ " .. formatTime(timeRemaining) .. " " .. nextStageText
-					fruitCountdownLabel.Visible = false
-				end
+				-- Fully refresh tooltip while hovered (realtime countdowns + buffs)
+				showPlantInfo(plant, mousePosition)
 			end
 		else
 			hidePlantInfo()

@@ -77,6 +77,56 @@ ClientState.TradeOffer = {
 ClientState.ActiveWindow = nil -- "Shop", "Inventory", "Pets", "Sell", "Trading", etc.
 
 -- =============================================================================
+-- INTERNAL REMOTE HOOKS
+-- =============================================================================
+
+local weatherConnection: RBXScriptConnection? = nil
+
+local function tryConnectWeatherChanged()
+	if weatherConnection then
+		return
+	end
+
+	local function findWeatherEvent(): RemoteEvent?
+		local direct = ReplicatedStorage:FindFirstChild(Constants.EVENTS.WEATHER_CHANGED)
+		if direct and direct:IsA("RemoteEvent") then
+			return direct
+		end
+
+		local eventsFolder = ReplicatedStorage:FindFirstChild("Events")
+		if eventsFolder then
+			local nested = eventsFolder:FindFirstChild(Constants.EVENTS.WEATHER_CHANGED)
+			if nested and nested:IsA("RemoteEvent") then
+				return nested
+			end
+		end
+
+		return nil
+	end
+
+	local weatherEvent = findWeatherEvent()
+	if not weatherEvent then
+		-- The server may not have created it yet; wait briefly.
+		weatherEvent = ReplicatedStorage:WaitForChild(Constants.EVENTS.WEATHER_CHANGED, 15) :: RemoteEvent?
+		if not (weatherEvent and weatherEvent:IsA("RemoteEvent")) then
+			local eventsFolder = ReplicatedStorage:FindFirstChild("Events")
+			if eventsFolder then
+				local nested = eventsFolder:WaitForChild(Constants.EVENTS.WEATHER_CHANGED, 5) :: RemoteEvent?
+				if nested and nested:IsA("RemoteEvent") then
+					weatherEvent = nested
+				end
+			end
+		end
+	end
+
+	if weatherEvent and weatherEvent:IsA("RemoteEvent") then
+		weatherConnection = weatherEvent.OnClientEvent:Connect(function(weather: string)
+			ClientState.SetWeather(weather)
+		end)
+	end
+end
+
+-- =============================================================================
 -- CALLBACKS (UI components can subscribe to state changes)
 -- =============================================================================
 
@@ -225,5 +275,7 @@ end
 function ClientState.HasEnoughCoins(amount: number): boolean
 	return ClientState.Coins >= amount
 end
+
+task.defer(tryConnectWeatherChanged)
 
 return ClientState

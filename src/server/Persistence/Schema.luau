@@ -19,8 +19,8 @@ function Schema.Default()
 		},
 		EquippedPets = {}, -- Array of pet instance IDs (up to 3)
 		GardenPets = {}, -- Array of pet instance IDs (up to 7)
-		PlantSlots = {}, -- {[slotIndex] = {Id, Type, Stage, PlantTime, WateredUntil, PetBoost, Size, Weight}}
-		FreePlants = {}, -- {[plantId] = {Id, Type, Stage, PlantTime, Position, WateredUntil, PetBoost, Size, Weight}}
+		PlantSlots = {}, -- {[slotIndex] = {Id, Type, Stage, PlantTime, BaseStageTime, WateredUntil, PetBoost, Size, Weight}}
+		FreePlants = {}, -- {[plantId] = {Id, Type, Stage, PlantTime, BaseStageTime, Position, WateredUntil, PetBoost, Size, Weight}}
 		SessionLock = nil, -- Session lock for preventing conflicts
 		SessionLockTime = 0,
 		LastSaved = os.time(),

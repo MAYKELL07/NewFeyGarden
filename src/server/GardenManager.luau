@@ -26,6 +26,7 @@ local Constants = safeRequire("Constants")
 local Config = safeRequire("Config")
 local PlantModule = safeRequire("PlantModule")
 local BuffsModule = safeRequire("BuffsModule")
+local EggModule = safeRequire("EggModule")
 if not (Constants and Config and PlantModule and BuffsModule) then
 	return {}
 end
@@ -509,13 +510,14 @@ local function setupGrowAllPrompt(gardenFolder: Folder)
 end
 
 -- Calculate the correct stage and remaining time based on PlantTime (supports offline growth)
-local function calculateOfflineGrowth(plantType: string, plantTime: number)
+
+local function calculateOfflineGrowth(plantType: string, plantTime: number, baseStageTime: number?)
 	local config = Constants.PLANT_CONFIG[plantType]
 	if not config then
-		return Constants.GROWTH_STAGES.SEED, 0, config and config.GrowthTime or 60
+		return Constants.GROWTH_STAGES.SEED, 0, baseStageTime or 60
 	end
-	
-	local growthTime = config.GrowthTime or 60
+
+	local growthTime = baseStageTime or config.GrowthTime or 60
 	local elapsed = os.time() - plantTime
 	
 	-- Stage timeline: SEED (0 to growthTime) -> SPROUT (growthTime to 2*growthTime) -> BLOOM (after 2*growthTime)
@@ -539,13 +541,19 @@ local function continueGrowthFromStage(plantModel: Model, savedStage: string?, s
 	if not config then
 		return
 	end
+
+	local baseStageTime = plantModel:GetAttribute("BaseStageTime")
+	if type(baseStageTime) ~= "number" then
+		baseStageTime = Constants.GetDefaultBaseStageGrowthSecondsForPlant(plantType)
+		plantModel:SetAttribute("BaseStageTime", baseStageTime)
+	end
 	
 	-- Use saved PlantTime for offline growth calculation, or current time if not available
 	local plantTime = savedPlantTime or plantModel:GetAttribute("PlantTime") or os.time()
 	plantModel:SetAttribute("PlantTime", plantTime)
 	
 	-- Calculate correct stage based on elapsed time (offline growth)
-	local calculatedStage, remainingTime, stageGrowthTime = calculateOfflineGrowth(plantType, plantTime)
+	local calculatedStage, remainingTime, stageGrowthTime = calculateOfflineGrowth(plantType, plantTime, baseStageTime)
 	
 	-- Set the calculated stage
 	plantModel:SetAttribute("Stage", calculatedStage)
@@ -588,7 +596,7 @@ local function continueGrowthFromStage(plantModel: Model, savedStage: string?, s
 			
 			-- Apply buffs for future stages
 			local multiplier = BuffsModule.GetGrowthMultiplier(plantModel)
-			local waitTime = math.max(config.GrowthTime * multiplier, 0.1)
+			local waitTime = math.max(baseStageTime * multiplier, 0.1)
 
 			plantModel:SetAttribute("Stage", nextStage)
 			plantModel:SetAttribute("Harvestable", nextStage == Constants.GROWTH_STAGES.BLOOM)
@@ -627,9 +635,9 @@ local function savePlantSlots(userId: number, gardenFolder: Folder)
 	-- First, clear existing free plants data to avoid duplicates
 	DataService.ClearAllFreePlants(userId)
 	
-	-- Find and save all plants
+	-- Find and save all plants (and planted eggs)
 	for _, child in ipairs(parentFolder:GetChildren()) do
-		if child:IsA("Model") and child:GetAttribute("PlantType") then
+		if child:IsA("Model") and (child:GetAttribute("PlantType") or child:GetAttribute("EggType") or child:GetAttribute("Kind") == "Egg") then
 			local plantId = child:GetAttribute("PlantId")
 			if not plantId then
 				plantId = game:GetService("HttpService"):GenerateGUID(false)
@@ -640,17 +648,30 @@ local function savePlantSlots(userId: number, gardenFolder: Folder)
 				or child:FindFirstChild("Base") and child.Base.Position
 				or Vector3.new(0, 0, 0)
 			
-			DataService.AddFreePlant(userId, {
-				Id = plantId,
-				Type = child:GetAttribute("PlantType"),
-				Stage = child:GetAttribute("Stage") or Constants.GROWTH_STAGES.SEED,
-				PlantTime = child:GetAttribute("PlantTime") or os.time(),
-				Position = {X = position.X, Y = position.Y, Z = position.Z},
-				WateredUntil = child:GetAttribute("WateredUntil") or 0,
-				PetBoost = child:GetAttribute("PetBoost") or false,
-				Size = child:GetAttribute("Size") or 1,
-				Weight = child:GetAttribute("Weight") or 1,
-			})
+			local eggType = child:GetAttribute("EggType")
+			if type(eggType) == "string" then
+				DataService.AddFreePlant(userId, {
+					Id = plantId,
+					Kind = "Egg",
+					Type = eggType,
+					PlantTime = child:GetAttribute("PlantTime") or os.time(),
+					HatchAt = child:GetAttribute("HatchAt") or 0,
+					Position = {X = position.X, Y = position.Y, Z = position.Z},
+				})
+			else
+				DataService.AddFreePlant(userId, {
+					Id = plantId,
+					Type = child:GetAttribute("PlantType"),
+					Stage = child:GetAttribute("Stage") or Constants.GROWTH_STAGES.SEED,
+					PlantTime = child:GetAttribute("PlantTime") or os.time(),
+					BaseStageTime = child:GetAttribute("BaseStageTime"),
+					Position = {X = position.X, Y = position.Y, Z = position.Z},
+					WateredUntil = child:GetAttribute("WateredUntil") or 0,
+					PetBoost = child:GetAttribute("PetBoost") or false,
+					Size = child:GetAttribute("Size") or 1,
+					Weight = child:GetAttribute("Weight") or 1,
+				})
+			end
 			savedCount = savedCount + 1
 		end
 	end
@@ -666,7 +687,7 @@ local function restorePlantSlots(userId: number, gardenFolder: Folder)
 	local parentFolder = plotsFolder or gardenFolder
 	
 	for _, child in ipairs(parentFolder:GetChildren()) do
-		if child:IsA("Model") and child:GetAttribute("PlantType") then
+		if child:IsA("Model") and (child:GetAttribute("PlantType") or child:GetAttribute("EggType") or child:GetAttribute("Kind") == "Egg") then
 			child:Destroy()
 		end
 	end
@@ -682,6 +703,38 @@ local function restorePlantSlots(userId: number, gardenFolder: Folder)
 	
 	if freePlantCount > 0 then
 		-- print(string.format("[RestorePlants] Restoring %d free-form plants", freePlantCount))
+
+		local function hatchEggAndCleanup(ownerUserId: number, eggType: string, freePlantId: string, eggModel: Model?)
+			local rolledPetType = nil
+			local rolledRarity = nil
+			rolledPetType, rolledRarity = EconomyService.RollPetFromEggType(eggType)
+			if not rolledPetType then
+				warn("[GardenManager] No pet rolled for eggType:", eggType)
+				return
+			end
+
+			local sizeWeight = Constants.GenerateRandomSizeWeight("Pet")
+			local petInstance = DataService.AddPetInstance(ownerUserId, rolledPetType, sizeWeight.Size, sizeWeight.Weight)
+			if not petInstance then
+				warn("[GardenManager] Failed to add pet instance for hatched egg")
+				return
+			end
+
+			DataService.RemoveFreePlant(ownerUserId, freePlantId)
+			local cacheForUser = GardenManager.ActivePlants[ownerUserId]
+			if cacheForUser then
+				cacheForUser[freePlantId] = nil
+			end
+
+			if eggModel and eggModel.Parent then
+				eggModel:Destroy()
+			end
+
+			local ownerPlayer = Players:GetPlayerByUserId(ownerUserId)
+			if ownerPlayer then
+				EconomyService.SyncPlayerData(ownerPlayer)
+			end
+		end
 		
 		for plantId, state in pairs(freePlants) do
 			if type(state) == "table" and type(state.Type) == "string" and state.Position then
@@ -690,26 +743,67 @@ local function restorePlantSlots(userId: number, gardenFolder: Folder)
 					state.Position.Y or 0,
 					state.Position.Z or 0
 				)
-				
-				local savedSize = state.Size or 1
-				local plantModel = PlantModule.CreatePlantModel(state.Type, position, savedSize)
-				
-				if plantModel then
-					plantModel:SetAttribute("PlantId", plantId)
-					plantModel:SetAttribute("OwnerUserId", userId)
-					plantModel:SetAttribute("Owner", userId)
-					plantModel:SetAttribute("WateredUntil", state.WateredUntil or 0)
-					plantModel:SetAttribute("PetBoost", state.PetBoost or false)
-					plantModel:SetAttribute("Size", state.Size or 1)
-					plantModel:SetAttribute("Weight", state.Weight or 1)
-					plantModel:SetAttribute("PlantTime", state.PlantTime or os.time())
-					plantModel:SetAttribute("FreePlanted", true)
-					plantModel.Parent = parentFolder
+
+				local isEgg = state.Kind == "Egg" or Constants.EGG_CONFIG[state.Type] ~= nil
+				if isEgg and EggModule then
+					local eggType = state.Type
+					local hatchAt = tonumber(state.HatchAt) or 0
+					local now = os.time()
+					if hatchAt > 0 and hatchAt <= now then
+						hatchEggAndCleanup(userId, eggType, plantId, nil)
+					else
+						local eggModel = EggModule.CreateEggModel(eggType, position)
+						if eggModel then
+							eggModel:SetAttribute("PlantId", plantId)
+							eggModel:SetAttribute("Kind", "Egg")
+							eggModel:SetAttribute("EggType", eggType)
+							eggModel:SetAttribute("OwnerUserId", userId)
+							eggModel:SetAttribute("Owner", userId)
+							eggModel:SetAttribute("PlantTime", state.PlantTime or now)
+							eggModel:SetAttribute("HatchAt", hatchAt)
+							eggModel:SetAttribute("FreePlanted", true)
+							eggModel.Parent = parentFolder
+							cache[plantId] = eggModel
+
+							local remaining = 0
+							if hatchAt > 0 then
+								remaining = math.max(0, hatchAt - now)
+							else
+								local eggConfig = Constants.EGG_CONFIG[eggType]
+								remaining = eggConfig and eggConfig.HatchTimeSeconds or 60
+							end
+
+							task.delay(remaining, function()
+								hatchEggAndCleanup(userId, eggType, plantId, eggModel)
+							end)
+						end
+					end
+				else
+					local savedSize = state.Size or 1
+					local plantModel = PlantModule.CreatePlantModel(state.Type, position, savedSize)
 					
-					continueGrowthFromStage(plantModel, state.Stage, state.PlantTime)
-					cache[plantId] = plantModel
-					
-					-- print(string.format("[RestorePlants] ✓ Restored free plant %s at position", state.Type))
+					if plantModel then
+						plantModel:SetAttribute("PlantId", plantId)
+						plantModel:SetAttribute("OwnerUserId", userId)
+						plantModel:SetAttribute("Owner", userId)
+						plantModel:SetAttribute("WateredUntil", state.WateredUntil or 0)
+						plantModel:SetAttribute("PetBoost", state.PetBoost or false)
+						plantModel:SetAttribute("Size", state.Size or 1)
+						plantModel:SetAttribute("Weight", state.Weight or 1)
+						plantModel:SetAttribute("PlantTime", state.PlantTime or os.time())
+						if type(state.BaseStageTime) == "number" then
+							plantModel:SetAttribute("BaseStageTime", state.BaseStageTime)
+						else
+							plantModel:SetAttribute("BaseStageTime", Constants.GetDefaultBaseStageGrowthSecondsForPlant(state.Type))
+						end
+						plantModel:SetAttribute("FreePlanted", true)
+						plantModel.Parent = parentFolder
+						
+						continueGrowthFromStage(plantModel, state.Stage, state.PlantTime)
+						cache[plantId] = plantModel
+						
+						-- print(string.format("[RestorePlants] ✓ Restored free plant %s at position", state.Type))
+					end
 				end
 			end
 		end
@@ -1069,9 +1163,20 @@ function GardenManager.PlantSeedAtPosition(player: Player, position: Vector3, pl
 		return false, "Too close to another plant"
 	end
 	
-	-- Check if player has the seed
-	if not EconomyService.RemoveSeed(player, plantType) then
-		return false, "Seed unavailable"
+	local isSeed = Constants.PLANT_CONFIG[plantType] ~= nil
+	local isEgg = Constants.EGG_CONFIG[plantType] ~= nil
+	if not isSeed and not isEgg then
+		return false, "Invalid item"
+	end
+
+	if isSeed then
+		if not EconomyService.RemoveSeed(player, plantType) then
+			return false, "Seed unavailable"
+		end
+	else
+		if not EconomyService.RemoveEgg(player, plantType, 1) then
+			return false, "Egg unavailable"
+		end
 	end
 	
 	-- Generate unique ID and random size/weight
@@ -1087,56 +1192,140 @@ function GardenManager.PlantSeedAtPosition(player: Player, position: Vector3, pl
 	end
 	local adjustedPosition = Vector3.new(position.X, plantY, position.Z)
 	
-	-- Create the plant model
-	local plantModel = PlantModule.CreatePlantModel(plantType, adjustedPosition, sizeWeight.Size)
-	if not plantModel then
-		EconomyService.AddSeed(player, plantType, 1)
-		return false, "Failed to create plant model"
+	local function parentToGarden(model: Model)
+		local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
+		if plotsFolder then
+			model.Parent = plotsFolder
+		else
+			model.Parent = garden
+		end
 	end
-	
-	-- Set attributes
-	plantModel:SetAttribute("PlantId", plantId)
-	plantModel:SetAttribute("OwnerUserId", player.UserId)
-	plantModel:SetAttribute("Owner", player.UserId)
-	plantModel:SetAttribute("WateredUntil", 0)
-	plantModel:SetAttribute("PetBoost", false)
-	plantModel:SetAttribute("Size", sizeWeight.Size)
-	plantModel:SetAttribute("Weight", sizeWeight.Weight)
-	plantModel:SetAttribute("FreePlanted", true)
-	plantModel:SetAttribute("PlantPosition", adjustedPosition) -- Store position for persistence
-	
-	-- Parent to plots folder
-	local plotsFolder = garden:FindFirstChild(Config.World.PlotsFolder)
-	if plotsFolder then
-		plantModel.Parent = plotsFolder
-	else
-		plantModel.Parent = garden
-	end
-	
-	-- Cache the plant using plantId as key
+
 	local cache = ensurePlayerCache(player.UserId)
-	cache[plantId] = plantModel
-	
-	-- Save to DataStore if persistence enabled
-	if Config.Economy.EnablePersistence then
-		DataService.AddFreePlant(player.UserId, {
-			Id = plantId,
-			Type = plantType,
-			Stage = plantModel:GetAttribute("Stage"),
-			PlantTime = plantModel:GetAttribute("PlantTime") or os.time(),
-			Position = {X = adjustedPosition.X, Y = adjustedPosition.Y, Z = adjustedPosition.Z},
-			WateredUntil = 0,
-			PetBoost = false,
-			Size = sizeWeight.Size,
-			Weight = sizeWeight.Weight,
-		})
-		task.spawn(function()
-			DataService.ForceSave(player.UserId)
+
+	if isSeed then
+		local plantModel = PlantModule.CreatePlantModel(plantType, adjustedPosition, sizeWeight.Size)
+		if not plantModel then
+			EconomyService.AddSeed(player, plantType, 1)
+			return false, "Failed to create plant model"
+		end
+		
+		-- Set attributes
+		plantModel:SetAttribute("PlantId", plantId)
+		plantModel:SetAttribute("OwnerUserId", player.UserId)
+		plantModel:SetAttribute("Owner", player.UserId)
+		plantModel:SetAttribute("WateredUntil", 0)
+		plantModel:SetAttribute("PetBoost", false)
+		plantModel:SetAttribute("Size", sizeWeight.Size)
+		plantModel:SetAttribute("Weight", sizeWeight.Weight)
+		plantModel:SetAttribute("BaseStageTime", Constants.RollBaseStageGrowthSecondsForPlant(plantType))
+		plantModel:SetAttribute("FreePlanted", true)
+		plantModel:SetAttribute("PlantPosition", adjustedPosition) -- Store position for persistence
+		
+		parentToGarden(plantModel)
+		cache[plantId] = plantModel
+		
+		-- Save to DataStore if persistence enabled
+		if Config.Economy.EnablePersistence then
+			DataService.AddFreePlant(player.UserId, {
+				Id = plantId,
+				Type = plantType,
+				Stage = plantModel:GetAttribute("Stage"),
+				PlantTime = plantModel:GetAttribute("PlantTime") or os.time(),
+				BaseStageTime = plantModel:GetAttribute("BaseStageTime"),
+				Position = {X = adjustedPosition.X, Y = adjustedPosition.Y, Z = adjustedPosition.Z},
+				WateredUntil = 0,
+				PetBoost = false,
+				Size = sizeWeight.Size,
+				Weight = sizeWeight.Weight,
+			})
+			task.spawn(function()
+				DataService.ForceSave(player.UserId)
+			end)
+		end
+		
+		-- Start growth
+		task.spawn(PlantModule.GrowPlant, plantModel)
+	else
+		if not EggModule then
+			DataService.AddEgg(player.UserId, plantType, 1)
+			EconomyService.SyncPlayerData(player)
+			return false, "Egg module missing"
+		end
+
+		local eggConfig = Constants.EGG_CONFIG[plantType]
+		local hatchSeconds = eggConfig and eggConfig.HatchTimeSeconds or 60
+		local plantedAt = os.time()
+		local hatchAt = plantedAt + hatchSeconds
+		local userId = player.UserId
+
+		local eggModel = EggModule.CreateEggModel(plantType, adjustedPosition)
+		if not eggModel then
+			DataService.AddEgg(player.UserId, plantType, 1)
+			EconomyService.SyncPlayerData(player)
+			return false, "Failed to create egg model"
+		end
+
+		eggModel:SetAttribute("PlantId", plantId)
+		eggModel:SetAttribute("Kind", "Egg")
+		eggModel:SetAttribute("EggType", plantType)
+		eggModel:SetAttribute("OwnerUserId", player.UserId)
+		eggModel:SetAttribute("Owner", player.UserId)
+		eggModel:SetAttribute("PlantTime", plantedAt)
+		eggModel:SetAttribute("HatchAt", hatchAt)
+		eggModel:SetAttribute("FreePlanted", true)
+
+		parentToGarden(eggModel)
+		cache[plantId] = eggModel
+
+		if Config.Economy.EnablePersistence then
+			DataService.AddFreePlant(userId, {
+				Id = plantId,
+				Kind = "Egg",
+				Type = plantType,
+				PlantTime = plantedAt,
+				HatchAt = hatchAt,
+				Position = {X = adjustedPosition.X, Y = adjustedPosition.Y, Z = adjustedPosition.Z},
+			})
+			task.spawn(function()
+				DataService.ForceSave(userId)
+			end)
+		end
+
+		task.delay(hatchSeconds, function()
+			if not eggModel.Parent then
+				return
+			end
+
+			local eggType = eggModel:GetAttribute("EggType")
+			if type(eggType) ~= "string" then
+				return
+			end
+
+			local rolledPetType = nil
+			local rolledRarity = nil
+			rolledPetType, rolledRarity = EconomyService.RollPetFromEggType(eggType)
+			if not rolledPetType then
+				warn("[GardenManager] No pet rolled for planted egg:", eggType)
+				return
+			end
+
+			local petSizeWeight = Constants.GenerateRandomSizeWeight("Pet")
+			local petInstance = DataService.AddPetInstance(userId, rolledPetType, petSizeWeight.Size, petSizeWeight.Weight)
+			if not petInstance then
+				warn("[GardenManager] Failed to add pet instance for planted egg hatch")
+				return
+			end
+
+			DataService.RemoveFreePlant(userId, plantId)
+			cache[plantId] = nil
+			eggModel:Destroy()
+			local ownerPlayer = Players:GetPlayerByUserId(userId)
+			if ownerPlayer then
+				EconomyService.SyncPlayerData(ownerPlayer)
+			end
 		end)
 	end
-	
-	-- Start growth
-	task.spawn(PlantModule.GrowPlant, plantModel)
 	
 	return true, nil
 end

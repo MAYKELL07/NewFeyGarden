@@ -4,6 +4,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
 local TweenService = game:GetService("TweenService")
+local Players = game:GetService("Players")
 
 local sharedFolder = ReplicatedStorage:FindFirstChild("Shared") or ReplicatedStorage:WaitForChild("Shared", 5)
 if not sharedFolder then
@@ -32,9 +33,14 @@ local WeatherController = {}
 WeatherController.CurrentWeather = Constants.WEATHER_TYPES.SUNNY
 
 -- Create RemoteEvent for weather updates
-local weatherEvent = Instance.new("RemoteEvent")
-weatherEvent.Name = Constants.EVENTS.WEATHER_CHANGED
-weatherEvent.Parent = ReplicatedStorage
+local weatherEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.WEATHER_CHANGED)
+if not (weatherEvent and weatherEvent:IsA("RemoteEvent")) then
+	local created = Instance.new("RemoteEvent")
+	created.Name = Constants.EVENTS.WEATHER_CHANGED
+	created.Parent = ReplicatedStorage
+	weatherEvent = created
+end
+weatherEvent = weatherEvent :: RemoteEvent
 
 -- Apply weather settings to lighting with smooth transitions
 local function applyWeather(weatherType)
@@ -68,6 +74,11 @@ local function applyWeather(weatherType)
 	-- Notify all clients for particle effects
 	weatherEvent:FireAllClients(weatherType)
 end
+
+-- Ensure late joiners receive current weather
+Players.PlayerAdded:Connect(function(player)
+	weatherEvent:FireClient(player, WeatherController.CurrentWeather)
+end)
 
 -- Initialize weather system
 function WeatherController.Initialize()

@@ -530,6 +530,17 @@ local function rollPet(rarity)
 	return pets[math.random(1, #pets)]
 end
 
+function EconomyService.RollPetFromEggType(eggType: string): (string?, string?)
+	local eggConfig = Constants.EGG_CONFIG[eggType]
+	if not eggConfig then
+		return nil, nil
+	end
+
+	local rolledRarity = rollRarity(eggConfig)
+	local rolledPetType = rollPet(rolledRarity)
+	return rolledPetType, rolledRarity
+end
+
 -- Buy an egg
 function EconomyService.BuyEgg(player, eggType, amount)
 	local eggConfig = Constants.EGG_CONFIG[eggType]
@@ -560,6 +571,33 @@ function EconomyService.BuyEgg(player, eggType, amount)
 	return true
 end
 
+function EconomyService.RemoveEgg(player: Player, eggType: string, amount: number?): boolean
+	amount = amount or 1
+	if amount <= 0 then
+		return true
+	end
+
+	local eggConfig = Constants.EGG_CONFIG[eggType]
+	if not eggConfig then
+		return false
+	end
+
+	local eggCount = DataService.GetEggCount(player.UserId, eggType)
+	if eggCount < amount then
+		return false
+	end
+
+	for _ = 1, amount do
+		local removed = DataService.RemoveEgg(player.UserId, eggType)
+		if not removed then
+			return false
+		end
+	end
+
+	EconomyService.SyncPlayerData(player)
+	return true
+end
+
 -- Open an egg (gacha roll)
 function EconomyService.OpenEgg(player, eggType)
 	local eggConfig = Constants.EGG_CONFIG[eggType]
@@ -585,11 +623,7 @@ function EconomyService.OpenEgg(player, eggType)
 		return false
 	end
 	
-	-- Roll for rarity
-	local rolledRarity = rollRarity(eggConfig)
-	
-	-- Roll for pet type within that rarity
-	local rolledPetType = rollPet(rolledRarity)
+	local rolledPetType, rolledRarity = EconomyService.RollPetFromEggType(eggType)
 	if not rolledPetType then
 		-- Fallback: give back the egg and report error
 		DataService.AddEgg(player.UserId, eggType, 1)

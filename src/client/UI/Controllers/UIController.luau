@@ -136,6 +136,14 @@ function UIController.Initialize()
 		updateInventory = events:FindFirstChild("UpdateInventory") :: RemoteEvent?
 		weatherChanged = events:FindFirstChild("WeatherChanged") :: RemoteEvent?
 	end
+
+	-- WeatherChanged is currently created at ReplicatedStorage root by WeatherController.
+	if not weatherChanged then
+		local direct = ReplicatedStorage:FindFirstChild(Constants.EVENTS.WEATHER_CHANGED)
+		if direct and direct:IsA("RemoteEvent") then
+			weatherChanged = direct
+		end
+	end
 	
 	-- Initialize HUD components
 	local hudParent = hudContainer or hudLayer or screenGui
