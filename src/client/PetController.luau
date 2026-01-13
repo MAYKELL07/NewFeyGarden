@@ -42,9 +42,15 @@ local MAX_GARDEN_PETS = Constants.MAX_GARDEN_PETS or 7
 
 -- Weight to scale mapping
 -- Weight 1 = scale 1.0, Weight increases/decreases scale proportionally
-local MIN_WEIGHT_SCALE = 0.6  -- Minimum scale at very low weight
-local MAX_WEIGHT_SCALE = 1.8  -- Maximum scale at very high weight
-local WEIGHT_SCALE_FACTOR = 0.15  -- How much each weight point affects scale
+local MIN_WEIGHT_SCALE = 0.7  -- Minimum scale at very low weight (increased from 0.6 for stability)
+local MAX_WEIGHT_SCALE = 1.6  -- Maximum scale at very high weight (reduced from 1.8 to prevent extremes)
+local WEIGHT_SCALE_FACTOR = 0.12  -- How much each weight point affects scale (reduced from 0.15)
+
+-- Scale categories - parts that should scale differently to maintain proportions
+local SCALE_EXEMPT_NAMES = {
+	"Handle", "Handle1", "Handle2", -- Tool handles that might be parented to pets
+	"Attachment", "WeldConstraint", "Motor6D" -- Constraints that shouldn't be scaled
+}
 
 -- Animation IDs keyed by pet type string (matches Constants.PET_TYPES values)
 local PET_ANIMATION_IDS = {
@@ -122,19 +128,49 @@ local function applyWeightScale(petModel, weight)
 	-- Calculate relative scale change
 	local relativeScale = scale / currentScale
 	
-	-- Scale all BaseParts in the model
+	-- Validate scale change isn't too extreme (safety check)
+	if relativeScale < 0.5 or relativeScale > 2.0 then
+		warn("[PetController] Extreme scale change detected, skipping:", relativeScale)
+		return
+	end
+	
+	-- Scale BaseParts in the model, but be selective about what we scale
 	for _, part in ipairs(petModel:GetDescendants()) do
 		if part:IsA("BasePart") then
-			part.Size = part.Size * relativeScale
+			-- Check if this part should be exempt from scaling
+			local shouldScale = true
+			for _, exemptName in ipairs(SCALE_EXEMPT_NAMES) do
+				if string.find(part.Name, exemptName) then
+					shouldScale = false
+					break
+				end
+			end
+			
+			-- Also exempt very small parts that might be details/accessories
+			local partVolume = part.Size.X * part.Size.Y * part.Size.Z
+			if partVolume < 0.1 then -- Very small parts (likely details)
+				shouldScale = false
+			end
+			
+			if shouldScale then
+				-- Store original size if not already stored
+				if not part:GetAttribute("OriginalSize") then
+					part:SetAttribute("OriginalSize", tostring(part.Size))
+				end
+				
+				part.Size = part.Size * relativeScale
+			end
 		end
 	end
 	
-	-- Update light range if present
+	-- Update light range if present (scale with pet size)
 	local body = petModel.PrimaryPart or petModel:FindFirstChildWhichIsA("BasePart")
 	if body then
 		local light = body:FindFirstChild("PetLight")
 		if light and light:IsA("PointLight") then
-			light.Range = 8 * scale
+			-- Scale light range more conservatively than the pet itself
+			local lightScale = 1 + ((scale - 1) * 0.7) -- 70% of the size scaling
+			light.Range = 8 * lightScale
 		end
 	end
 	
@@ -196,13 +232,46 @@ local function faceTarget(petBody, targetPosition, movementType)
 	local bodyGyro = petBody and petBody:FindFirstChild("BodyGyro")
 	if not bodyGyro then return end
 
-	local direction = targetPosition - petBody.Position
+	local currentPosition = petBody.Position
+	local direction = targetPosition - currentPosition
+	
 	-- Always flatten to horizontal (no pitch rotation for any pet type)
 	direction = Vector3.new(direction.X, 0, direction.Z)
-	if direction.Magnitude < 0.1 then return end
+	if direction.Magnitude < 0.1 then return end -- Don't rotate if barely moving
 
-	local lookTarget = petBody.Position + direction.Unit
-	bodyGyro.CFrame = CFrame.lookAt(petBody.Position, lookTarget, Vector3.yAxis)
+	-- Calculate target rotation
+	local lookTarget = currentPosition + direction.Unit
+	local targetCFrame = CFrame.lookAt(currentPosition, lookTarget, Vector3.yAxis)
+	
+	-- Get current rotation for smooth interpolation
+	local currentCFrame = bodyGyro.CFrame
+	
+	-- Smooth rotation interpolation (prevents snappy turning)
+	local rotationSpeed = 0.15 -- Lower = smoother rotation (0.1-0.3 range)
+	
+	-- Different rotation speeds based on movement type
+	if movementType == "Walk" then
+		rotationSpeed = 0.08 -- Walking pets turn more gradually
+	else
+		rotationSpeed = 0.12 -- Flying pets can turn a bit faster
+	end
+	
+	-- Interpolate between current and target rotation
+	local smoothedCFrame = currentCFrame:Lerp(targetCFrame, rotationSpeed)
+	bodyGyro.CFrame = smoothedCFrame
+	
+	-- Adjust gyro properties for smoother turning
+	if movementType == "Walk" then
+		-- Walking pets need more stable ground orientation
+		bodyGyro.MaxTorque = Vector3.new(8000, 4000, 8000) -- Stronger X/Z, moderate Y
+		bodyGyro.P = 4000
+		bodyGyro.D = 600
+	else
+		-- Flying pets can be more free in rotation
+		bodyGyro.MaxTorque = Vector3.new(3000, 3000, 3000)
+		bodyGyro.P = 2500
+		bodyGyro.D = 400
+	end
 end
 
 -- Control animation playback based on movement state
@@ -425,32 +494,54 @@ local function updateEquippedPets()
 					local config = Constants.PET_CONFIG[petType]
 					
 					if config then
-						-- Calculate follow position (spread pets around player)
+						-- Calculate follow position with more natural variation
 						local angle = (index - 1) * (math.pi * 2 / MAX_EQUIPPED_PETS)
-						local followDist = config.FollowDistance * PET_FOLLOW_DISTANCE_MULTIPLIER
-						local offsetX = math.cos(angle) * followDist
-						local offsetZ = math.sin(angle) * followDist
+						
+						-- Add some dynamic variation to the follow distance and angle
+						local distanceVariation = math.sin(time * 0.8 + index) * 0.3 -- Small distance wobble
+						local angleVariation = math.sin(time * 0.5 + index * 2) * 0.2 -- Slight angle drift
+						
+						local followDist = config.FollowDistance * PET_FOLLOW_DISTANCE_MULTIPLIER * (1 + distanceVariation)
+						local adjustedAngle = angle + angleVariation
+						
+						local offsetX = math.cos(adjustedAngle) * followDist
+						local offsetZ = math.sin(adjustedAngle) * followDist
+						
+						-- Store previous position for lag calculation
+						if not petModel:GetAttribute("LastTargetPos") then
+							petModel:SetAttribute("LastTargetPos", tostring(hrp.Position))
+						end
 						
 						local targetPosition
 						if movementType == "Fly" then
-							-- Flying pets hover above/around the player
-							local offset = Vector3.new(offsetX, 2, offsetZ)
+							-- Flying pets hover above/around the player with natural drift
+							local baseHeight = 2 + math.sin(time * 1.2 + index) * 0.8 -- Varying heights
+							local offset = Vector3.new(offsetX, baseHeight, offsetZ)
 							targetPosition = hrp.Position + offset
 							
-							-- Add bobbing motion for flying pets
-							local bobOffset = math.sin(time * 2 + index) * 0.5
+							-- Add gentle bobbing motion for flying pets (weight affects frequency)
+							local petWeight = petModel:GetAttribute("Weight") or 1
+							local bobFreq = 1.8 / petWeight -- Heavier pets bob slower
+							local bobOffset = math.sin(time * bobFreq + index) * 0.4
 							targetPosition = targetPosition + Vector3.new(0, bobOffset, 0)
 						else
-							-- Walking pets stay on the ground near the player
+							-- Walking pets follow on ground with natural lag
 							local offset = Vector3.new(offsetX, 0, offsetZ)
 							targetPosition = hrp.Position + offset
+							
+							-- Add slight lag behind player movement for more natural following
+							local prevTargetStr = petModel:GetAttribute("LastTargetPos") or tostring(hrp.Position)
+							local prevTarget = Vector3.new(tonumber(string.split(prevTargetStr, ",")[1]) or 0, 
+														  tonumber(string.split(prevTargetStr, ",")[2]) or 0, 
+														  tonumber(string.split(prevTargetStr, ",")[3]) or 0)
+							local laggedTarget = prevTarget:Lerp(targetPosition, 0.85) -- Slight lag
 							
 							-- Raycast to find ground level
 							local rayParams = RaycastParams.new()
 							rayParams.FilterType = Enum.RaycastFilterType.Exclude
 							rayParams.FilterDescendantsInstances = {player.Character, petModel}
 							
-							local rayOrigin = targetPosition + Vector3.new(0, 5, 0)
+							local rayOrigin = laggedTarget + Vector3.new(0, 5, 0)
 							local rayResult = Workspace:Raycast(rayOrigin, Vector3.new(0, -15, 0), rayParams)
 							
 							if rayResult then
@@ -459,24 +550,37 @@ local function updateEquippedPets()
 								targetPosition = rayResult.Position + Vector3.new(0, petHeight + 0.1, 0)
 							else
 								-- Fallback: use player's Y position
-								targetPosition = Vector3.new(targetPosition.X, hrp.Position.Y - 2, targetPosition.Z)
+								targetPosition = Vector3.new(laggedTarget.X, hrp.Position.Y - 2, laggedTarget.Z)
 							end
 							
-							-- Add slight hop/bounce motion for walking pets
-							local hopOffset = math.abs(math.sin(time * 4 + index)) * 0.15
+							-- Add slight hop/bounce motion for walking pets (varies by weight)
+							local petWeight = petModel:GetAttribute("Weight") or 1
+							local hopFreq = 3.5 / petWeight -- Heavier pets hop less frequently
+							local hopOffset = math.abs(math.sin(time * hopFreq + index)) * (0.2 / petWeight)
 							targetPosition = targetPosition + Vector3.new(0, hopOffset, 0)
 						end
 						
-						-- Smooth follow with BodyPosition
-						bodyPosition.Position = targetPosition
+						-- Store current target for next frame's lag calculation
+						petModel:SetAttribute("LastTargetPos", tostring(targetPosition))
+						
+						-- Smooth follow with BodyPosition (less snappy than before)
+						local currentPos = petBody.Position
+						local smoothingFactor = 0.12 -- Reduced from implicit 1.0 for smoother following
+						local smoothedTarget = currentPos:Lerp(targetPosition, smoothingFactor)
+						bodyPosition.Position = smoothedTarget
 
 						-- Check if pet is actually moving (distance to target)
-						local distanceToTarget = (petBody.Position - targetPosition).Magnitude
-						local isMoving = distanceToTarget > 0.5
+						local distanceToTarget = (currentPos - targetPosition).Magnitude
+						local isMoving = distanceToTarget > 0.8 -- Slightly higher threshold
 						
-						-- Face movement direction (use player's look direction when close)
+						-- Face movement direction more naturally
 						if isMoving then
-							faceTarget(petBody, targetPosition, movementType)
+							-- Look ahead in movement direction rather than directly at target
+							local movementDirection = (smoothedTarget - currentPos)
+							if movementDirection.Magnitude > 0.1 then
+								local lookAheadPos = currentPos + movementDirection.Unit * 3
+								faceTarget(petBody, lookAheadPos, movementType)
+							end
 						end
 						
 						-- Control animation based on movement type
@@ -648,25 +752,76 @@ local function updateGardenPets(deltaTime)
 							petData.state = "idle"
 							petData.stateEndTime = time + math.random(gardenInfo.minIdleTime, gardenInfo.maxIdleTime)
 							petData.targetPos = petBody.Position
+							petData.lastMoveTime = time
+							petData.moveStartPos = petBody.Position -- Track where movement started for curves
 						end
 						
 						-- Check if state should change
 						if time > petData.stateEndTime then
-							-- Decide next state
-							if math.random() < gardenInfo.idleChance then
+							-- Decide next state with some personality variations
+							local idleChance = gardenInfo.idleChance
+							
+							-- Heavier pets are lazier (more likely to idle)
+							idleChance = idleChance + (petWeight - 1) * 0.15
+							idleChance = math.clamp(idleChance, 0.2, 0.9)
+							
+							if math.random() < idleChance then
 								petData.state = "idle"
-								petData.stateEndTime = time + math.random(gardenInfo.minIdleTime, gardenInfo.maxIdleTime)
+								-- Vary idle times more naturally
+								local baseIdleTime = math.random(gardenInfo.minIdleTime, gardenInfo.maxIdleTime)
+								local weightFactor = 1 + (petWeight - 1) * 0.3 -- Heavier pets idle longer
+								petData.stateEndTime = time + (baseIdleTime * weightFactor)
 							else
 								petData.state = "moving"
-								petData.stateEndTime = time + math.random(gardenInfo.minMoveTime, gardenInfo.maxMoveTime)
+								petData.lastMoveTime = time
+								petData.moveStartPos = petBody.Position
 								
-								-- Pick a random point within box bounds
-								local offsetX = (math.random() * 2 - 1) * gardenInfo.halfWidth * 0.8
-								local offsetZ = (math.random() * 2 - 1) * gardenInfo.halfLength * 0.8
+								-- More realistic movement duration (distance-based)
+								local baseMoveTime = math.random(gardenInfo.minMoveTime, gardenInfo.maxMoveTime)
+								petData.stateEndTime = time + baseMoveTime
+								
+								-- Generate more natural target positions (avoid moving to exact center too often)
+								local currentPos = petBody.Position
+								local distanceFromCenter = (currentPos - gardenInfo.center).Magnitude
+								
+								-- If far from center, bias toward center; if close, allow more wandering
+								local centerBias = math.clamp(distanceFromCenter / (gardenInfo.halfWidth * 0.5), 0, 1)
+								
+								local offsetX, offsetZ
+								if math.random() < centerBias * 0.4 then
+									-- Move toward center occasionally
+									local dirToCenter = (gardenInfo.center - currentPos).Unit
+									local moveDistance = math.random(gardenInfo.halfWidth * 0.3, gardenInfo.halfWidth * 0.7)
+									offsetX = dirToCenter.X * moveDistance
+									offsetZ = dirToCenter.Z * moveDistance
+								else
+									-- Random wandering with some direction preference
+									-- Add slight bias to continue in a similar direction (more natural)
+									local prevDirection = petData.lastDirection or Vector3.new(math.random(-1,1), 0, math.random(-1,1))
+									local newDirection = Vector3.new(
+										math.random(-1, 1) * 0.7 + prevDirection.X * 0.3,
+										0,
+										math.random(-1, 1) * 0.7 + prevDirection.Z * 0.3
+									).Unit
+									
+									local moveDistance = math.random(gardenInfo.halfWidth * 0.4, gardenInfo.halfWidth * 0.8)
+									offsetX = newDirection.X * moveDistance
+									offsetZ = newDirection.Z * moveDistance
+									petData.lastDirection = newDirection
+								end
+								
+								-- Clamp to bounds with some padding
+								offsetX = math.clamp(offsetX, -gardenInfo.halfWidth * 0.85, gardenInfo.halfWidth * 0.85)
+								offsetZ = math.clamp(offsetZ, -gardenInfo.halfLength * 0.85, gardenInfo.halfLength * 0.85)
 								
 								if movementType == "Fly" then
-									-- Flying pets roam at various heights
-									local height = gardenInfo.minHeight + math.random() * (gardenInfo.maxHeight - gardenInfo.minHeight)
+									-- Flying pets: vary height based on distance traveled
+									local horizontalDist = math.sqrt(offsetX*offsetX + offsetZ*offsetZ)
+									local heightRange = gardenInfo.maxHeight - gardenInfo.minHeight
+									local heightVariation = (horizontalDist / gardenInfo.halfWidth) * heightRange * 0.5
+									local baseHeight = gardenInfo.minHeight + math.random() * (heightRange - heightVariation)
+									local height = math.clamp(baseHeight + heightVariation, gardenInfo.minHeight, gardenInfo.maxHeight)
+									
 									petData.targetPos = gardenInfo.center + Vector3.new(offsetX, height, offsetZ)
 								else
 									-- Walking pets stay on the ground
@@ -721,11 +876,53 @@ local function updateGardenPets(deltaTime)
 							end
 						end
 						
-						-- Smooth move to target
+						-- Smooth move to target with improved realism
 						if petData.state == "moving" then
-							local smoothed = currentPos:Lerp(finalTargetPos, moveAlpha)
+							-- Create curved path for more natural movement
+							local moveProgress = 0
+							if petData.lastMoveTime and petData.stateEndTime > petData.lastMoveTime then
+								moveProgress = math.clamp((time - petData.lastMoveTime) / (petData.stateEndTime - petData.lastMoveTime), 0, 1)
+							end
+							
+							-- Add slight curve to the movement path (more natural than straight lines)
+							local startPos = petData.moveStartPos or currentPos
+							local endPos = finalTargetPos
+							local midPoint = (startPos + endPos) * 0.5
+							
+							-- Add perpendicular offset for curve (flying pets curve more)
+							local pathDirection = (endPos - startPos)
+							if pathDirection.Magnitude > 0.5 then
+								local perpendicular = Vector3.new(-pathDirection.Z, 0, pathDirection.X).Unit
+								local curveIntensity = movementType == "Fly" and 2.0 or 0.8
+								local curveOffset = perpendicular * math.sin(moveProgress * math.pi) * curveIntensity * petWeight
+								midPoint = midPoint + curveOffset
+							end
+							
+							-- Bezier curve interpolation for smooth curved movement
+							local curvedPos
+							if moveProgress < 0.5 then
+								-- First half: start to midpoint
+								local t = moveProgress * 2
+								curvedPos = startPos:Lerp(midPoint, t)
+							else
+								-- Second half: midpoint to end
+								local t = (moveProgress - 0.5) * 2
+								curvedPos = midPoint:Lerp(endPos, t)
+							end
+							
+							-- Apply movement with weight-based speed variation
+							local weightSpeedFactor = 1 / math.sqrt(petWeight) -- Heavier pets move slower
+							local adjustedMoveAlpha = moveAlpha * weightSpeedFactor
+							
+							local smoothed = currentPos:Lerp(curvedPos, adjustedMoveAlpha)
 							bodyPosition.Position = smoothed
-							faceTarget(petBody, smoothed, movementType)
+							
+							-- Face the direction of movement (not just target)
+							local movementDirection = smoothed - currentPos
+							if movementDirection.Magnitude > 0.1 then
+								local lookAheadPos = smoothed + movementDirection.Unit * 2
+								faceTarget(petBody, lookAheadPos, movementType)
+							end
 						else
 							-- When idle, gently settle toward the current vertical plane
 							local idlePos = Vector3.new(currentPos.X, finalTargetPos.Y, currentPos.Z)

@@ -189,13 +189,13 @@ Config.GardenPetRoaming = {
 	MinHeight = 2,                       -- Minimum hover height above floor
 	MaxHeight = 10,                       -- Maximum hover height above floor
 	
-	-- Movement behavior
-	IdleChance = 0.6,                    -- Chance to stay idle vs moving (0-1)
-	MinIdleTime = 3,                     -- Minimum seconds to stay idle
-	MaxIdleTime = 8,                     -- Maximum seconds to stay idle
-	MinMoveTime = 2,                     -- Minimum seconds between movement updates
-	MaxMoveTime = 5,                     -- Maximum seconds between movement updates
-	MoveSpeed = 0.3,                     -- How fast pets move (lower = slower/calmer)
+	-- Movement behavior (improved timing for realism)
+	IdleChance = 0.65,                   -- Chance to stay idle vs moving (0-1) - slightly higher for calmer pets
+	MinIdleTime = 4,                     -- Minimum seconds to stay idle (increased)
+	MaxIdleTime = 12,                    -- Maximum seconds to stay idle (increased)
+	MinMoveTime = 3,                     -- Minimum seconds between movement updates (increased)
+	MaxMoveTime = 8,                     -- Maximum seconds between movement updates (increased)
+	MoveSpeed = 0.08,                    -- How fast pets move (reduced for smoother movement)
 	
 	-- Vertical bobbing
 	BobAmplitude = 0.3,                  -- Vertical bob height

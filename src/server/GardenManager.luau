@@ -205,7 +205,7 @@ function GardenManager.SetupPlantHarvestDetector(plantModel: Model, userId: numb
 	if existingCD then
 		existingCD:Destroy()
 	end
-	
+
 	-- Spawn fruits on the plant (they start invisible)
 	local fruits = PlantModule.SpawnFruits(plantModel)
 	
