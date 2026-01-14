@@ -181,18 +181,25 @@ function EconomyService.InitializePlayerData(player)
 	end
 	
 	-- print(string.format("EconomyService: ✓ Initialized data for %s - Coins: %d, Seeds: %d types", player.Name, profile.Coins, seedCount))
-	
-	EconomyService.SyncPlayerData(player)
+
+	EconomyService.SyncPlayerData(player, true)
 end
 
 -- Sync player data to client
-function EconomyService.SyncPlayerData(player)
+function EconomyService.SyncPlayerData(player, syncPets)
 	local profile = DataService.GetProfile(player.UserId)
 	if not profile then return end
+
+	local includePets = syncPets == true
 	
-	-- Get equipped and garden pet instances (full data)
-	local equippedPetInstances = DataService.GetEquippedPetInstances(player.UserId)
-	local gardenPetInstances = DataService.GetGardenPetInstances(player.UserId)
+	local equippedPetInstances
+	local gardenPetInstances
+
+	if includePets then
+		-- Get equipped and garden pet instances (full data)
+		equippedPetInstances = DataService.GetEquippedPetInstances(player.UserId)
+		gardenPetInstances = DataService.GetGardenPetInstances(player.UserId)
+	end
 	
 	-- Update cache
 	EconomyService.PlayerData[player.UserId] = {
@@ -205,18 +212,21 @@ function EconomyService.SyncPlayerData(player)
 	-- Update currency
 	updateCurrencyEvent:FireClient(player, profile.Coins, true)
 	
-	-- Update inventory (now includes full pet instances, eggs, and equipped/garden pet data)
+	-- Update inventory (include pet data only when requested to avoid respawn)
 	local inventoryData = {
 		Seeds = profile.Inventory.Seeds,
 		Pets = profile.Inventory.Pets, -- Full pet instances array [{Id, PetType, Size, Weight}]
 		Eggs = profile.Inventory.Eggs or {},
 		Fruits = profile.Inventory.Fruits,
 		Gear = profile.Inventory.Gear or {},
-		EquippedPets = equippedPetInstances, -- Full instances for rendering
-		EquippedPetIds = profile.EquippedPets or {}, -- Just IDs for quick lookup
-		GardenPets = gardenPetInstances, -- Full instances for rendering
-		GardenPetIds = profile.GardenPets or {} -- Just IDs for quick lookup
 	}
+
+	if includePets then
+		inventoryData.EquippedPets = equippedPetInstances -- Full instances for rendering
+		inventoryData.EquippedPetIds = profile.EquippedPets or {} -- Just IDs for quick lookup
+		inventoryData.GardenPets = gardenPetInstances -- Full instances for rendering
+		inventoryData.GardenPetIds = profile.GardenPets or {} -- Just IDs for quick lookup
+	end
 	updateInventoryEvent:FireClient(player, inventoryData)
 end
 
@@ -269,7 +279,7 @@ function EconomyService.AddSeed(player, plantType, amount)
 		EconomyService.PlayerData[player.UserId].Inventory = profile.Inventory
 	end
 	
-	EconomyService.SyncPlayerData(player)
+	EconomyService.SyncPlayerData(player, false)
 	return true
 end
 
@@ -284,7 +294,7 @@ function EconomyService.RemoveSeed(player, plantType)
 		EconomyService.PlayerData[player.UserId].Inventory = profile.Inventory
 	end
 	
-	EconomyService.SyncPlayerData(player)
+	EconomyService.SyncPlayerData(player, false)
 	return true
 end
 
@@ -358,7 +368,7 @@ function EconomyService.BuyPet(player, petType)
 		EconomyService.PlayerData[player.UserId].Inventory = profile.Inventory
 	end
 	
-	EconomyService.SyncPlayerData(player)
+	EconomyService.SyncPlayerData(player, true)
 	
 	-- print(player.Name .. " bought " .. petType .. " pet")
 	return true
@@ -391,7 +401,7 @@ function EconomyService.BuyGear(player, gearType)
 		EconomyService.PlayerData[player.UserId].Inventory = profile.Inventory
 	end
 	
-	EconomyService.SyncPlayerData(player)
+	EconomyService.SyncPlayerData(player, false)
 	
 	-- print(player.Name .. " bought " .. gearType .. " gear")
 	return true
@@ -418,7 +428,7 @@ function EconomyService.EquipPet(player, petId)
 		EconomyService.PlayerData[player.UserId].EquippedPets = profile.EquippedPets
 	end
 	
-	EconomyService.SyncPlayerData(player)
+	EconomyService.SyncPlayerData(player, true)
 	return true
 end
 
@@ -435,7 +445,7 @@ function EconomyService.UnequipPet(player, petId)
 		EconomyService.PlayerData[player.UserId].EquippedPets = profile.EquippedPets
 	end
 	
-	EconomyService.SyncPlayerData(player)
+	EconomyService.SyncPlayerData(player, true)
 	return true
 end
 
@@ -459,7 +469,7 @@ function EconomyService.AddGardenPet(player, petId)
 		EconomyService.PlayerData[player.UserId].GardenPets = profile.GardenPets
 	end
 	
-	EconomyService.SyncPlayerData(player)
+	EconomyService.SyncPlayerData(player, true)
 	return true
 end
 
@@ -476,7 +486,7 @@ function EconomyService.RemoveGardenPet(player, petId)
 		EconomyService.PlayerData[player.UserId].GardenPets = profile.GardenPets
 	end
 	
-	EconomyService.SyncPlayerData(player)
+	EconomyService.SyncPlayerData(player, true)
 	return true
 end
 
@@ -565,7 +575,7 @@ function EconomyService.BuyEgg(player, eggType, amount)
 		EconomyService.PlayerData[player.UserId].Inventory = profile.Inventory
 	end
 	
-	EconomyService.SyncPlayerData(player)
+	EconomyService.SyncPlayerData(player, false)
 	
 	-- print(string.format("%s bought %dx %s", player.Name, amount, eggConfig.DisplayName))
 	return true
@@ -594,7 +604,7 @@ function EconomyService.RemoveEgg(player: Player, eggType: string, amount: numbe
 		end
 	end
 
-	EconomyService.SyncPlayerData(player)
+	EconomyService.SyncPlayerData(player, false)
 	return true
 end
 
@@ -671,13 +681,8 @@ function EconomyService.OpenEgg(player, eggType)
 	-- Fire result to client for animation
 	eggOpenedEvent:FireClient(player, true, resultData, nil)
 	
-	-- Sync inventory immediately so UI updates right away
-	EconomyService.SyncPlayerData(player)
-	
-	-- Sync again after animation finishes (in case client missed the first one)
-	task.delay(3.5, function()
-		EconomyService.SyncPlayerData(player)
-	end)
+	-- Sync inventory immediately so UI updates right away (pets included for new hatch)
+	EconomyService.SyncPlayerData(player, true)
 	
 	return true
 end
@@ -731,8 +736,8 @@ function EconomyService.SellFruitById(player, fruitId)
 	-- Add coins
 	EconomyService.AddCoins(player, sellPrice)
 	
-	-- Sync inventory to client
-	EconomyService.SyncPlayerData(player)
+	-- Sync inventory to client (no pet changes)
+	EconomyService.SyncPlayerData(player, false)
 	
 	return true, sellPrice, weight
 end
@@ -776,7 +781,7 @@ function EconomyService.SellAllFruitsOfType(player, fruitType)
 	
 	if totalSold > 0 then
 		EconomyService.AddCoins(player, totalCoins)
-		EconomyService.SyncPlayerData(player)
+		EconomyService.SyncPlayerData(player, false)
 	end
 	
 	return true, totalSold, totalCoins
@@ -827,7 +832,7 @@ function EconomyService.SellFruit(player, fruitName, amount)
 	EconomyService.AddCoins(player, totalPrice)
 	
 	-- Sync inventory to client
-	EconomyService.SyncPlayerData(player)
+	EconomyService.SyncPlayerData(player, false)
 	
 	return true
 end
@@ -898,7 +903,7 @@ function EconomyService.Initialize()
 	
 	-- Handle request for player data (client can call this to get initial data)
 	requestDataEvent.OnServerEvent:Connect(function(player)
-		EconomyService.SyncPlayerData(player)
+		EconomyService.SyncPlayerData(player, true)
 	end)
 	
 	-- Handle Robux seed purchase requests (prompts the purchase)
@@ -951,7 +956,7 @@ function EconomyService.Initialize()
 			
 			if success then
 				-- Sync inventory to client
-				EconomyService.SyncPlayerData(player)
+				EconomyService.SyncPlayerData(player, false)
 				print(string.format("[EconomyService] Robux purchase: %s bought %dx %s seeds", player.Name, seedAmount, plantType))
 				return Enum.ProductPurchaseDecision.PurchaseGranted
 			else

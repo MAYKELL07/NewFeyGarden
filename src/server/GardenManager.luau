@@ -141,8 +141,8 @@ local function setupFruitPrompt(fruit: Instance, plantModel: Model, userId: numb
 		-- Add fruit to player inventory
 		local success, fruitInstance = DataService.AddFruitInstance(userId, fruitType, fruitWeight)
 		if success then
-			-- Sync inventory to client
-			EconomyService.SyncPlayerData(triggeringPlayer)
+			-- Sync inventory to client (no pet changes)
+			EconomyService.SyncPlayerData(triggeringPlayer, false)
 			
 			-- Fire event to client for visual feedback
 			harvestFruitEvent:FireClient(triggeringPlayer, fruitType, 1)
@@ -732,7 +732,7 @@ local function restorePlantSlots(userId: number, gardenFolder: Folder)
 
 			local ownerPlayer = Players:GetPlayerByUserId(ownerUserId)
 			if ownerPlayer then
-				EconomyService.SyncPlayerData(ownerPlayer)
+				EconomyService.SyncPlayerData(ownerPlayer, true)
 			end
 		end
 		
@@ -1249,7 +1249,7 @@ function GardenManager.PlantSeedAtPosition(player: Player, position: Vector3, pl
 	else
 		if not EggModule then
 			DataService.AddEgg(player.UserId, plantType, 1)
-			EconomyService.SyncPlayerData(player)
+			EconomyService.SyncPlayerData(player, false)
 			return false, "Egg module missing"
 		end
 
@@ -1262,7 +1262,7 @@ function GardenManager.PlantSeedAtPosition(player: Player, position: Vector3, pl
 		local eggModel = EggModule.CreateEggModel(plantType, adjustedPosition)
 		if not eggModel then
 			DataService.AddEgg(player.UserId, plantType, 1)
-			EconomyService.SyncPlayerData(player)
+			EconomyService.SyncPlayerData(player, false)
 			return false, "Failed to create egg model"
 		end
 
@@ -1322,7 +1322,7 @@ function GardenManager.PlantSeedAtPosition(player: Player, position: Vector3, pl
 			eggModel:Destroy()
 			local ownerPlayer = Players:GetPlayerByUserId(userId)
 			if ownerPlayer then
-				EconomyService.SyncPlayerData(ownerPlayer)
+				EconomyService.SyncPlayerData(ownerPlayer, true)
 			end
 		end)
 	end

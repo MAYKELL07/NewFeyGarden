@@ -137,7 +137,7 @@ function UISetup.CreateUI()
 	titleLabel.Position = UDim2.new(0.5, 0, 0.3, 0)
 	titleLabel.AnchorPoint = Vector2.new(0.5, 0.5)
 	titleLabel.BackgroundTransparency = 1
-	titleLabel.Text = "🌿 FEY GARDEN 🌿"
+	titleLabel.Text = "🌿 FEYGARDEN 🌿"
 	titleLabel.TextColor3 = Color3.fromRGB(180, 240, 200) -- Magical glow green
 	titleLabel.Font = Enum.Font.GothamBold
 	titleLabel.TextScaled = true
@@ -856,67 +856,151 @@ function UISetup.CreateUI()
 	local function createPetItemTemplate()
 		local petCard = Instance.new("Frame")
 		petCard.Name = "PetItemTemplate"
-		petCard.Size = UDim2.new(0, 90, 0, 110)
+		petCard.Size = UDim2.new(1, -10, 0, 110) -- Match ShopWindow list item scale
 		petCard.BackgroundColor3 = theme.forestDeep
 		petCard.BorderSizePixel = 0
-		
-		addCorner(petCard, 10)
+
+		addCorner(petCard, 12)
 		addStroke(petCard, theme.tealGem, 2, 0.4)
-		
-		-- Pet icon
+
+		local gradient = Instance.new("UIGradient")
+		gradient.Name = "Gradient"
+		gradient.Color = ColorSequence.new(theme.woodPanel, theme.woodBark)
+		gradient.Rotation = 90
+		gradient.Parent = petCard
+
+		-- Aspect ratio for consistent scaling (matches shop list cards)
+		local aspectRatio = Instance.new("UIAspectRatioConstraint")
+		aspectRatio.AspectRatio = 3.5
+		aspectRatio.AspectType = Enum.AspectType.ScaleWithParentSize
+		aspectRatio.DominantAxis = Enum.DominantAxis.Width
+		aspectRatio.Parent = petCard
+
+		-- Left: Pet icon container
+		local iconContainer = Instance.new("Frame")
+		iconContainer.Name = "IconContainer"
+		iconContainer.Size = UDim2.new(0.22, 0, 0.85, 0)
+		iconContainer.Position = UDim2.new(0.02, 0, 0.075, 0)
+		iconContainer.BackgroundColor3 = theme.forestDark
+		iconContainer.BorderSizePixel = 0
+		iconContainer.Parent = petCard
+		addCorner(iconContainer, 8)
+
+		local iconAspect = Instance.new("UIAspectRatioConstraint")
+		iconAspect.AspectRatio = 1
+		iconAspect.AspectType = Enum.AspectType.FitWithinMaxSize
+		iconAspect.DominantAxis = Enum.DominantAxis.Height
+		iconAspect.Parent = iconContainer
+
 		local petIcon = Instance.new("TextLabel")
 		petIcon.Name = "PetIcon"
-		petIcon.Size = UDim2.new(0.75, 0, 0.45, 0)
-		petIcon.Position = UDim2.new(0.5, 0, 0.28, 0)
+		petIcon.Size = UDim2.new(0.9, 0, 0.9, 0)
+		petIcon.Position = UDim2.new(0.5, 0, 0.5, 0)
 		petIcon.AnchorPoint = Vector2.new(0.5, 0.5)
 		petIcon.BackgroundTransparency = 1
-		petIcon.Text = "🐱"
+		petIcon.Text = "🐾"
 		petIcon.TextScaled = true
 		petIcon.Font = Enum.Font.GothamBold
 		petIcon.TextColor3 = theme.textLight
-		petIcon.Parent = petCard
-		
-		-- Pet name
+		petIcon.Parent = iconContainer
+
+		-- Middle: Pet info
+		local infoContainer = Instance.new("Frame")
+		infoContainer.Name = "InfoContainer"
+		infoContainer.Size = UDim2.new(0.50, 0, 0.85, 0)
+		infoContainer.Position = UDim2.new(0.26, 0, 0.075, 0)
+		infoContainer.BackgroundTransparency = 1
+		infoContainer.Parent = petCard
+
 		local petName = Instance.new("TextLabel")
 		petName.Name = "PetName"
-		petName.Size = UDim2.new(0.9, 0, 0.18, 0)
-		petName.Position = UDim2.new(0.5, 0, 0.52, 0)
-		petName.AnchorPoint = Vector2.new(0.5, 0)
+		petName.Size = UDim2.new(1, 0, 0.34, 0)
+		petName.Position = UDim2.new(0, 0, 0.05, 0)
 		petName.BackgroundTransparency = 1
-		petName.Text = "Cat"
+		petName.Text = "Pet Name"
 		petName.TextColor3 = theme.textLight
 		petName.Font = Enum.Font.GothamBold
 		petName.TextScaled = true
+		petName.TextXAlignment = Enum.TextXAlignment.Left
 		petName.TextTruncate = Enum.TextTruncate.AtEnd
-		petName.Parent = petCard
-		
-		-- Boost stat
+		petName.Parent = infoContainer
+
+		local petStats = Instance.new("TextLabel")
+		petStats.Name = "StatsLabel"
+		petStats.Size = UDim2.new(1, 0, 0.2, 0)
+		petStats.Position = UDim2.new(0, 0, 0.42, 0)
+		petStats.BackgroundTransparency = 1
+		petStats.Text = "Size: 1.0 | Weight: 1.0"
+		petStats.TextColor3 = theme.textMoss
+		petStats.Font = Enum.Font.Gotham
+		petStats.TextScaled = true
+		petStats.TextXAlignment = Enum.TextXAlignment.Left
+		petStats.Parent = infoContainer
+
 		local boostLabel = Instance.new("TextLabel")
 		boostLabel.Name = "BoostLabel"
-		boostLabel.Size = UDim2.new(0.9, 0, 0.14, 0)
-		boostLabel.Position = UDim2.new(0.5, 0, 0.72, 0)
-		boostLabel.AnchorPoint = Vector2.new(0.5, 0)
+		boostLabel.Size = UDim2.new(1, 0, 0.2, 0)
+		boostLabel.Position = UDim2.new(0, 0, 0.64, 0)
 		boostLabel.BackgroundTransparency = 1
-		boostLabel.Text = "+10% Growth"
+		boostLabel.Text = "Boost: 10%"
 		boostLabel.TextColor3 = theme.tealGlow
 		boostLabel.Font = Enum.Font.Gotham
 		boostLabel.TextScaled = true
-		boostLabel.Parent = petCard
-		
-		-- Equip/Unequip button
+		boostLabel.TextXAlignment = Enum.TextXAlignment.Left
+		boostLabel.Parent = infoContainer
+
+		local statusLabel = Instance.new("TextLabel")
+		statusLabel.Name = "StatusLabel"
+		statusLabel.Size = UDim2.new(1, 0, 0.18, 0)
+		statusLabel.Position = UDim2.new(0, 0, 0.84, 0)
+		statusLabel.BackgroundTransparency = 1
+		statusLabel.Text = ""
+		statusLabel.TextColor3 = theme.textGold
+		statusLabel.Font = Enum.Font.GothamBold
+		statusLabel.TextScaled = true
+		statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+		statusLabel.Parent = infoContainer
+
+		-- Right: Action buttons
+		local actionContainer = Instance.new("Frame")
+		actionContainer.Name = "ActionContainer"
+		actionContainer.Size = UDim2.new(0.22, 0, 0.85, 0)
+		actionContainer.Position = UDim2.new(0.76, 0, 0.075, 0)
+		actionContainer.BackgroundTransparency = 1
+		actionContainer.Parent = petCard
+
+		local actionLayout = Instance.new("UIListLayout")
+		actionLayout.FillDirection = Enum.FillDirection.Vertical
+		actionLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		actionLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		actionLayout.Padding = UDim.new(0, 6)
+		actionLayout.Parent = actionContainer
+
 		local equipButton = Instance.new("TextButton")
 		equipButton.Name = "EquipButton"
-		equipButton.Size = UDim2.new(0.85, 0, 0.16, 0)
-		equipButton.Position = UDim2.new(0.5, 0, 0.88, 0)
-		equipButton.AnchorPoint = Vector2.new(0.5, 0)
+		equipButton.Size = UDim2.new(0.95, 0, 0.44, 0)
 		equipButton.BackgroundColor3 = theme.tealGem
-		equipButton.Text = "⭐ EQUIP" -- Icon + text for accessibility
+		equipButton.Text = "⭐ EQUIP"
 		equipButton.TextColor3 = theme.textLight
 		equipButton.Font = Enum.Font.GothamBold
 		equipButton.TextScaled = true
-		equipButton.Parent = petCard
-		addCorner(equipButton, 6)
+		equipButton.LayoutOrder = 1
+		equipButton.Parent = actionContainer
+		addCorner(equipButton, 8)
 		addButtonFeedback(equipButton)
+
+		local gardenButton = Instance.new("TextButton")
+		gardenButton.Name = "GardenButton"
+		gardenButton.Size = UDim2.new(0.95, 0, 0.44, 0)
+		gardenButton.BackgroundColor3 = theme.mossGreen
+		gardenButton.Text = "🏡 GARDEN"
+		gardenButton.TextColor3 = theme.textLight
+		gardenButton.Font = Enum.Font.GothamBold
+		gardenButton.TextScaled = true
+		gardenButton.LayoutOrder = 2
+		gardenButton.Parent = actionContainer
+		addCorner(gardenButton, 8)
+		addButtonFeedback(gardenButton)
 		
 		return petCard
 	end
@@ -1658,8 +1742,7 @@ function UISetup.CreateUI()
 	shopScroll.ScrollingEnabled = true
 	shopScroll.ScrollBarThickness = 10
 	shopScroll.ScrollBarImageColor3 = theme.tealGem
-	shopScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	shopScroll.CanvasSize = UDim2.new(0, 0, 2, 0)
+	shopScroll.CanvasSize = UDim2.new(0, 0, 7, 200)
 	shopScroll.ZIndex = 12
 	shopScroll.Parent = shopLeftPanel
 	
@@ -1815,7 +1898,7 @@ function UISetup.CreateUI()
 	sellCloseStroke.Parent = sellCloseButton
 	
 	-- =============================================================================
-	-- PETS WINDOW (Modal) - 2 Column Layout: Available Pets | Equipped Pet
+	-- PETS WINDOW (Modal)
 	-- =============================================================================
 	local petsWindow = Instance.new("Frame")
 	petsWindow.Name = "PetsWindow"
@@ -1881,8 +1964,8 @@ function UISetup.CreateUI()
 	-- LEFT PANEL - Available Pets (no box art, scroll has background)
 	local petsLeftPanel = Instance.new("Frame")
 	petsLeftPanel.Name = "LeftPanel"
-	petsLeftPanel.Size = UDim2.new(0.48, 0, 0.88, 0)
-	petsLeftPanel.Position = UDim2.new(0.01, 0, 0.1, 0)
+	petsLeftPanel.Size = UDim2.new(0.96, 0, 0.88, 0)
+	petsLeftPanel.Position = UDim2.new(0.02, 0, 0.1, 0)
 	petsLeftPanel.BackgroundTransparency = 1
 	petsLeftPanel.BorderSizePixel = 0
 	petsLeftPanel.ZIndex = 11
@@ -1916,9 +1999,9 @@ function UISetup.CreateUI()
 	petsScroll.Parent = petsLeftPanel
 	
 	addCorner(petsScroll, 12)
-	
+
 	local petsLayout = Instance.new("UIListLayout")
-	petsLayout.Padding = UDim.new(0, 8)
+	petsLayout.Padding = UDim.new(0, 10)
 	petsLayout.SortOrder = Enum.SortOrder.LayoutOrder
 	petsLayout.Parent = petsScroll
 	
@@ -1932,57 +2015,6 @@ function UISetup.CreateUI()
 	-- Add template for cloning (invisible)
 	addTemplateToScrollFrame(petsScroll, "PetItem")
 	bindCanvasSize(petsScroll, petsLayout, petsPadding)
-	
-	-- RIGHT PANEL - Equipped Pet Display
-	local petsRightPanel = Instance.new("Frame")
-	petsRightPanel.Name = "RightPanel"
-	petsRightPanel.Size = UDim2.new(0.48, 0, 0.88, 0)
-	petsRightPanel.Position = UDim2.new(0.51, 0, 0.1, 0)
-	petsRightPanel.BackgroundTransparency = 1
-	petsRightPanel.BorderSizePixel = 0
-	petsRightPanel.ZIndex = 11
-	petsRightPanel.Parent = petsWindow
-	-- No box art - using transparent panel
-	
-	local petsRightTitle = Instance.new("TextLabel")
-	petsRightTitle.Name = "PanelTitle"
-	petsRightTitle.Size = UDim2.new(0.9, 0, 0.06, 0)
-	petsRightTitle.Position = UDim2.new(0.05, 0, 0.02, 0)
-	petsRightTitle.BackgroundTransparency = 1
-	petsRightTitle.Text = "⭐ Equipped Pet"
-	petsRightTitle.TextColor3 = theme.textMoss
-	petsRightTitle.Font = Enum.Font.GothamBold
-	petsRightTitle.TextScaled = true
-	petsRightTitle.TextXAlignment = Enum.TextXAlignment.Left
-	petsRightTitle.ZIndex = 12
-	petsRightTitle.Parent = petsRightPanel
-	
-	-- Equipped pet display area (with 0.7 opacity background)
-	local equippedPetDisplay = Instance.new("Frame")
-	equippedPetDisplay.Name = "EquippedPetDisplay"
-	equippedPetDisplay.Size = UDim2.new(0.9, 0, 0.9, 0)
-	equippedPetDisplay.Position = UDim2.new(0.05, 0, 0.09, 0)
-	equippedPetDisplay.BackgroundColor3 = theme.forestDark
-	equippedPetDisplay.BackgroundTransparency = 0.3 -- 0.7 opacity
-	equippedPetDisplay.ZIndex = 12
-	equippedPetDisplay.Parent = petsRightPanel
-	
-	addCorner(equippedPetDisplay, 12)
-	
-	-- Placeholder for equipped pet (will be populated by UIHandler)
-	local equippedPetLabel = Instance.new("TextLabel")
-	equippedPetLabel.Name = "PlaceholderLabel"
-	equippedPetLabel.Size = UDim2.new(0.9, 0, 0.3, 0)
-	equippedPetLabel.Position = UDim2.new(0.05, 0, 0.35, 0)
-	equippedPetLabel.BackgroundTransparency = 1
-	equippedPetLabel.Text = "No pet equipped\n\n🐾\n\nSelect a pet from the left!"
-	equippedPetLabel.TextColor3 = theme.textMoss
-	equippedPetLabel.Font = Enum.Font.Gotham
-	equippedPetLabel.TextSize = 18
-	equippedPetLabel.TextWrapped = true
-	equippedPetLabel.TextYAlignment = Enum.TextYAlignment.Center
-	equippedPetLabel.ZIndex = 13
-	equippedPetLabel.Parent = equippedPetDisplay
 	
 	-- =============================================================================
 	-- PET SHOP WINDOW (Separate from Inventory) - Egg Shop + Player Pets Preview

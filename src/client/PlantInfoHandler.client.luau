@@ -292,6 +292,36 @@ local function getAccurateBuffStatus(plantModel)
 	}
 end
 
+-- Count current fruit availability so tooltip matches what can actually be picked
+local function getFruitAvailability(plantModel)
+	local fruitsFolder = plantModel:FindFirstChild("Fruits")
+	local available = 0
+	local attached = 0
+
+	if fruitsFolder then
+		for _, child in ipairs(fruitsFolder:GetChildren()) do
+			if child:GetAttribute("FruitType") then
+				attached += 1
+				if child:GetAttribute("Revealed") then
+					available += 1
+				end
+			end
+		end
+	end
+
+	local attrRemaining = plantModel:GetAttribute("FruitsRemaining")
+	if typeof(attrRemaining) == "number" then
+		attached = math.max(attached, attrRemaining)
+	end
+
+	local total = plantModel:GetAttribute("FruitCount")
+	if typeof(total) ~= "number" or total < attached then
+		total = attached
+	end
+
+	return available, attached, total
+end
+
 local function showPlantInfo(plantModel, mousePosition: Vector2)
 	if not infoFrame then return end
 	
@@ -321,8 +351,7 @@ local function showPlantInfo(plantModel, mousePosition: Vector2)
 	-- Update countdown using stageDisplay (which has fallback logic)
 	local timeRemaining, nextStageText = calculateTimeToNextStage(plantModel)
 	if stageDisplay == Constants.GROWTH_STAGES.BLOOM then
-		local fruitsRevealed = plantModel:GetAttribute("FruitsRevealed") or 0
-		local totalFruits = plantModel:GetAttribute("FruitCount") or 0
+		local availableFruits, attachedFruits, totalFruits = getFruitAvailability(plantModel)
 		local harvestRemovesPlant = plantModel:GetAttribute("HarvestRemovesPlant")
 		local nextRevealTime = plantModel:GetAttribute("NextFruitRevealTime") or 0
 
@@ -331,22 +360,23 @@ local function showPlantInfo(plantModel, mousePosition: Vector2)
 			countdownLabel.Text = "🍎 Fruits: 0/0"
 			fruitCountdownLabel.Visible = false
 		else
-			-- Simple progress indicator only (no "left")
-			countdownLabel.Text = string.format("🍎 Fruits: %d/%d", fruitsRevealed, totalFruits)
+			countdownLabel.Text = string.format("🍎 Ready: %d/%d", availableFruits, attachedFruits)
 
-			-- Keep showing countdown until all fruit is revealed
-			if fruitsRevealed < totalFruits then
+			if availableFruits < attachedFruits then
 				local timeToNextFruit = 0
 				if nextRevealTime > 0 then
 					timeToNextFruit = math.max(0, nextRevealTime - os.time())
 				end
 				fruitCountdownLabel.Text = "⏱ Next fruit: " .. formatTime(timeToNextFruit)
 				fruitCountdownLabel.Visible = true
+			elseif attachedFruits == 0 then
+				fruitCountdownLabel.Text = "✨ Waiting for regrowth"
+				fruitCountdownLabel.Visible = true
 			else
 				if harvestRemovesPlant then
-					fruitCountdownLabel.Text = "✨ All fruit grown • Harvest removes plant"
+					fruitCountdownLabel.Text = "✨ All fruit collected • Harvest removes plant"
 				else
-					fruitCountdownLabel.Text = "✨ All fruit grown"
+					fruitCountdownLabel.Text = "✨ All fruit collected"
 				end
 				fruitCountdownLabel.Visible = true
 			end

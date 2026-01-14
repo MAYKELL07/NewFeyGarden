@@ -184,10 +184,10 @@ Config.EggOpening = {
 -- Settings for how pets roam within the player's garden
 Config.GardenPetRoaming = {
 	-- Roaming bounds (box centered on garden floor)
-	BoundsHalfWidth = 30,                -- Half-width of roaming box (X axis)
+	BoundsHalfWidth = 60,                -- Half-width of roaming box (X axis)
 	BoundsHalfLength = 30,               -- Half-length of roaming box (Z axis)
 	MinHeight = 2,                       -- Minimum hover height above floor
-	MaxHeight = 10,                       -- Maximum hover height above floor
+	MaxHeight = 20,                       -- Maximum hover height above floor
 	
 	-- Movement behavior (improved timing for realism)
 	IdleChance = 0.65,                   -- Chance to stay idle vs moving (0-1) - slightly higher for calmer pets

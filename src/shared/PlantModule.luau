@@ -92,31 +92,76 @@ local function collectFruitTemplates(plantFolder: Instance, plantPart: Instance?
 	local fruitTemplates = {}
 	local templateRootCFrame: CFrame? = nil
 
-	-- First, try fruits authored under the current plant model (runtime Plant instance)
-	if plantPart then
-		local rootCFrame = getPrimaryCFrame(plantPart)
-		if rootCFrame then
-			templateRootCFrame = rootCFrame
-			for _, desc in ipairs(plantPart:GetDescendants()) do
-				if desc:IsA("BasePart") and string.sub(desc.Name, 1, 5) == "Fruit" then
+	local function hasFruitPrefix(name: string): boolean
+		return string.sub(name, 1, 5) == "Fruit"
+	end
+
+	local function parseFruitIndex(name: string): number?
+		if not hasFruitPrefix(name) then
+			return nil
+		end
+		local suffix = string.sub(name, 6)
+		local num = tonumber(suffix)
+		return num
+	end
+
+	local function isDescendantOfFruitModel(instance: Instance, root: Instance): boolean
+		local current = instance.Parent
+		while current and current ~= root do
+			if current:IsA("Model") and hasFruitPrefix(current.Name) then
+				return true
+			end
+			current = current.Parent
+		end
+		return false
+	end
+
+	local function collectFromRoot(rootInstance: Instance)
+		local rootCFrame = getPrimaryCFrame(rootInstance)
+		if not rootCFrame then
+			return
+		end
+		templateRootCFrame = rootCFrame
+
+		for _, desc in ipairs(rootInstance:GetDescendants()) do
+			if desc:IsA("Model") and hasFruitPrefix(desc.Name) then
+				table.insert(fruitTemplates, desc)
+			elseif desc:IsA("BasePart") and hasFruitPrefix(desc.Name) then
+				-- If a Fruit* model exists, prefer it over parts inside that model.
+				if not isDescendantOfFruitModel(desc, rootInstance) then
 					table.insert(fruitTemplates, desc)
 				end
 			end
 		end
 	end
 
+	-- First, try fruits authored under the current plant model (runtime Plant instance)
+	if plantPart then
+		collectFromRoot(plantPart)
+	end
+
 	-- Fallback: fruits under plant folder (content repo)
 	if #fruitTemplates == 0 then
 		local matureModel = plantFolder:FindFirstChild("Mature")
 		if matureModel and matureModel:IsA("Model") then
-			templateRootCFrame = getPrimaryCFrame(matureModel)
-			for _, child in ipairs(matureModel:GetDescendants()) do
-				if child:IsA("BasePart") and string.sub(child.Name, 1, 5) == "Fruit" then
-					table.insert(fruitTemplates, child)
-				end
-			end
+			collectFromRoot(matureModel)
 		end
 	end
+
+	table.sort(fruitTemplates, function(a: Instance, b: Instance)
+		local aIndex = parseFruitIndex(a.Name)
+		local bIndex = parseFruitIndex(b.Name)
+		if aIndex and bIndex then
+			return aIndex < bIndex
+		end
+		if aIndex then
+			return true
+		end
+		if bIndex then
+			return false
+		end
+		return a.Name < b.Name
+	end)
 
 	return fruitTemplates, templateRootCFrame
 end
@@ -449,9 +494,18 @@ function PlantModule.SpawnFruits(plantModel)
 	local plantPart = plantModel:FindFirstChild("Plant")
 	local fruitTemplates, templateRoot = collectFruitTemplates(plantFolder, plantPart)
 	for _, template in ipairs(fruitTemplates) do
-		if plantPart and template:IsDescendantOf(plantPart) and template:IsA("BasePart") then
-			template.Transparency = 1
-			template.CanCollide = false
+		if plantPart and template:IsDescendantOf(plantPart) then
+			if template:IsA("BasePart") then
+				template.Transparency = 1
+				template.CanCollide = false
+			elseif template:IsA("Model") then
+				for _, part in ipairs(template:GetDescendants()) do
+					if part:IsA("BasePart") then
+						part.Transparency = 1
+						part.CanCollide = false
+					end
+				end
+			end
 		end
 	end
 	local usePlaceholder = #fruitTemplates == 0
@@ -540,7 +594,12 @@ function PlantModule.SpawnFruits(plantModel)
 			end
 			local relCFrame
 			if templateRoot then
-				relCFrame = templateRoot:ToObjectSpace(template.CFrame)
+				local templateCFrame = getPrimaryCFrame(template)
+				if templateCFrame then
+					relCFrame = templateRoot:ToObjectSpace(templateCFrame)
+				else
+					relCFrame = CFrame.new()
+				end
 			else
 				relCFrame = CFrame.new()
 			end
@@ -781,20 +840,33 @@ function PlantModule.SpawnSingleFruit(plantModel, fruitIndex)
 	
 	local plantFolder = findPlantFolder(plantsFolder, plantType)
 	if not plantFolder then return nil end
-	
-	local fruitTemplates, templateRoot = collectFruitTemplates(plantFolder)
-	local usePlaceholder = #fruitTemplates == 0
 
 	local plantPart = plantModel:FindFirstChild("Plant")
 	local plantRootCFrame = plantPart and getPrimaryCFrame(plantPart)
 	if not plantRootCFrame then return nil end
+
+	local fruitTemplates, templateRoot = collectFruitTemplates(plantFolder, plantPart)
+	for _, template in ipairs(fruitTemplates) do
+		if plantPart and template:IsDescendantOf(plantPart) then
+			if template:IsA("BasePart") then
+				template.Transparency = 1
+				template.CanCollide = false
+			elseif template:IsA("Model") then
+				for _, part in ipairs(template:GetDescendants()) do
+					if part:IsA("BasePart") then
+						part.Transparency = 1
+						part.CanCollide = false
+					end
+				end
+			end
+		end
+	end
+	local usePlaceholder = #fruitTemplates == 0
 	
 	-- Get or create fruits folder
 	local fruitsFolder = plantModel:FindFirstChild("Fruits")
 	if not fruitsFolder then
 		fruitsFolder = Instance.new("Folder")
-	local fruitTemplates, templateRoot = collectFruitTemplates(plantFolder, plantPart)
-	local usePlaceholder = #fruitTemplates == 0
 		fruitsFolder.Name = "Fruits"
 		fruitsFolder.Parent = plantModel
 	end
@@ -857,7 +929,12 @@ function PlantModule.SpawnSingleFruit(plantModel, fruitIndex)
 		relCFrame = CFrame.new(offset)
 	else
 		if templateRoot then
-			relCFrame = templateRoot:ToObjectSpace(fruitTemplates[templateIndex].CFrame)
+			local templateCFrame = getPrimaryCFrame(fruitTemplates[templateIndex])
+			if templateCFrame then
+				relCFrame = templateRoot:ToObjectSpace(templateCFrame)
+			else
+				relCFrame = CFrame.new()
+			end
 		else
 			relCFrame = CFrame.new()
 		end
@@ -873,7 +950,21 @@ function PlantModule.SpawnSingleFruit(plantModel, fruitIndex)
 	fruit:SetAttribute("FruitType", plantType .. "Fruit")
 	fruit:SetAttribute("PlantType", plantType)
 	fruit:SetAttribute("FruitIndex", fruitIndex)
+	fruit:SetAttribute("Revealed", false)
 	fruit:SetAttribute("UseScaleReveal", usePlaceholder)
+
+	if fruit:IsA("BasePart") then
+		fruit.Transparency = 1
+		if usePlaceholder then
+			fruit.Size = fruit.Size * 0.01
+		end
+	elseif fruit:IsA("Model") then
+		for _, part in ipairs(fruit:GetDescendants()) do
+			if part:IsA("BasePart") then
+				part.Transparency = 1
+			end
+		end
+	end
 	
 	local plantWeight = plantModel:GetAttribute("Weight") or 1
 	local fruitWeight = plantWeight * (0.9 + math.random() * 0.2)

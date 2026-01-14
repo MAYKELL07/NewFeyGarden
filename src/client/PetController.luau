@@ -115,67 +115,87 @@ local function calculateWeightScale(weight)
 	return math.clamp(scale, MIN_WEIGHT_SCALE, MAX_WEIGHT_SCALE)
 end
 
+local function scaleCFramePosition(cf, scale)
+	return CFrame.new(cf.Position * scale) * (cf - cf.Position)
+end
+
+local function scaleMotorOffsets(model, relativeScale)
+	for _, descendant in ipairs(model:GetDescendants()) do
+		if descendant:IsA("Motor6D") then
+			if descendant.C0 then
+				descendant.C0 = scaleCFramePosition(descendant.C0, relativeScale)
+			end
+			if descendant.C1 then
+				descendant.C1 = scaleCFramePosition(descendant.C1, relativeScale)
+			end
+		end
+	end
+end
+
+local function scaleAttachments(model, relativeScale)
+	for _, descendant in ipairs(model:GetDescendants()) do
+		if descendant:IsA("Attachment") then
+			descendant.Position = descendant.Position * relativeScale
+		end
+	end
+end
+
+local function shouldScalePart(part, respectExempt)
+	if not respectExempt then return true end
+
+	for _, exemptName in ipairs(SCALE_EXEMPT_NAMES) do
+		if string.find(part.Name, exemptName) then
+			return false
+		end
+	end
+
+	local volume = part.Size.X * part.Size.Y * part.Size.Z
+	return volume >= 0.1
+end
+
+local function scaleModelParts(petModel, relativeScale, respectExempt)
+	for _, part in ipairs(petModel:GetDescendants()) do
+		if part:IsA("BasePart") and shouldScalePart(part, respectExempt) then
+			part.Size = part.Size * relativeScale
+		end
+	end
+end
+
+local function updateLightRange(petModel, targetScale)
+	local body = petModel.PrimaryPart or petModel:FindFirstChildWhichIsA("BasePart")
+	if not body then return end
+
+	local light = body:FindFirstChild("PetLight")
+	if light and light:IsA("PointLight") then
+		local baseRange = light:GetAttribute("BaseRange") or light.Range or 0
+		light:SetAttribute("BaseRange", baseRange)
+		light.Range = baseRange * targetScale
+	end
+end
+
+local function applyModelScale(petModel, targetScale, respectExempt)
+	if not petModel or not targetScale or targetScale <= 0 then return end
+
+	local currentScale = petModel:GetAttribute("AppliedScale") or 1
+	local relativeScale = targetScale / currentScale
+	if relativeScale <= 0 or math.abs(relativeScale - 1) < 0.01 then return end
+
+	scaleModelParts(petModel, relativeScale, respectExempt)
+	scaleAttachments(petModel, relativeScale)
+	scaleMotorOffsets(petModel, relativeScale)
+	updateLightRange(petModel, targetScale)
+
+	petModel:SetAttribute("AppliedScale", targetScale)
+end
+
 -- Apply scale to pet model based on weight
 local function applyWeightScale(petModel, weight)
-	if not petModel or not petModel.Parent then return end
-	
-	local scale = calculateWeightScale(weight)
-	local currentScale = petModel:GetAttribute("AppliedScale") or 1
-	
-	-- Skip if scale hasn't changed significantly
-	if math.abs(scale - currentScale) < 0.01 then return end
-	
-	-- Calculate relative scale change
-	local relativeScale = scale / currentScale
-	
-	-- Validate scale change isn't too extreme (safety check)
-	if relativeScale < 0.5 or relativeScale > 2.0 then
-		warn("[PetController] Extreme scale change detected, skipping:", relativeScale)
-		return
-	end
-	
-	-- Scale BaseParts in the model, but be selective about what we scale
-	for _, part in ipairs(petModel:GetDescendants()) do
-		if part:IsA("BasePart") then
-			-- Check if this part should be exempt from scaling
-			local shouldScale = true
-			for _, exemptName in ipairs(SCALE_EXEMPT_NAMES) do
-				if string.find(part.Name, exemptName) then
-					shouldScale = false
-					break
-				end
-			end
-			
-			-- Also exempt very small parts that might be details/accessories
-			local partVolume = part.Size.X * part.Size.Y * part.Size.Z
-			if partVolume < 0.1 then -- Very small parts (likely details)
-				shouldScale = false
-			end
-			
-			if shouldScale then
-				-- Store original size if not already stored
-				if not part:GetAttribute("OriginalSize") then
-					part:SetAttribute("OriginalSize", tostring(part.Size))
-				end
-				
-				part.Size = part.Size * relativeScale
-			end
-		end
-	end
-	
-	-- Update light range if present (scale with pet size)
-	local body = petModel.PrimaryPart or petModel:FindFirstChildWhichIsA("BasePart")
-	if body then
-		local light = body:FindFirstChild("PetLight")
-		if light and light:IsA("PointLight") then
-			-- Scale light range more conservatively than the pet itself
-			local lightScale = 1 + ((scale - 1) * 0.7) -- 70% of the size scaling
-			light.Range = 8 * lightScale
-		end
-	end
-	
-	-- Store the applied scale for future reference
-	petModel:SetAttribute("AppliedScale", scale)
+	if not petModel then return end
+
+	local baseSize = petModel:GetAttribute("Size") or 1
+	local targetScale = baseSize * calculateWeightScale(weight)
+
+	applyModelScale(petModel, targetScale, true)
 end
 
 -- Setup weight attribute listener for a pet model
@@ -360,11 +380,6 @@ local function createPetModel(petInstance, petName)
 		if part:IsA("BasePart") then
 			part.CanCollide = false
 			part.Anchored = false
-			
-			-- Apply size scaling (scale relative to original size)
-			if petSize ~= 1 then
-				part.Size = part.Size * petSize
-			end
 		end
 	end
 	
@@ -375,14 +390,16 @@ local function createPetModel(petInstance, petName)
 		body.CustomPhysicalProperties = PhysicalProperties.new(density, 0.3, 0.5, 1, 1)
 		
 		-- Add glow effect
-		if not body:FindFirstChild("PetLight") then
-			local light = Instance.new("PointLight")
+		local light = body:FindFirstChild("PetLight")
+		if not light then
+			light = Instance.new("PointLight")
 			light.Name = "PetLight"
 			light.Brightness = 1
-			light.Range = 8 * petSize -- Scale light with size
+			light.Range = 8
 			light.Color = config.Color
 			light.Parent = body
 		end
+		light:SetAttribute("BaseRange", light.Range)
 		
 		-- Add movement physics based on movement type
 		if movementType == "Fly" then
@@ -446,28 +463,10 @@ local function createPetModel(petInstance, petName)
 	petModel:SetAttribute("Size", petSize)
 	petModel:SetAttribute("Weight", petWeight)
 	petModel:SetAttribute("MovementType", movementType)
-	
-	-- Apply weight-based scaling and setup listener for future changes
-	local weightScale = calculateWeightScale(petWeight)
-	petModel:SetAttribute("AppliedScale", petSize * weightScale)  -- Combined initial scale
-	
-	-- Apply additional weight scale on top of size
-	if petWeight ~= 1 then
-		local relativeScale = weightScale  -- Weight scale relative to base (size already applied)
-		for _, part in ipairs(petModel:GetDescendants()) do
-			if part:IsA("BasePart") then
-				part.Size = part.Size * relativeScale
-			end
-		end
-		
-		-- Update light range
-		if body then
-			local light = body:FindFirstChild("PetLight")
-			if light and light:IsA("PointLight") then
-				light.Range = 8 * petSize * weightScale
-			end
-		end
-	end
+	petModel:SetAttribute("AppliedScale", 1)
+
+	applyModelScale(petModel, petSize, false)
+	applyWeightScale(petModel, petWeight)
 	
 	-- Setup listener for weight attribute changes
 	setupWeightListener(petModel)

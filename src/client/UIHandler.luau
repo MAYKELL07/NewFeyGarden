@@ -1685,228 +1685,330 @@ local function createPetInstanceItem(petInstance, container, layoutOrder)
 	-- Calculate actual boost based on weight
 	local baseBoost = config.WaterBoost or 0
 	local actualBoost = baseBoost * petWeight
-	
-	local itemFrame = Instance.new("Frame")
-	itemFrame.Name = petId
-	itemFrame.Size = UDim2.new(1, 0, 0, 90)
-	itemFrame.BackgroundColor3 = isEquipped and THEME.TealGem or (isInGarden and THEME.MossGreen or THEME.WoodPanel)
-	itemFrame.BorderSizePixel = 0
-	itemFrame.ZIndex = 11
-	itemFrame.LayoutOrder = layoutOrder or 1
-	itemFrame.Parent = container
-	
-	local corner = Instance.new("UICorner")
-	corner.CornerRadius = UDim.new(0, 12)
-	corner.Parent = itemFrame
-	
-	local gradient = Instance.new("UIGradient")
-	if isEquipped then
-		gradient.Color = ColorSequence.new(THEME.TealGem, THEME.ForestDeep)
-	elseif isInGarden then
-		gradient.Color = ColorSequence.new(THEME.MossGreen, THEME.ForestDeep)
-	else
-		gradient.Color = ColorSequence.new(THEME.WoodPanel, THEME.WoodBark)
-	end
-	gradient.Rotation = 90
-	gradient.Parent = itemFrame
 
-	local stroke = Instance.new("UIStroke")
-	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-	stroke.Thickness = 2
-	stroke.Color = rarityColor
-	stroke.Transparency = 0.2
-	stroke.Parent = itemFrame
-	
-	-- Icon
-	local icon = Instance.new("TextLabel")
-	icon.Size = UDim2.new(0, 50, 0, 50)
-	icon.Position = UDim2.new(0, 8, 0, 8)
-	icon.BackgroundTransparency = 1
-	icon.Text = "🐾"
-	icon.TextScaled = true
-	icon.TextColor3 = rarityColor
-	icon.Font = Enum.Font.GothamBold
-	icon.ZIndex = 12
-	icon.Parent = itemFrame
-	
-	-- Name with rarity color
-	local nameLabel = Instance.new("TextLabel")
-	nameLabel.Size = UDim2.new(0.35, 0, 0, 22)
-	nameLabel.Position = UDim2.new(0.15, 0, 0, 8)
-	nameLabel.BackgroundTransparency = 1
-	nameLabel.Text = displayName
-	nameLabel.TextColor3 = rarityColor
-	nameLabel.Font = Enum.Font.GothamBold
-	nameLabel.TextSize = 16
-	nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-	nameLabel.ZIndex = 12
-	nameLabel.Parent = itemFrame
-	
-	-- Size/Weight stats
-	local statsLabel = Instance.new("TextLabel")
-	statsLabel.Size = UDim2.new(0.35, 0, 0, 16)
-	statsLabel.Position = UDim2.new(0.15, 0, 0, 32)
-	statsLabel.BackgroundTransparency = 1
-	statsLabel.Text = string.format("Size: %.2f | Weight: %.2f", petSize, petWeight)
-	statsLabel.TextColor3 = THEME.TextMoss
-	statsLabel.Font = Enum.Font.Gotham
-	statsLabel.TextSize = 12
-	statsLabel.TextXAlignment = Enum.TextXAlignment.Left
-	statsLabel.ZIndex = 12
-	statsLabel.Parent = itemFrame
-	
-	-- Boost info (affected by weight)
-	local boostLabel = Instance.new("TextLabel")
-	boostLabel.Size = UDim2.new(0.35, 0, 0, 16)
-	boostLabel.Position = UDim2.new(0.15, 0, 0, 50)
-	boostLabel.BackgroundTransparency = 1
-	boostLabel.Text = string.format("Boost: %.1f%%", actualBoost * 100)
-	boostLabel.TextColor3 = THEME.TealGlow
-	boostLabel.Font = Enum.Font.Gotham
-	boostLabel.TextSize = 12
-	boostLabel.TextXAlignment = Enum.TextXAlignment.Left
-	boostLabel.ZIndex = 12
-	boostLabel.Parent = itemFrame
-	
-	-- Status indicator
-	local statusLabel = Instance.new("TextLabel")
-	statusLabel.Size = UDim2.new(0.2, 0, 0, 18)
-	statusLabel.Position = UDim2.new(0.15, 0, 0, 68)
-	statusLabel.BackgroundTransparency = 1
-	statusLabel.Font = Enum.Font.GothamBold
-	statusLabel.TextSize = 11
-	statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-	statusLabel.ZIndex = 12
-	statusLabel.Parent = itemFrame
-	
-	if isEquipped then
-		statusLabel.Text = "✓ EQUIPPED"
-		statusLabel.TextColor3 = THEME.TealGlow
-	elseif isInGarden then
-		statusLabel.Text = "🏡 IN GARDEN"
-		statusLabel.TextColor3 = THEME.MossGreen
-	else
+	local function createFallbackPetCard()
+		local frame = Instance.new("Frame")
+		frame.Name = petId
+		frame.Size = UDim2.new(1, -10, 0, 110)
+		frame.BackgroundColor3 = THEME.WoodPanel
+		frame.BorderSizePixel = 0
+		frame.LayoutOrder = layoutOrder or 1
+		frame.ZIndex = 11
+		frame.Parent = container
+
+		Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+
+		local gradient = Instance.new("UIGradient")
+		gradient.Name = "Gradient"
+		gradient.Color = ColorSequence.new(THEME.WoodPanel, THEME.WoodBark)
+		gradient.Rotation = 90
+		gradient.Parent = frame
+
+		local stroke = Instance.new("UIStroke")
+		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+		stroke.Thickness = 2
+		stroke.Color = rarityColor
+		stroke.Transparency = 0.2
+		stroke.Parent = frame
+
+		local iconContainer = Instance.new("Frame")
+		iconContainer.Name = "IconContainer"
+		iconContainer.Size = UDim2.new(0, 90, 0, 90)
+		iconContainer.Position = UDim2.new(0, 10, 0.5, 0)
+		iconContainer.AnchorPoint = Vector2.new(0, 0.5)
+		iconContainer.BackgroundColor3 = THEME.ForestDark
+		iconContainer.BorderSizePixel = 0
+		iconContainer.ZIndex = 12
+		iconContainer.Parent = frame
+		Instance.new("UICorner", iconContainer).CornerRadius = UDim.new(0, 10)
+
+		local petIcon = Instance.new("TextLabel")
+		petIcon.Name = "PetIcon"
+		petIcon.Size = UDim2.new(1, 0, 1, 0)
+		petIcon.BackgroundTransparency = 1
+		petIcon.Text = config.Icon or "🐾"
+		petIcon.TextScaled = true
+		petIcon.TextColor3 = THEME.TextLight
+		petIcon.Font = Enum.Font.GothamBold
+		petIcon.ZIndex = 13
+		petIcon.Parent = iconContainer
+
+		local infoContainer = Instance.new("Frame")
+		infoContainer.Name = "InfoContainer"
+		infoContainer.Size = UDim2.new(1, -220, 1, -18)
+		infoContainer.Position = UDim2.new(0, 110, 0, 9)
+		infoContainer.BackgroundTransparency = 1
+		infoContainer.ZIndex = 12
+		infoContainer.Parent = frame
+
+		local petName = Instance.new("TextLabel")
+		petName.Name = "PetName"
+		petName.Size = UDim2.new(1, 0, 0, 28)
+		petName.Position = UDim2.new(0, 0, 0, 0)
+		petName.BackgroundTransparency = 1
+		petName.Text = displayName
+		petName.TextColor3 = rarityColor
+		petName.Font = Enum.Font.GothamBold
+		petName.TextSize = 18
+		petName.TextXAlignment = Enum.TextXAlignment.Left
+		petName.TextTruncate = Enum.TextTruncate.AtEnd
+		petName.ZIndex = 13
+		petName.Parent = infoContainer
+
+		local statsLabel = Instance.new("TextLabel")
+		statsLabel.Name = "StatsLabel"
+		statsLabel.Size = UDim2.new(1, 0, 0, 18)
+		statsLabel.Position = UDim2.new(0, 0, 0, 30)
+		statsLabel.BackgroundTransparency = 1
+		statsLabel.Text = string.format("Size: %.2f | Weight: %.2f", petSize, petWeight)
+		statsLabel.TextColor3 = THEME.TextMoss
+		statsLabel.Font = Enum.Font.Gotham
+		statsLabel.TextSize = 12
+		statsLabel.TextXAlignment = Enum.TextXAlignment.Left
+		statsLabel.ZIndex = 13
+		statsLabel.Parent = infoContainer
+
+		local boostLabel = Instance.new("TextLabel")
+		boostLabel.Name = "BoostLabel"
+		boostLabel.Size = UDim2.new(1, 0, 0, 18)
+		boostLabel.Position = UDim2.new(0, 0, 0, 50)
+		boostLabel.BackgroundTransparency = 1
+		boostLabel.Text = string.format("Boost: %.1f%%", actualBoost * 100)
+		boostLabel.TextColor3 = THEME.TealGlow
+		boostLabel.Font = Enum.Font.Gotham
+		boostLabel.TextSize = 12
+		boostLabel.TextXAlignment = Enum.TextXAlignment.Left
+		boostLabel.ZIndex = 13
+		boostLabel.Parent = infoContainer
+
+		local statusLabel = Instance.new("TextLabel")
+		statusLabel.Name = "StatusLabel"
+		statusLabel.Size = UDim2.new(1, 0, 0, 18)
+		statusLabel.Position = UDim2.new(0, 0, 1, -18)
+		statusLabel.BackgroundTransparency = 1
 		statusLabel.Text = ""
+		statusLabel.TextColor3 = THEME.TextGold
+		statusLabel.Font = Enum.Font.GothamBold
+		statusLabel.TextSize = 12
+		statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+		statusLabel.ZIndex = 13
+		statusLabel.Parent = infoContainer
+
+		local actionContainer = Instance.new("Frame")
+		actionContainer.Name = "ActionContainer"
+		actionContainer.Size = UDim2.new(0, 100, 1, -18)
+		actionContainer.Position = UDim2.new(1, -110, 0, 9)
+		actionContainer.BackgroundTransparency = 1
+		actionContainer.ZIndex = 12
+		actionContainer.Parent = frame
+
+		local actionLayout = Instance.new("UIListLayout")
+		actionLayout.FillDirection = Enum.FillDirection.Vertical
+		actionLayout.SortOrder = Enum.SortOrder.LayoutOrder
+		actionLayout.Padding = UDim.new(0, 8)
+		actionLayout.Parent = actionContainer
+
+		local equipButton = Instance.new("TextButton")
+		equipButton.Name = "EquipButton"
+		equipButton.Size = UDim2.new(1, 0, 0, 40)
+		equipButton.BackgroundColor3 = THEME.TealGem
+		equipButton.Text = "Equip"
+		equipButton.TextColor3 = THEME.TextLight
+		equipButton.Font = Enum.Font.GothamBold
+		equipButton.TextSize = 14
+		equipButton.ZIndex = 13
+		equipButton.LayoutOrder = 1
+		equipButton.Parent = actionContainer
+		Instance.new("UICorner", equipButton).CornerRadius = UDim.new(0, 10)
+
+		local gardenButton = Instance.new("TextButton")
+		gardenButton.Name = "GardenButton"
+		gardenButton.Size = UDim2.new(1, 0, 0, 40)
+		gardenButton.BackgroundColor3 = THEME.MossGreen
+		gardenButton.Text = "Garden"
+		gardenButton.TextColor3 = THEME.TextLight
+		gardenButton.Font = Enum.Font.GothamBold
+		gardenButton.TextSize = 14
+		gardenButton.ZIndex = 13
+		gardenButton.LayoutOrder = 2
+		gardenButton.Parent = actionContainer
+		Instance.new("UICorner", gardenButton).CornerRadius = UDim.new(0, 10)
+
+		return frame
 	end
-	
-	-- Button container
-	local buttonContainer = Instance.new("Frame")
-	buttonContainer.Size = UDim2.new(0.35, 0, 0.8, 0)
-	buttonContainer.Position = UDim2.new(0.62, 0, 0.1, 0)
-	buttonContainer.BackgroundTransparency = 1
-	buttonContainer.ZIndex = 12
-	buttonContainer.Parent = itemFrame
-	
-	local buttonLayout = Instance.new("UIListLayout")
-	buttonLayout.FillDirection = Enum.FillDirection.Vertical
-	buttonLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	buttonLayout.Padding = UDim.new(0, 4)
-	buttonLayout.Parent = buttonContainer
+
+	local template = container:FindFirstChild("PetItemTemplate")
+	local itemFrame: Frame
+	if template and template:IsA("Frame") then
+		itemFrame = template:Clone()
+		itemFrame.Name = petId
+		itemFrame.Visible = true
+		itemFrame.LayoutOrder = layoutOrder or 1
+		itemFrame.Parent = container
+
+		-- If the template is from an older UI build (missing our expected structure),
+		-- fall back to a fully scripted card so buttons/stats still work.
+		local actionContainer = itemFrame:FindFirstChild("ActionContainer", true)
+		local equipBtn = itemFrame:FindFirstChild("EquipButton", true)
+		local gardenBtn = itemFrame:FindFirstChild("GardenButton", true)
+		if not actionContainer or not equipBtn or not gardenBtn then
+			itemFrame:Destroy()
+			itemFrame = createFallbackPetCard()
+		end
+	else
+		itemFrame = createFallbackPetCard()
+	end
+
+	itemFrame.ZIndex = 11
+	itemFrame.Size = UDim2.new(1, -10, 0, 110)
+	itemFrame.BackgroundColor3 = isEquipped and THEME.TealGem or (isInGarden and THEME.MossGreen or THEME.WoodPanel)
+
+	local gradient = itemFrame:FindFirstChild("Gradient")
+	if gradient and gradient:IsA("UIGradient") then
+		if isEquipped then
+			gradient.Color = ColorSequence.new(THEME.TealGem, THEME.ForestDeep)
+		elseif isInGarden then
+			gradient.Color = ColorSequence.new(THEME.MossGreen, THEME.ForestDeep)
+		else
+			gradient.Color = ColorSequence.new(THEME.WoodPanel, THEME.WoodBark)
+		end
+	end
+
+	local stroke = itemFrame:FindFirstChildWhichIsA("UIStroke")
+	if stroke then
+		stroke.Color = rarityColor
+		stroke.Transparency = 0.2
+	end
+
+	local iconLabel = itemFrame:FindFirstChild("PetIcon", true)
+	if iconLabel and iconLabel:IsA("TextLabel") then
+		iconLabel.Text = config.Icon or "🐾"
+		iconLabel.TextColor3 = THEME.TextLight
+	end
+
+	local nameLabel = itemFrame:FindFirstChild("PetName", true)
+	if nameLabel and nameLabel:IsA("TextLabel") then
+		nameLabel.Text = displayName
+		nameLabel.TextColor3 = rarityColor
+	end
+
+	local statsLabel = itemFrame:FindFirstChild("StatsLabel", true)
+	if statsLabel and statsLabel:IsA("TextLabel") then
+		statsLabel.Text = string.format("Size: %.2f | Weight: %.2f", petSize, petWeight)
+	end
+
+	local boostLabel = itemFrame:FindFirstChild("BoostLabel", true)
+	if boostLabel and boostLabel:IsA("TextLabel") then
+		boostLabel.Text = string.format("Boost: %.1f%%", actualBoost * 100)
+	end
+
+	local statusLabel = itemFrame:FindFirstChild("StatusLabel", true)
+	if statusLabel and statusLabel:IsA("TextLabel") then
+		if isEquipped then
+			statusLabel.Text = "✓ EQUIPPED"
+			statusLabel.TextColor3 = THEME.TextGold
+		elseif isInGarden then
+			statusLabel.Text = "🏡 IN GARDEN"
+			statusLabel.TextColor3 = THEME.MossGreen
+		else
+			statusLabel.Text = ""
+			statusLabel.TextColor3 = THEME.TextMoss
+		end
+	end
 	
 	-- Max caps
 	local maxEquipped = Constants.MAX_EQUIPPED_PETS or 3
 	local maxGarden = Constants.MAX_GARDEN_PETS or 7
 	local currentEquipped = playerInventory.EquippedPets and #playerInventory.EquippedPets or 0
 	local currentGarden = playerInventory.GardenPets and #playerInventory.GardenPets or 0
-	
-	-- Equip/Unequip button
-	if isEquipped then
-		local unequipButton = Instance.new("TextButton")
-		unequipButton.Size = UDim2.new(1, 0, 0, 24)
-		unequipButton.BackgroundColor3 = THEME.WoodBark
-		unequipButton.Text = "Unequip"
-		unequipButton.TextColor3 = THEME.TextLight
-		unequipButton.Font = Enum.Font.GothamBold
-		unequipButton.TextSize = 11
-		unequipButton.ZIndex = 13
-		unequipButton.LayoutOrder = 1
-		unequipButton.Parent = buttonContainer
-		
-		Instance.new("UICorner", unequipButton).CornerRadius = UDim.new(0, 6)
-		
-		unequipButton.MouseButton1Click:Connect(function()
-			playSound("ButtonClick")
-			local unequipEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.UNEQUIP_PET)
-			if unequipEvent then
-				unequipEvent:FireServer(petId)
-				playSound("PetUnequip")
-				showNotification("Unequipped " .. displayName, THEME.WoodPanel, "🐾")
-			end
-		end)
-	else
-		local equipButton = Instance.new("TextButton")
-		equipButton.Size = UDim2.new(1, 0, 0, 24)
-		equipButton.BackgroundColor3 = currentEquipped < maxEquipped and THEME.TealGem or THEME.ForestDark
-		equipButton.Text = currentEquipped < maxEquipped and "Equip" or ("Full " .. maxEquipped .. "/" .. maxEquipped)
-		equipButton.TextColor3 = THEME.TextLight
-		equipButton.Font = Enum.Font.GothamBold
-		equipButton.TextSize = 11
-		equipButton.ZIndex = 13
-		equipButton.LayoutOrder = 1
-		equipButton.Parent = buttonContainer
-		
-		Instance.new("UICorner", equipButton).CornerRadius = UDim.new(0, 6)
-		
-		if currentEquipped < maxEquipped then
+
+	local equipButton = itemFrame:FindFirstChild("EquipButton", true)
+	if equipButton and equipButton:IsA("TextButton") then
+		local baseColor = THEME.TealGem
+		if isEquipped then
+			baseColor = THEME.WoodBark
+			equipButton.Text = "Unequip"
+			equipButton.BackgroundColor3 = baseColor
 			equipButton.MouseButton1Click:Connect(function()
 				playSound("ButtonClick")
-				local equipEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.EQUIP_PET)
-				if equipEvent then
-					equipEvent:FireServer(petId)
-					playSound("PetEquip")
-					showNotification("Equipped " .. displayName, THEME.TealGem, "🐾")
+				local unequipEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.UNEQUIP_PET)
+				if unequipEvent then
+					unequipEvent:FireServer(petId)
+					playSound("PetUnequip")
+					showNotification("Unequipped " .. displayName, THEME.WoodPanel, "🐾")
 				end
 			end)
+		else
+			local canEquip = currentEquipped < maxEquipped
+			baseColor = canEquip and THEME.TealGem or THEME.ForestDark
+			equipButton.Text = canEquip and "Equip" or ("Full " .. maxEquipped .. "/" .. maxEquipped)
+			equipButton.BackgroundColor3 = baseColor
+			if canEquip then
+				equipButton.MouseButton1Click:Connect(function()
+					playSound("ButtonClick")
+					local equipEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.EQUIP_PET)
+					if equipEvent then
+						equipEvent:FireServer(petId)
+						playSound("PetEquip")
+						showNotification("Equipped " .. displayName, THEME.TealGem, "🐾")
+					end
+				end)
+			end
 		end
-	end
-	
-	-- Garden add/remove button
-	if isInGarden then
-		local removeGardenButton = Instance.new("TextButton")
-		removeGardenButton.Size = UDim2.new(1, 0, 0, 24)
-		removeGardenButton.BackgroundColor3 = THEME.WoodBark
-		removeGardenButton.Text = "Remove from Garden"
-		removeGardenButton.TextColor3 = THEME.TextLight
-		removeGardenButton.Font = Enum.Font.GothamBold
-		removeGardenButton.TextSize = 10
-		removeGardenButton.ZIndex = 13
-		removeGardenButton.LayoutOrder = 2
-		removeGardenButton.Parent = buttonContainer
-		
-		Instance.new("UICorner", removeGardenButton).CornerRadius = UDim.new(0, 6)
-		
-		removeGardenButton.MouseButton1Click:Connect(function()
-			playSound("ButtonClick")
-			local removeEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.REMOVE_GARDEN_PET)
-			if removeEvent then
-				removeEvent:FireServer(petId)
-				showNotification("Removed from garden", THEME.WoodPanel, "🏡")
+		equipButton.MouseEnter:Connect(function()
+			if equipButton.BackgroundColor3 ~= THEME.ForestDark then
+				equipButton.BackgroundColor3 = THEME.TealGlow
 			end
 		end)
-	elseif not isEquipped then
-		local addGardenButton = Instance.new("TextButton")
-		addGardenButton.Size = UDim2.new(1, 0, 0, 24)
-		addGardenButton.BackgroundColor3 = currentGarden < maxGarden and THEME.MossGreen or THEME.ForestDark
-		addGardenButton.Text = currentGarden < maxGarden and "Add to Garden" or ("Garden Full " .. maxGarden .. "/" .. maxGarden)
-		addGardenButton.TextColor3 = THEME.TextLight
-		addGardenButton.Font = Enum.Font.GothamBold
-		addGardenButton.TextSize = 10
-		addGardenButton.ZIndex = 13
-		addGardenButton.LayoutOrder = 2
-		addGardenButton.Parent = buttonContainer
-		
-		Instance.new("UICorner", addGardenButton).CornerRadius = UDim.new(0, 6)
-		
-		if currentGarden < maxGarden then
-			addGardenButton.MouseButton1Click:Connect(function()
+		equipButton.MouseLeave:Connect(function()
+			equipButton.BackgroundColor3 = baseColor
+		end)
+	end
+
+	local gardenButton = itemFrame:FindFirstChild("GardenButton", true)
+	if gardenButton and gardenButton:IsA("TextButton") then
+		local baseColor = THEME.MossGreen
+		if isInGarden then
+			baseColor = THEME.WoodBark
+			gardenButton.Text = "Remove"
+			gardenButton.BackgroundColor3 = baseColor
+			gardenButton.MouseButton1Click:Connect(function()
 				playSound("ButtonClick")
-				local addEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.ADD_GARDEN_PET)
-				if addEvent then
-					addEvent:FireServer(petId)
-					showNotification("Added to garden!", THEME.MossGreen, "🏡")
+				local removeEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.REMOVE_GARDEN_PET)
+				if removeEvent then
+					removeEvent:FireServer(petId)
+					showNotification("Removed from garden", THEME.WoodPanel, "🏡")
 				end
 			end)
+		elseif not isEquipped then
+			local canAdd = currentGarden < maxGarden
+			baseColor = canAdd and THEME.MossGreen or THEME.ForestDark
+			gardenButton.Text = canAdd and "Add" or ("Full " .. maxGarden .. "/" .. maxGarden)
+			gardenButton.BackgroundColor3 = baseColor
+			if canAdd then
+				gardenButton.MouseButton1Click:Connect(function()
+					playSound("ButtonClick")
+					local addEvent = ReplicatedStorage:FindFirstChild(Constants.EVENTS.ADD_GARDEN_PET)
+					if addEvent then
+						addEvent:FireServer(petId)
+						showNotification("Added to garden!", THEME.MossGreen, "🏡")
+					end
+				end)
+			end
+		else
+			-- If equipped, garden action is not allowed in current rules.
+			baseColor = THEME.ForestDark
+			gardenButton.Text = "Garden"
+			gardenButton.BackgroundColor3 = baseColor
 		end
+		gardenButton.MouseEnter:Connect(function()
+			if gardenButton.BackgroundColor3 ~= THEME.ForestDark then
+				gardenButton.BackgroundColor3 = THEME.LeafPanel or THEME.TealGlow
+			end
+		end)
+		gardenButton.MouseLeave:Connect(function()
+			gardenButton.BackgroundColor3 = baseColor
+		end)
 	end
 end
 
@@ -2081,9 +2183,13 @@ updatePetsWindow = function()
 		return 
 	end
 	
-	-- Clear existing
+	-- Clear existing (preserve templates and layout/padding)
 	for _, child in ipairs(petsScroll:GetChildren()) do
-		if child:IsA("Frame") or child:IsA("TextLabel") then child:Destroy() end
+		if child:IsA("Frame") and not string.find(child.Name, "Template") then
+			child:Destroy()
+		elseif child:IsA("TextLabel") then
+			child:Destroy()
+		end
 	end
 	
 	-- Add header with counts
@@ -2691,6 +2797,7 @@ function UIHandler.Initialize()
 
 	collapseToSinglePanel(shopWindow)
 	collapseToSinglePanel(sellWindow)
+	collapseToSinglePanel(petsWindow)
 	
 	-- =============================================================================
 	-- NAVIGATION BUTTONS (Top Center)
