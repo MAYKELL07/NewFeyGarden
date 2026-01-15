@@ -147,11 +147,7 @@ function EconomyService.InitializePlayerData(player)
 		attempts = attempts + 1
 		profile = DataService.GetProfile(player.UserId)
 		
-		if not profile then
-			if attempts % 4 == 0 then
-				-- print(string.format("EconomyService: Waiting for profile to load for %s (attempt %d/%d)", player.Name, attempts, maxAttempts))
-			end
-		end
+		-- Intentionally silent until profile loads
 	end
 	
 	if not profile then

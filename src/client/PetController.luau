@@ -441,8 +441,12 @@ local function createPetModel(petInstance, petName)
 	local motorConnectedParts = {}
 	for _, motor in ipairs(petModel:GetDescendants()) do
 		if motor:IsA("Motor6D") then
-			if motor.Part0 then motorConnectedParts[motor.Part0] = true end
-			if motor.Part1 then motorConnectedParts[motor.Part1] = true end
+			if motor.Part0 then
+				motorConnectedParts[motor.Part0] = true
+			end
+			if motor.Part1 then
+				motorConnectedParts[motor.Part1] = true
+			end
 		end
 	end
 	
@@ -708,12 +712,6 @@ local function getPlayerGardenInfo()
 	return nil
 end
 
--- Legacy function for compatibility
-local function getPlayerGardenCenter()
-	local info = getPlayerGardenInfo()
-	return info and info.center or nil
-end
-
 -- Update garden pets roaming behavior with box bounds and idle
 local function updateGardenPets(deltaTime)
 	if #PetController.GardenPets == 0 then return end
@@ -946,7 +944,6 @@ end
 
 -- Apply pet boost to nearby plants (for both equipped and garden pets)
 local function applyPetBoosts()
-	local Config = require(ReplicatedStorage.Shared.Config)
 	local gardensFolder = Workspace:FindFirstChild(Config.World.GardensFolder)
 	if not gardensFolder then return end
 	
@@ -1122,7 +1119,7 @@ function PetController.SpawnGardenPets(gardenPets)
 	-- Get garden info with retry (garden may not be assigned yet)
 	local gardenInfo = nil
 	local maxRetries = 10
-	for attempt = 1, maxRetries do
+	for _ = 1, maxRetries do
 		gardenInfo = getPlayerGardenInfo()
 		if gardenInfo then
 			break
@@ -1314,13 +1311,13 @@ function PetController.Initialize()
 	
 	-- Update pets on every frame
 	RunService.RenderStepped:Connect(function(dt)
-		updateEquippedPets(dt)
+		updateEquippedPets()
 		updateGardenPets(dt)
 		applyPetBoosts()
 	end)
 	
 	-- Respawn pets when character respawns
-	player.CharacterAdded:Connect(function(character)
+	player.CharacterAdded:Connect(function()
 		task.wait(1) -- Wait for character to load
 		
 		-- Respawn equipped pets

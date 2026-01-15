@@ -40,6 +40,16 @@ Config.World = {
 	TeleportPartName = "TpPart",         -- Name of the part where players spawn in their garden
 	ShopPartName = "ShopPart",           -- Name of the part that has the ProximityPrompt for opening shop
 	SellPartName = "SellPart",           -- Name of the part that has the ProximityPrompt for opening sell shop
+	PetShopPartName = "PetShopPart",     -- Name of the part that has the ProximityPrompt for opening the pet/egg shop
+	GearShopPartName = "GearShopPart",   -- Name of the part that has the ProximityPrompt for opening the gear shop (if used)
+}
+
+-- ============================================================================
+-- PROXIMITY PROMPT TUNING
+-- ============================================================================
+Config.ProximityPrompts = {
+	-- All shop-related prompts are scaled by this factor (user-requested: 2x).
+	ShopDistanceMultiplier = 1,
 }
 
 -- ============================================================================

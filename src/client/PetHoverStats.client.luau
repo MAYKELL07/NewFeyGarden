@@ -15,12 +15,10 @@ if not sharedFolder then
 end
 
 local Constants = require(sharedFolder:WaitForChild("Constants"))
-local Config = require(sharedFolder:WaitForChild("Config"))
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 local camera = workspace.CurrentCamera
-local mouse = player:GetMouse()
 
 local PetHoverStats = {}
 
@@ -40,7 +38,6 @@ local THEME = {
 -- State
 local tooltipUI = nil
 local currentHoveredPet = nil
-local lastMousePosition = Vector2.new(0, 0)
 
 -- Create the tooltip UI
 local function createTooltip()

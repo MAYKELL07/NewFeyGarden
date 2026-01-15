@@ -14,7 +14,6 @@ if not sharedFolder then
 end
 
 local Config = require(sharedFolder:WaitForChild("Config"))
-local NPCModule = require(sharedFolder:WaitForChild("NPCModule"))
 
 local player = Players.LocalPlayer
 
@@ -32,17 +31,14 @@ end
 local HighlightProximityHandler = {}
 
 -- Configuration
-local HIGHLIGHT_DISTANCE = 15 -- studs - distance to start highlighting
-local PROMPT_DISTANCE = 8 -- studs - distance for prompt to be interactable
+local DEFAULT_HIGHLIGHT_DISTANCE = 15 -- studs - fallback distance to start highlighting
+local DEFAULT_PROMPT_DISTANCE = 8 -- studs - fallback distance for prompt to be interactable
+local SHOP_DISTANCE_MULTIPLIER = (Config.ProximityPrompts and Config.ProximityPrompts.ShopDistanceMultiplier) or 1
 local NPC_FOLDER_NAME = "NPCs"
 
 -- Theme colors
-local HIGHLIGHT_COLOR = Color3.fromRGB(180, 220, 255) -- Soft blue highlight
 local NPC_HIGHLIGHT_COLOR = Color3.fromRGB(200, 180, 255) -- Purple for NPCs
 local FRUIT_HIGHLIGHT_COLOR = Color3.fromRGB(255, 200, 150) -- Orange for fruits
-
--- Track highlights
-local activeHighlights = {}
 
 -- Store all interactable objects
 local interactables = {} -- {instance = {type = "NPC"/"Fruit", highlight = Highlight?, prompt = ProximityPrompt?}}
@@ -96,6 +92,21 @@ local function removeHighlight(instance)
 end
 
 -- Register an interactable
+local function applyShopPromptDistance(prompt)
+	if not prompt then return end
+	if prompt:GetAttribute("ShopDistanceScaled") then return end
+
+	if SHOP_DISTANCE_MULTIPLIER and SHOP_DISTANCE_MULTIPLIER ~= 1 then
+		local baseDistance = prompt.MaxActivationDistance
+		if not baseDistance or baseDistance <= 0 then
+			baseDistance = 10
+		end
+		prompt.MaxActivationDistance = baseDistance * SHOP_DISTANCE_MULTIPLIER
+	end
+
+	prompt:SetAttribute("ShopDistanceScaled", true)
+end
+
 local function registerInteractable(instance, interactType)
 	if interactables[instance] then return end
 	
@@ -109,17 +120,18 @@ local function registerInteractable(instance, interactType)
 	
 	-- For NPCs, ensure they have a ProximityPrompt and set up dialogue trigger
 	if interactType == "NPC" then
-		local targetPart = nil
-		if instance:IsA("Model") then
-			targetPart = instance.PrimaryPart or instance:FindFirstChildWhichIsA("BasePart")
-		elseif instance:IsA("BasePart") then
-			targetPart = instance
-		end
+		-- Prefer existing prompt inside NPC model
+		local prompt = instance:FindFirstChildOfClass("ProximityPrompt", true)
 		
-		if targetPart then
-			-- Find existing prompt or create one
-			local prompt = instance:FindFirstChildOfClass("ProximityPrompt", true)
-			if not prompt then
+		if not prompt then
+			local targetPart = nil
+			if instance:IsA("Model") then
+				targetPart = instance.PrimaryPart or instance:FindFirstChildWhichIsA("BasePart", true)
+			elseif instance:IsA("BasePart") then
+				targetPart = instance
+			end
+			
+			if targetPart then
 				prompt = Instance.new("ProximityPrompt")
 				prompt.ObjectText = instance.Name
 				prompt.ActionText = "Talk"
@@ -128,69 +140,86 @@ local function registerInteractable(instance, interactType)
 				prompt.RequiresLineOfSight = false
 				prompt.Parent = targetPart
 			end
-			
-			-- Determine NPC type from name or attribute
-			local npcType = instance:GetAttribute("NPCType") or instance.Name
-			local lowerType = npcType:lower()
-			-- Normalize NPC type - check for keywords
-			if lowerType:find("pet") or lowerType:find("egg") then
-				npcType = "PetStore"
-			elseif lowerType:find("fruit") or lowerType:find("sell") or lowerType:find("market") then
-				npcType = "FruitSeller"
-			elseif lowerType:find("seed") or lowerType:find("shop") or lowerType:find("flora") then
-				npcType = "SeedShop"
-			else
-				-- If no keywords match, try to use NPCModule.NPC_TYPES as fallback
-				-- Default to SeedShop for unrecognized NPCs
-				warn("[HighlightProximityHandler] Unknown NPC type:", npcType, "- defaulting to SeedShop")
-				npcType = "SeedShop"
-			end
-			
-			-- Connect prompt triggered to dialogue handler
-			prompt.Triggered:Connect(function(triggeringPlayer)
-				if triggeringPlayer ~= player then return end
-				
-				print("[HighlightProximityHandler] Prompt triggered for NPC:", instance.Name, "Type:", npcType) -- DEBUG
-				
-				local dialogueHandler = getNPCDialogueHandler()
-				print("[HighlightProximityHandler] DialogueHandler loaded:", dialogueHandler ~= nil) -- DEBUG
-				if dialogueHandler and dialogueHandler.OpenDialogue then
-					dialogueHandler.OpenDialogue(npcType, instance)
-				else
-					print("[HighlightProximityHandler] ERROR: DialogueHandler or OpenDialogue not found!") -- DEBUG
-				end
-			end)
-			
-			interactables[instance].prompt = prompt
-			interactables[instance].npcType = npcType
 		end
+		
+		if not prompt then
+			return
+		end
+
+		applyShopPromptDistance(prompt)
+		
+		-- Determine NPC type from name or attribute
+		local npcType = instance:GetAttribute("NPCType") or instance.Name
+		local lowerType = npcType:lower()
+		-- Normalize NPC type - check for keywords
+		npcType = "SeedShop"
+		if lowerType:find("gear") or lowerType:find("tool") then
+			npcType = "GearShop"
+		elseif lowerType:find("pet") or lowerType:find("egg") then
+			npcType = "PetStore"
+		elseif lowerType:find("fruit") or lowerType:find("sell") or lowerType:find("market") then
+			npcType = "FruitSeller"
+		end
+		
+		-- Connect prompt triggered to dialogue handler
+		prompt.Triggered:Connect(function(triggeringPlayer)
+			if triggeringPlayer ~= player then return end
+			local dialogueHandler = getNPCDialogueHandler()
+			if dialogueHandler and dialogueHandler.OpenDialogue then
+				dialogueHandler.OpenDialogue(npcType, instance)
+			end
+		end)
+		
+		interactables[instance].prompt = prompt
+		interactables[instance].npcType = npcType
 	end
 end
 
 -- Scan for NPCs
 local function findAllNPCs()
-	print("[HighlightProximityHandler] Scanning for NPCs...") -- DEBUG
-	
 	local npcsFolder = workspace:FindFirstChild(NPC_FOLDER_NAME)
 	if npcsFolder then
-		print("[HighlightProximityHandler] Found NPC folder with", #npcsFolder:GetChildren(), "children") -- DEBUG
 		for _, npc in ipairs(npcsFolder:GetChildren()) do
 			if npc:IsA("Model") then
-				print("[HighlightProximityHandler] Registering NPC:", npc.Name) -- DEBUG
 				registerInteractable(npc, "NPC")
 			end
 		end
-	else
-		print("[HighlightProximityHandler] NPC folder not found!") -- DEBUG
 	end
 	
 	-- Check for specific NPC names
-	local npcNames = {"SeedShop", "FruitSeller", "PetStore", "SeedShopNPC", "FruitSellerNPC", "PetStoreNPC"}
+	local npcNames = {
+		"SeedShop",
+		"FruitSeller",
+		"PetStore",
+		"GearShop",
+		"PetShop",
+		"SeedShopNPC",
+		"FruitSellerNPC",
+		"PetStoreNPC",
+		"GearShopNPC",
+		"PetShopNPC",
+	}
 	for _, npcName in ipairs(npcNames) do
 		local npc = workspace:FindFirstChild(npcName, true)
 		if npc and npc:IsA("Model") then
-			print("[HighlightProximityHandler] Found NPC by name:", npcName) -- DEBUG
 			registerInteractable(npc, "NPC")
+		end
+	end
+
+	-- Broad scan for NPC models by attribute or Humanoid
+	for _, descendant in ipairs(workspace:GetDescendants()) do
+		if descendant:IsA("Model") and not interactables[descendant] then
+			if Players:GetPlayerFromCharacter(descendant) then
+				continue
+			end
+			local npcType = descendant:GetAttribute("NPCType")
+			local lowerName = descendant.Name:lower()
+			local hasPrompt = descendant:FindFirstChildWhichIsA("ProximityPrompt", true) ~= nil
+			local nameLooksLikeNPC = lowerName:find("shop") or lowerName:find("seller") or lowerName:find("merchant")
+				or lowerName:find("pet") or lowerName:find("egg") or lowerName:find("gear") or lowerName:find("seed")
+			if npcType or hasPrompt or nameLooksLikeNPC then
+				registerInteractable(descendant, "NPC")
+			end
 		end
 	end
 end
@@ -235,7 +264,6 @@ local function update()
 	
 	local closestPromptInstance = nil
 	local closestPromptDistance = math.huge
-	local closestPrompt = nil
 	
 	-- Scan for new fruits (they spawn dynamically)
 	findAllFruits()
@@ -252,8 +280,22 @@ local function update()
 		
 		local distance = (playerPos - instancePos).Magnitude
 		
+		-- Resolve prompt (if any) for distance tuning
+		local prompt = data.prompt
+		if not prompt then
+			if instance:IsA("Model") then
+				prompt = instance:FindFirstChildOfClass("ProximityPrompt", true)
+			elseif instance:IsA("BasePart") then
+				prompt = instance:FindFirstChildOfClass("ProximityPrompt")
+			end
+			data.prompt = prompt
+		end
+
+		local highlightDistance = (prompt and prompt.MaxActivationDistance) or DEFAULT_HIGHLIGHT_DISTANCE
+		local promptDistance = (prompt and prompt.MaxActivationDistance) or DEFAULT_PROMPT_DISTANCE
+
 		-- Handle highlighting
-		if distance <= HIGHLIGHT_DISTANCE then
+		if distance <= highlightDistance then
 			if not data.highlighted then
 				createHighlight(instance, data.highlightColor)
 				data.highlighted = true
@@ -266,24 +308,16 @@ local function update()
 		end
 		
 		-- Find closest prompt
-		if distance <= PROMPT_DISTANCE then
-			local prompt = nil
-			if instance:IsA("Model") then
-				prompt = instance:FindFirstChildOfClass("ProximityPrompt", true)
-			elseif instance:IsA("BasePart") then
-				prompt = instance:FindFirstChildOfClass("ProximityPrompt")
-			end
-			
+		if distance <= promptDistance then
 			if prompt and distance < closestPromptDistance then
 				closestPromptInstance = instance
 				closestPromptDistance = distance
-				closestPrompt = prompt
 			end
 		end
 	end
 	
 	-- Handle single prompt visibility (only show closest prompt)
-	for instance, data in pairs(interactables) do
+	for instance in pairs(interactables) do
 		if not instance or not instance.Parent then continue end
 		
 		local prompts = {}
@@ -295,7 +329,9 @@ local function update()
 			end
 		elseif instance:IsA("BasePart") then
 			local p = instance:FindFirstChildOfClass("ProximityPrompt")
-			if p then table.insert(prompts, p) end
+			if p then
+				table.insert(prompts, p)
+			end
 		end
 		
 		for _, prompt in ipairs(prompts) do

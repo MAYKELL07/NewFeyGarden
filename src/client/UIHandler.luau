@@ -2185,9 +2185,7 @@ updatePetsWindow = function()
 	
 	-- Clear existing (preserve templates and layout/padding)
 	for _, child in ipairs(petsScroll:GetChildren()) do
-		if child:IsA("Frame") and not string.find(child.Name, "Template") then
-			child:Destroy()
-		elseif child:IsA("TextLabel") then
+		if (child:IsA("Frame") and not string.find(child.Name, "Template")) or child:IsA("TextLabel") then
 			child:Destroy()
 		end
 	end
@@ -2974,9 +2972,35 @@ function UIHandler.Initialize()
 	end
 	
 	-- Setup proximity prompts
-	local shopPart = workspace:WaitForChild(Config.World.ShopPartName, 10)
+	local function findWorldPart(name)
+		if not name then return nil end
+		local part = workspace:FindFirstChild(name)
+		if not part then
+			part = workspace:FindFirstChild(name, true)
+		end
+		return part
+	end
+
+	local function applyShopPromptDistance(prompt)
+		if not prompt then return end
+		if prompt:GetAttribute("ShopDistanceScaled") then return end
+
+		local multiplier = (Config.ProximityPrompts and Config.ProximityPrompts.ShopDistanceMultiplier) or 1
+		if multiplier and multiplier ~= 1 then
+			local baseDistance = prompt.MaxActivationDistance
+			if not baseDistance or baseDistance <= 0 then
+				baseDistance = 10
+			end
+			prompt.MaxActivationDistance = baseDistance * multiplier
+		end
+
+		prompt:SetAttribute("ShopDistanceScaled", true)
+	end
+
+	local shopPart = findWorldPart(Config.World.ShopPartName)
 	if shopPart then
-		local prompt = shopPart:FindFirstChildOfClass("ProximityPrompt")
+		local prompt = shopPart:FindFirstChildWhichIsA("ProximityPrompt", true)
+		applyShopPromptDistance(prompt)
 		if prompt then
 			prompt.Triggered:Connect(function()
 				if shopWindow then
@@ -2992,9 +3016,10 @@ function UIHandler.Initialize()
 		end
 	end
 	
-	local sellPart = workspace:WaitForChild(Config.World.SellPartName, 10)
+	local sellPart = findWorldPart(Config.World.SellPartName)
 	if sellPart then
-		local prompt = sellPart:FindFirstChildOfClass("ProximityPrompt")
+		local prompt = sellPart:FindFirstChildWhichIsA("ProximityPrompt", true)
+		applyShopPromptDistance(prompt)
 		if prompt then
 			prompt.Triggered:Connect(function()
 				if sellWindow then
@@ -3012,15 +3037,36 @@ function UIHandler.Initialize()
 	-- =============================================================================
 	-- PROXIMITY PROMPTS FOR PET SHOP (Egg Shop + Pet Preview)
 	-- =============================================================================
-	local petShopPart = workspace:WaitForChild("PetShopPart", 10)
+	local petShopPart = findWorldPart(Config.World.PetShopPartName)
 	if petShopPart then
-		local prompt = petShopPart:FindFirstChildOfClass("ProximityPrompt")
+		local prompt = petShopPart:FindFirstChildWhichIsA("ProximityPrompt", true)
+		applyShopPromptDistance(prompt)
 		if prompt then
 			prompt.Triggered:Connect(function()
 				if petShopWindow then
 					NPCUIHandler.MoveCameraToNPC("PetCamera")
 					updatePetShopWindow()
 					petShopWindow.Visible = true
+					hideHUD()
+					playSound("WindowOpen")
+				end
+			end)
+		end
+	end
+
+	-- =============================================================================
+	-- PROXIMITY PROMPTS FOR GEAR SHOP (Tools)
+	-- =============================================================================
+	local gearShopPart = findWorldPart(Config.World.GearShopPartName)
+	if gearShopPart then
+		local prompt = gearShopPart:FindFirstChildWhichIsA("ProximityPrompt", true)
+		applyShopPromptDistance(prompt)
+		if prompt then
+			prompt.Triggered:Connect(function()
+				if gearShopWindow then
+					NPCUIHandler.MoveCameraToNPC("GearCamera")
+					updateGearShopWindow()
+					gearShopWindow.Visible = true
 					hideHUD()
 					playSound("WindowOpen")
 				end

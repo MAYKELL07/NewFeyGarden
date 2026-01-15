@@ -157,11 +157,6 @@ local function updatePlantParticles(plantModel)
 	
 	if emitters.weather.Enabled ~= hasWeatherBuff then
 		emitters.weather.Enabled = hasWeatherBuff
-		if hasWeatherBuff then
-			-- print(string.format("[BuffParticles] Weather particles enabled for %s (Weather: %s)", plantModel.Name, currentWeather))
-		else
-			-- print(string.format("[BuffParticles] Weather particles disabled for %s (Weather: %s)", plantModel.Name, currentWeather))
-		end
 	end
 	
 	-- Update weather particle color based on weather type
@@ -177,22 +172,12 @@ local function updatePlantParticles(plantModel)
 	local isWatered = BuffsModule.IsWatered(plantModel)
 	if emitters.watered.Enabled ~= isWatered then
 		emitters.watered.Enabled = isWatered
-		if isWatered then
-			-- print(string.format("[BuffParticles] Watered particles enabled for %s", plantModel.Name))
-		else
-			-- print(string.format("[BuffParticles] Watered particles disabled for %s", plantModel.Name))
-		end
 	end
 	
 	-- Check pet buff
 	local hasPetBuff = plantModel:GetAttribute("PetBoost") == true
 	if emitters.pet.Enabled ~= hasPetBuff then
 		emitters.pet.Enabled = hasPetBuff
-		if hasPetBuff then
-			-- print(string.format("[BuffParticles] Pet particles enabled for %s", plantModel.Name))
-		else
-			-- print(string.format("[BuffParticles] Pet particles disabled for %s", plantModel.Name))
-		end
 	end
 end
 

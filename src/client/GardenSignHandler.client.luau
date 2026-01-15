@@ -6,8 +6,6 @@
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
 
 local sharedFolder = ReplicatedStorage:WaitForChild("Shared", 10)
 if not sharedFolder then
@@ -16,7 +14,6 @@ if not sharedFolder then
 end
 
 local Config = require(sharedFolder:WaitForChild("Config"))
-local Constants = require(sharedFolder:WaitForChild("Constants"))
 
 local player = Players.LocalPlayer
 
@@ -33,15 +30,6 @@ local THEME = {
 	HeartRed = Color3.fromRGB(255, 100, 120),
 }
 
--- Track liked gardens (prevents spam-liking)
-local likedGardens = {}
-
--- Get or create RemoteEvents for likes
-local function getRemotes()
-	local likeEvent = ReplicatedStorage:FindFirstChild("GardenLike")
-	local getLikesFunc = ReplicatedStorage:FindFirstChild("GetGardenLikes")
-	return likeEvent, getLikesFunc
-end
 
 -- Setup the existing SurfaceGui on a garden sign
 local function setupSignSurfaceGui(garden, ownerUserId, ownerName, gardenLevel, likeCount)
@@ -302,7 +290,9 @@ local function watchGardenChanges()
 							local surfaceGui = signPart:FindFirstChildOfClass("SurfaceGui")
 							if surfaceGui then
 								local content = surfaceGui:FindFirstChild("GardenSignContent")
-								if content then content:Destroy() end
+								if content then
+									content:Destroy()
+								end
 							end
 						end
 					end

@@ -3,8 +3,6 @@
 
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Schema = require(script.Parent.Schema)
 
@@ -159,9 +157,7 @@ local function SaveProfile(userId, isShuttingDown)
 	
 	IsSaving[userId] = false
 	
-	if success then
-		-- print(string.format("[DataService] ✓ Saved profile for UserId %d (Coins: %d, Seeds: %d types, Plants: %d slots)", userId, profile.Coins or 0, seedCount, plantCount))
-	else
+	if not success then
 		warn(string.format("[DataService] ✗ Failed to save profile for UserId %d", userId))
 	end
 	
@@ -175,7 +171,7 @@ local function AutosaveLoop()
 	while true do
 		task.wait(SAVE_INTERVAL)
 		
-		for userId, profile in pairs(Profiles) do
+		for userId, _ in pairs(Profiles) do
 			local last = lastAutosave[userId] or 0
 			
 			if os.clock() - last >= SAVE_INTERVAL then
@@ -197,16 +193,14 @@ Players.PlayerAdded:Connect(function(player)
 	Profiles[player.UserId] = profile
 	DataLoaded[player.UserId] = loaded
 	
-	if loaded then
-		-- print(string.format("[DataService] ✓ Loaded profile for %s (UserId: %d)", player.Name, player.UserId))
-	else
+	if not loaded then
 		warn(string.format("[DataService] ⚠ Using default profile for %s (UserId: %d)", player.Name, player.UserId))
 	end
 end)
 
 -- Player leave: Save profile
 Players.PlayerRemoving:Connect(function(player)
-	local success = SaveProfile(player.UserId, false)
+	SaveProfile(player.UserId, false)
 	
 	-- Release session lock
 	SessionLocks[player.UserId] = nil
@@ -218,11 +212,10 @@ end)
 game:BindToClose(function()
 	-- print("[DataService] Server shutting down - saving all profiles...")
 	
-	local savePromises = {}
 	for userId, _ in pairs(Profiles) do
-		table.insert(savePromises, task.spawn(function()
+		task.spawn(function()
 			SaveProfile(userId, true)
-		end))
+		end)
 	end
 	
 	-- Wait for all saves to complete (with timeout)

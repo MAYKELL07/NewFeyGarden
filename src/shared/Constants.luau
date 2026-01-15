@@ -893,6 +893,11 @@ Constants.FRUIT_CONFIG = {
 	
 	-- Fruit model size relative to plant
 	FruitScale = 0.4,
+
+	-- If present, these templates are cloned to render fruit.
+	-- Fruit1..N instances are treated as spawn markers (positions), not as the fruit visuals.
+	-- Recommended: add a per-plant FruitVisual (Model or BasePart) and keep Fruit1..N as invisible markers.
+	FruitTemplateNames = { "FruitVisual", "Fruit" },
 	
 	-- ProximityPrompt settings
 	PromptHoldDuration = 0.3,

@@ -9,7 +9,6 @@ local ProximityPromptService = game:GetService("ProximityPromptService")
 
 local Constants = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Constants"))
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
-local BuffsModule = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("BuffsModule"))
 
 -- Import ClientState for synced weather
 local ClientState = require(script.Parent:WaitForChild("UI"):WaitForChild("ClientState"))
@@ -128,7 +127,7 @@ local function createInfoUI()
 	countdownLabel.LayoutOrder = 3
 	countdownLabel.Parent = infoFrame
 	
-	-- Fruit countdown label (for bloom stage fruit reveals)
+	-- Fruit count label (ready/total)
 	fruitCountdownLabel = Instance.new("TextLabel")
 	fruitCountdownLabel.Name = "FruitCountdown"
 	fruitCountdownLabel.Size = UDim2.new(1, 0, 0, 0)
@@ -140,7 +139,7 @@ local function createInfoUI()
 	fruitCountdownLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
 	fruitCountdownLabel.TextXAlignment = Enum.TextXAlignment.Center
 	fruitCountdownLabel.LayoutOrder = 4
-	fruitCountdownLabel.Visible = false  -- Only shown during bloom
+		fruitCountdownLabel.Visible = true
 	fruitCountdownLabel.Parent = infoFrame
 
 	-- Boost label
@@ -350,42 +349,41 @@ local function showPlantInfo(plantModel, mousePosition: Vector2)
 	
 	-- Update countdown using stageDisplay (which has fallback logic)
 	local timeRemaining, nextStageText = calculateTimeToNextStage(plantModel)
+	local availableFruits, attachedFruits, totalFruits = getFruitAvailability(plantModel)
+	local nextRevealTime = plantModel:GetAttribute("NextFruitRevealTime") or 0
+
+	local countdownParts = {}
 	if stageDisplay == Constants.GROWTH_STAGES.BLOOM then
-		local availableFruits, attachedFruits, totalFruits = getFruitAvailability(plantModel)
-		local harvestRemovesPlant = plantModel:GetAttribute("HarvestRemovesPlant")
-		local nextRevealTime = plantModel:GetAttribute("NextFruitRevealTime") or 0
-
 		countdownLabel.TextColor3 = Color3.fromRGB(255, 200, 100)
-		if totalFruits <= 0 then
-			countdownLabel.Text = "🍎 Fruits: 0/0"
-			fruitCountdownLabel.Visible = false
-		else
-			countdownLabel.Text = string.format("🍎 Ready: %d/%d", availableFruits, attachedFruits)
+		table.insert(countdownParts, "Plant: Bloom")
 
-			if availableFruits < attachedFruits then
-				local timeToNextFruit = 0
-				if nextRevealTime > 0 then
-					timeToNextFruit = math.max(0, nextRevealTime - os.time())
-				end
-				fruitCountdownLabel.Text = "⏱ Next fruit: " .. formatTime(timeToNextFruit)
-				fruitCountdownLabel.Visible = true
-			elseif attachedFruits == 0 then
-				fruitCountdownLabel.Text = "✨ Waiting for regrowth"
-				fruitCountdownLabel.Visible = true
-			else
-				if harvestRemovesPlant then
-					fruitCountdownLabel.Text = "✨ All fruit collected • Harvest removes plant"
-				else
-					fruitCountdownLabel.Text = "✨ All fruit collected"
-				end
-				fruitCountdownLabel.Visible = true
+		local fruitPart = ""
+		if totalFruits <= 0 then
+			fruitPart = "Fruit: --"
+		elseif availableFruits < attachedFruits then
+			local timeToNextFruit = 0
+			if nextRevealTime > 0 then
+				timeToNextFruit = math.max(0, nextRevealTime - os.time())
 			end
+			fruitPart = "Fruit: " .. formatTime(timeToNextFruit)
+		elseif attachedFruits == 0 then
+			fruitPart = "Fruit: Regrowing"
+		else
+			fruitPart = "Fruit: Ready"
 		end
+		table.insert(countdownParts, fruitPart)
 	else
-		countdownLabel.Text = "⏱ " .. formatTime(timeRemaining) .. " " .. nextStageText
 		countdownLabel.TextColor3 = Color3.fromRGB(150, 255, 150)
-		fruitCountdownLabel.Visible = false
+		local plantPart = "Plant: " .. formatTime(timeRemaining)
+		if nextStageText ~= "" then
+			plantPart = plantPart .. " " .. nextStageText
+		end
+		table.insert(countdownParts, plantPart)
 	end
+	countdownLabel.Text = "⏱ " .. table.concat(countdownParts, " • ")
+
+	local displayTotal = math.max(totalFruits or 0, availableFruits or 0)
+	fruitCountdownLabel.Text = string.format("🍎 %d/%d", availableFruits, displayTotal)
 
 	-- Boost info with compact "badge row" style
 	local mult = buffStatus.TotalMultiplier or 1
@@ -452,7 +450,7 @@ local function removeHighlight(part)
 end
 
 -- Handle proximity prompt shown (fruit highlight on)
-local function onPromptShown(prompt, inputType)
+local function onPromptShown(prompt)
 	local fruit = prompt.Parent
 	if not fruit then return end
 	
@@ -468,7 +466,7 @@ local function onPromptShown(prompt, inputType)
 end
 
 -- Handle proximity prompt hidden (fruit highlight off)
-local function onPromptHidden(prompt, inputType)
+local function onPromptHidden(prompt)
 	local fruit = prompt.Parent
 	if not fruit then return end
 	
@@ -560,12 +558,7 @@ local function onUpdate()
 		local plant = findPlantFromPart(result.Instance)
 		
 		if plant then
-			if plant ~= currentHoveredPlant then
-				showPlantInfo(plant, mousePosition)
-			else
-				-- Fully refresh tooltip while hovered (realtime countdowns + buffs)
-				showPlantInfo(plant, mousePosition)
-			end
+			showPlantInfo(plant, mousePosition)
 		else
 			hidePlantInfo()
 		end

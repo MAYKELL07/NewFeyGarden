@@ -105,7 +105,7 @@ local function resolveNPCPart(npcModel)
 
 	if npcModel:IsA("Model") then
 		-- Try to find Head that is a BasePart
-		local head = npcModel:FindFirstChild("Head")
+		local head = npcModel:FindFirstChild("Head", true)
 		if head and head:IsA("BasePart") then
 			return head
 		end
@@ -116,7 +116,7 @@ local function resolveNPCPart(npcModel)
 		end
 		
 		-- Find any BasePart
-		return npcModel:FindFirstChildWhichIsA("BasePart")
+		return npcModel:FindFirstChildWhichIsA("BasePart", true)
 	end
 
 	return nil
